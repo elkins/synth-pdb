@@ -37,6 +37,26 @@ CA_DISTANCE = (
 
 PDB_ATOM_FORMAT = "ATOM  {atom_number: >5} {atom_name: <4}{alt_loc: <1}{residue_name: >3} {chain_id: <1}{residue_number: >4}{insertion_code: <1}   {x_coord: >8.3f}{y_coord: >8.3f}{z_coord: >8.3f}{occupancy: >6.2f}{temp_factor: >6.2f}          {element: >2}{charge: >2}"
 
+# Helper function to create a minimal PDB ATOM line
+def create_atom_line(
+    atom_number,
+    atom_name,
+    residue_name,
+    chain_id,
+    residue_number,
+    x,
+    y,
+    z,
+    element,
+    alt_loc="",
+    insertion_code=""
+):
+    return (
+        f"ATOM  {atom_number: >5} {atom_name: <4}{alt_loc: <1}{residue_name: >3} {chain_id: <1}"
+        f"{residue_number: >4}{insertion_code: <1}   "
+        f"{x: >8.3f}{y: >8.3f}{z: >8.3f}{1.00: >6.2f}{0.00: >6.2f}          "
+        f"{element: >2}  "
+    )
 
 def _rotate_coords_2d(coords: np.ndarray, angle_deg: float) -> np.ndarray:
     """

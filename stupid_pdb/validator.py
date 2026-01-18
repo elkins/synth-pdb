@@ -26,22 +26,32 @@ class PDBValidator:
     and Ramachandran angles.
     """
 
-    def __init__(self, pdb_content: str):
-        self.pdb_content = pdb_content
-        self.atoms = self._parse_pdb_atoms()
+    def __init__(self, pdb_content: str = None, parsed_atoms: list[dict] = None):
+        if pdb_content:
+            self.pdb_content = pdb_content
+            self.atoms = self._parse_pdb_atoms(pdb_content)
+        elif parsed_atoms is not None:
+            # Ensure coords are numpy arrays if they aren't already
+            for atom in parsed_atoms:
+                if isinstance(atom['coords'], list):
+                    atom['coords'] = np.array(atom['coords'])
+            self.atoms = parsed_atoms
+            self.pdb_content = self.atoms_to_pdb_content(self.atoms) # Reconstruct pdb_content for consistency
+        else:
+            raise ValueError("Either pdb_content or parsed_atoms must be provided.")
+
         self.grouped_atoms = self._group_atoms_by_residue()
         self.sequences_by_chain = self._get_sequences_by_chain()
         self.violations = []  # Stores detected violations
-        # Debugging print statement, will remove later
-        print(f"PDBValidator initialized with pdb_content length: {len(pdb_content) if pdb_content else 0}")
 
-    def _parse_pdb_atoms(self) -> list[dict]:
+    @staticmethod
+    def _parse_pdb_atoms(pdb_content: str) -> list[dict]:
         """
         Parses the PDB content and extracts atom information, specifically coordinates.
         Returns a list of dictionaries, each representing an atom with residue and chain info.
         """
         parsed_atoms = []
-        for line in self.pdb_content.splitlines():
+        for line in pdb_content.splitlines():
             stripped_line = line.strip()
             if stripped_line.startswith("ATOM") or stripped_line.startswith("HETATM"):
                 try:
@@ -81,6 +91,34 @@ class PDBValidator:
                         f"Could not parse PDB ATOM/HETATM line: {line.strip()} - {e}"
                     )
         return parsed_atoms
+
+    def get_atoms(self) -> list[dict]:
+        """
+        Returns a deep copy of the parsed atom data.
+        """
+        # Return a deep copy to allow external modification without affecting internal state directly
+        return [atom.copy() for atom in self.atoms]
+
+    @staticmethod
+    def atoms_to_pdb_line(atom_data: dict) -> str:
+        """
+        Converts a single atom dictionary back into a PDB ATOM line.
+        """
+        x, y, z = atom_data["coords"]
+        return (
+            f"ATOM  {atom_data['atom_number']: >5} {atom_data['atom_name']: <4}{atom_data['alt_loc']: <1}"
+            f"{atom_data['residue_name']: >3} {atom_data['chain_id']: <1}{atom_data['residue_number']: >4}"
+            f"{atom_data['insertion_code']: <1}   "
+            f"{x: >8.3f}{y: >8.3f}{z: >8.3f}{atom_data['occupancy']: >6.2f}"
+            f"{atom_data['temp_factor']: >6.2f}          {atom_data['element']: >2}{atom_data['charge']: <2}"
+        )
+
+    @staticmethod
+    def atoms_to_pdb_content(atom_list: list[dict]) -> str:
+        """
+        Converts a list of atom dictionaries into a full PDB content string.
+        """
+        return "\n".join([PDBValidator.atoms_to_pdb_line(atom) for atom in atom_list]) + "\n"
 
     def _group_atoms_by_residue(self):
         """
@@ -532,6 +570,7 @@ class PDBValidator:
                     continue
 
                 distance = self._calculate_distance(atom1["coords"], atom2["coords"])
+                print(f"DEBUG: Steric clash check between atom {atom1['atom_number']} and {atom2['atom_number']}. Distance: {distance:.2f}Å")
 
                 # General atom-atom minimum distance check
                 if distance < min_atom_distance:
@@ -540,6 +579,7 @@ class PDBValidator:
                         f"and {atom2['atom_name']}-{atom2['residue_number']}-{atom2['chain_id']} are too close ({distance:.2f}Å). "
                         f"Minimum allowed: {min_atom_distance:.2f}Å."
                     )
+                    print(f"DEBUG: Added violation: {self.violations[-1]}")
 
                 # Calpha-Calpha minimum distance check for non-consecutive residues
                 if (
@@ -556,6 +596,7 @@ class PDBValidator:
                             f"in chain {atom1['chain_id']} are too close ({distance:.2f}Å). "
                             f"Minimum allowed for non-adjacent: {min_ca_distance:.2f}Å."
                         )
+                        print(f"DEBUG: Added violation: {self.violations[-1]}")
 
                 # Van der Waals overlap check
                 vdw1 = VAN_DER_WAALS_RADII.get(
@@ -571,6 +612,7 @@ class PDBValidator:
                         f"({atom2['element']}) overlap significantly ({distance:.2f}Å). "
                         f"Expected minimum vdW distance: {expected_min_vdw_distance:.2f}Å (radii sum: {vdw1 + vdw2:.2f}Å)."
                     )
+                    print(f"DEBUG: Added violation: {self.violations[-1]}")
 
     def validate_peptide_plane(self, tolerance_deg: float = 30.0):
         """
@@ -776,3 +818,114 @@ class PDBValidator:
                         f"Residues {i + 1}-{i + 2} shows uncommon Asparagine-Glycine motif (NG). "
                         f"Often found in beta-turns, but flagging for review."
                     )
+
+    @staticmethod
+    def _apply_steric_clash_tweak(
+        parsed_atoms: list[dict],
+        push_distance: float = 0.1,
+        min_atom_distance: float = 2.0,
+        vdw_overlap_factor: float = 0.8,
+    ) -> list[dict]:
+        """
+        Applies a simple heuristic to alleviate steric clashes by pushing clashing atoms apart.
+        Modifies a copy of the input parsed_atoms list.
+        """
+        modified_atoms = [atom.copy() for atom in parsed_atoms]
+        num_atoms = len(modified_atoms)
+
+        if num_atoms < 2:
+            return modified_atoms
+
+        # Reconstruct bonded_pairs for this iteration (simplified, as in validate_steric_clashes)
+        # This is a bit inefficient but avoids deep refactoring for now.
+        temp_grouped_atoms = {}
+        for atom in modified_atoms:
+            chain_id = atom["chain_id"]
+            residue_number = atom["residue_number"]
+            atom_name = atom["atom_name"]
+
+            if chain_id not in temp_grouped_atoms:
+                temp_grouped_atoms[chain_id] = {}
+            if residue_number not in temp_grouped_atoms[chain_id]:
+                temp_grouped_atoms[chain_id][residue_number] = {}
+            temp_grouped_atoms[chain_id][residue_number][atom_name] = atom
+
+        bonded_pairs = set()
+        for chain_id, residues_in_chain in temp_grouped_atoms.items():
+            sorted_res_numbers = sorted(residues_in_chain.keys())
+            for i, res_num in enumerate(sorted_res_numbers):
+                current_res_atoms = residues_in_chain[res_num]
+                n_atom = current_res_atoms.get("N")
+                ca_atom = current_res_atoms.get("CA")
+                c_atom = current_res_atoms.get("C")
+                o_atom = current_res_atoms.get("O")
+
+                if n_atom and ca_atom:
+                    bonded_pairs.add(tuple(sorted((n_atom["atom_number"], ca_atom["atom_number"]))))
+                if ca_atom and c_atom:
+                    bonded_pairs.add(tuple(sorted((ca_atom["atom_number"], c_atom["atom_number"]))))
+                if c_atom and o_atom:
+                    bonded_pairs.add(tuple(sorted((c_atom["atom_number"], o_atom["atom_number"]))))
+                
+                if i + 1 < len(sorted_res_numbers):
+                    next_res_num = sorted_res_numbers[i + 1]
+                    next_res_atoms = residues_in_chain.get(next_res_num)
+                    if c_atom and next_res_atoms and next_res_atoms.get("N"):
+                        next_n_atom = next_res_atoms["N"]
+                        bonded_pairs.add(tuple(sorted((c_atom["atom_number"], next_n_atom["atom_number"]))))
+
+        clashing_atom_indices = set() # Store indices of atoms involved in a clash
+
+        for i in range(num_atoms):
+            atom1 = modified_atoms[i]
+            for j in range(i + 1, num_atoms):
+                atom2 = modified_atoms[j]
+
+                # Skip if atoms are identical or covalently bonded
+                if atom1["atom_number"] == atom2["atom_number"] or \
+                   tuple(sorted((atom1["atom_number"], atom2["atom_number"]))) in bonded_pairs:
+                    continue
+
+                distance = PDBValidator._calculate_distance(atom1["coords"], atom2["coords"])
+
+                clash_detected = False
+                # Check for minimum distance violation
+                if distance < min_atom_distance:
+                    clash_detected = True
+
+                # Check for Van der Waals overlap violation
+                vdw1 = VAN_DER_WAALS_RADII.get(atom1["element"], 1.5)
+                vdw2 = VAN_DER_WAALS_RADII.get(atom2["element"], 1.5)
+                expected_min_vdw_distance = (vdw1 + vdw2) * vdw_overlap_factor
+                if distance < expected_min_vdw_distance:
+                    clash_detected = True
+
+                if clash_detected:
+                    # Calculate required push distance to resolve the clash
+                    required_push = 0.0
+                    if distance < min_atom_distance:
+                        required_push = max(required_push, min_atom_distance - distance)
+                    
+                    vdw1 = VAN_DER_WAALS_RADII.get(atom1["element"], 1.5)
+                    vdw2 = VAN_DER_WAALS_RADII.get(atom2["element"], 1.5)
+                    expected_min_vdw_distance = (vdw1 + vdw2) * vdw_overlap_factor
+                    if distance < expected_min_vdw_distance:
+                        required_push = max(required_push, expected_min_vdw_distance - distance)
+
+                    # Apply push to alleviate clash
+                    vector = atom2["coords"] - atom1["coords"]
+                    norm_vector = np.linalg.norm(vector)
+                    
+                    if norm_vector > 1e-6: # Avoid division by zero if atoms are exactly superimposed
+                        unit_vector = vector / norm_vector
+                        # Each atom moves by half the required push
+                        modified_atoms[i]["coords"] -= unit_vector * (required_push / 2.0)
+                        modified_atoms[j]["coords"] += unit_vector * (required_push / 2.0)
+                        clashing_atom_indices.add(i)
+                        clashing_atom_indices.add(j)
+        
+        # Log how many atoms were tweaked
+        if clashing_atom_indices:
+            logger.debug(f"Applied tweaks to {len(clashing_atom_indices)} atoms to resolve steric clashes.")
+
+        return modified_atoms

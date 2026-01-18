@@ -1,6 +1,7 @@
 # stupid-pdb
 
-A simple tool to generate PDB files with random linear amino acid sequences.
+A simple tool to naively generate Protein Data Bank (PDB) files.
+The resulting linear peptide may not necessarily be biophysically realistic or useful for any purpose.
 
 ## Table of Contents
 - [Installation](#installation)
