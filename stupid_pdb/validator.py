@@ -1,0 +1,778 @@
+import numpy as np
+import logging
+
+from .data import (
+    BOND_LENGTH_N_CA,
+    BOND_LENGTH_CA_C,
+    BOND_LENGTH_C_N,
+    BOND_LENGTH_C_O,
+    ANGLE_N_CA_C,
+    ANGLE_C_N_CA,
+    ANGLE_CA_C_O,
+    VAN_DER_WAALS_RADII,
+    CHARGED_AMINO_ACIDS,
+    POSITIVE_AMINO_ACIDS,
+    NEGATIVE_AMINO_ACIDS,
+    HYDROPHOBIC_AMINO_ACIDS,
+    POLAR_UNCHARGED_AMINO_ACIDS,
+)
+
+logger = logging.getLogger(__name__)
+
+
+class PDBValidator:
+    """
+    A class to validate PDB structures for various violations like bond lengths, angles,
+    and Ramachandran angles.
+    """
+
+    def __init__(self, pdb_content: str):
+        self.pdb_content = pdb_content
+        self.atoms = self._parse_pdb_atoms()
+        self.grouped_atoms = self._group_atoms_by_residue()
+        self.sequences_by_chain = self._get_sequences_by_chain()
+        self.violations = []  # Stores detected violations
+        # Debugging print statement, will remove later
+        print(f"PDBValidator initialized with pdb_content length: {len(pdb_content) if pdb_content else 0}")
+
+    def _parse_pdb_atoms(self) -> list[dict]:
+        """
+        Parses the PDB content and extracts atom information, specifically coordinates.
+        Returns a list of dictionaries, each representing an atom with residue and chain info.
+        """
+        parsed_atoms = []
+        for line in self.pdb_content.splitlines():
+            stripped_line = line.strip()
+            if stripped_line.startswith("ATOM") or stripped_line.startswith("HETATM"):
+                try:
+                    atom_number = int(stripped_line[6:11].strip())
+                    atom_name = stripped_line[12:16].strip()
+                    alt_loc = stripped_line[16].strip()
+                    residue_name = stripped_line[17:20].strip()
+                    chain_id = stripped_line[21].strip()
+                    residue_number = int(stripped_line[22:26].strip())
+                    insertion_code = stripped_line[26].strip()
+                    x = float(stripped_line[30:38])
+                    y = float(stripped_line[38:46])
+                    z = float(stripped_line[46:54])
+                    occupancy = float(stripped_line[54:60].strip())
+                    temp_factor = float(stripped_line[60:66].strip())
+                    element = stripped_line[76:78].strip()
+                    charge = stripped_line[78:80].strip()
+
+                    parsed_atoms.append(
+                        {
+                            "atom_number": atom_number,
+                            "atom_name": atom_name,
+                            "alt_loc": alt_loc,
+                            "residue_name": residue_name,
+                            "chain_id": chain_id,
+                            "residue_number": residue_number,
+                            "insertion_code": insertion_code,
+                            "coords": np.array([x, y, z]),
+                            "occupancy": occupancy,
+                            "temp_factor": temp_factor,
+                            "element": element,
+                            "charge": charge,
+                        }
+                    )
+                except (ValueError, IndexError) as e:
+                    logger.warning(
+                        f"Could not parse PDB ATOM/HETATM line: {line.strip()} - {e}"
+                    )
+        return parsed_atoms
+
+    def _group_atoms_by_residue(self):
+        """
+        Groups parsed atoms by chain ID, then by residue number, then by atom name.
+        Structure: {chain_id: {residue_number: {atom_name: atom_data}}}
+        """
+        grouped_atoms = {}
+        for atom in self.atoms:
+            chain_id = atom["chain_id"]
+            residue_number = atom["residue_number"]
+            atom_name = atom["atom_name"]
+
+            if chain_id not in grouped_atoms:
+                grouped_atoms[chain_id] = {}
+            if residue_number not in grouped_atoms[chain_id]:
+                grouped_atoms[chain_id][residue_number] = {}
+
+            grouped_atoms[chain_id][residue_number][atom_name] = atom
+        return grouped_atoms
+
+    def _get_sequences_by_chain(self) -> dict[str, list[str]]:
+        """
+        Extracts the amino acid sequences (list of 3-letter codes) for each chain.
+        """
+        sequences = {}
+        for chain_id, residues_in_chain in self.grouped_atoms.items():
+            sorted_res_numbers = sorted(residues_in_chain.keys())
+            chain_sequence = []
+            for res_num in sorted_res_numbers:
+                # We can use any atom in the residue to get its name, CA is common.
+                ca_atom = residues_in_chain[res_num].get('CA')
+                if ca_atom:
+                    chain_sequence.append(ca_atom['residue_name'])
+                else:
+                    # Fallback if CA is not present (e.g., C-alpha only models don't have side chains)
+                    # Try to get residue name from first available atom
+                    first_atom = next(iter(residues_in_chain[res_num].values()), None)
+                    if first_atom:
+                        chain_sequence.append(first_atom['residue_name'])
+            sequences[chain_id] = chain_sequence
+        return sequences
+
+    @staticmethod
+    def _calculate_distance(coord1: np.ndarray, coord2: np.ndarray) -> float:
+        """
+        Calculates the Euclidean distance between two 3D coordinates.
+        """
+        return np.linalg.norm(coord1 - coord2)
+
+    @staticmethod
+    def _calculate_angle(
+        coord1: np.ndarray, coord2: np.ndarray, coord3: np.ndarray
+    ) -> float:
+        """
+        Calculates the angle (in degrees) formed by three coordinates, with coord2 as the vertex.
+        """
+        vec1 = coord1 - coord2
+        vec2 = coord3 - coord2
+
+        # Avoid division by zero for zero-length vectors
+        norm_vec1 = np.linalg.norm(vec1)
+        norm_vec2 = np.linalg.norm(vec2)
+
+        if norm_vec1 == 0 or norm_vec2 == 0:
+            return 0.0  # Or raise an error, depending on desired behavior for degenerate cases
+
+        cosine_angle = np.dot(vec1, vec2) / (norm_vec1 * norm_vec2)
+        # Ensure cosine_angle is within [-1, 1] to avoid issues with arccos due to floating point inaccuracies
+        cosine_angle = np.clip(cosine_angle, -1.0, 1.0)
+        angle_rad = np.arccos(cosine_angle)
+        return np.degrees(angle_rad)
+
+    @staticmethod
+    def _calculate_dihedral_angle(
+        p1: np.ndarray, p2: np.ndarray, p3: np.ndarray, p4: np.ndarray
+    ) -> float:
+        """
+        Calculates the dihedral angle (in degrees) defined by four points (p1, p2, p3, p4).
+        """
+        b1 = p2 - p1
+        b2 = p3 - p2
+        b3 = p4 - p3
+
+        # Normalize b2 for better numerical stability
+        b2 = b2 / np.linalg.norm(b2)
+
+        v = b1 - np.dot(b1, b2) * b2
+        w = b3 - np.dot(b3, b2) * b2
+
+        x = np.dot(v, w)
+        y = np.dot(np.cross(b2, v), w)
+
+        return np.degrees(np.arctan2(y, x))
+
+    def get_violations(self) -> list[str]:
+        """
+        Returns a list of detected violations.
+        """
+        return self.violations
+
+    def validate_bond_lengths(self, tolerance: float = 0.05):
+        """
+        Validates backbone bond lengths (N-CA, CA-C, C-O, C-N peptide bond) against standard values.
+        """
+        logger.info("Performing bond length validation.")
+
+        bond_standards = {
+            "N-CA": BOND_LENGTH_N_CA,
+            "CA-C": BOND_LENGTH_CA_C,
+            "C-O": BOND_LENGTH_C_O,
+            "C-N_peptide": BOND_LENGTH_C_N,
+        }
+
+        for chain_id, residues_in_chain in self.grouped_atoms.items():
+            sorted_res_numbers = sorted(residues_in_chain.keys())
+            for i, res_num in enumerate(sorted_res_numbers):
+                current_res_atoms = residues_in_chain[res_num]
+
+                n_atom = current_res_atoms.get("N")
+                ca_atom = current_res_atoms.get("CA")
+                c_atom = current_res_atoms.get("C")
+                o_atom = current_res_atoms.get("O")
+
+                # Check N-CA bond
+                if n_atom and ca_atom:
+                    actual_length = self._calculate_distance(
+                        n_atom["coords"], ca_atom["coords"]
+                    )
+                    expected_length = bond_standards["N-CA"]
+                    if abs(actual_length - expected_length) > tolerance:
+                        self.violations.append(
+                            f"Bond length violation: Chain {chain_id}, Residue {res_num} {n_atom['residue_name']} "
+                            f"N-CA bond ({actual_length:.2f}Å) deviates from standard ({expected_length:.2f}Å) "
+                            f"by more than {tolerance}Å. Actual: {actual_length:.2f}"
+                        )
+
+                # Check CA-C bond
+                if ca_atom and c_atom:
+                    actual_length = self._calculate_distance(
+                        ca_atom["coords"], c_atom["coords"]
+                    )
+                    expected_length = bond_standards["CA-C"]
+                    if abs(actual_length - expected_length) > tolerance:
+                        self.violations.append(
+                            f"Bond length violation: Chain {chain_id}, Residue {res_num} {ca_atom['residue_name']} "
+                            f"CA-C bond ({actual_length:.2f}Å) deviates from standard ({expected_length:.2f}Å) "
+                            f"by more than {tolerance}Å. Actual: {actual_length:.2f}"
+                        )
+
+                # Check C-O bond
+                if c_atom and o_atom:
+                    actual_length = self._calculate_distance(
+                        c_atom["coords"], o_atom["coords"]
+                    )
+                    expected_length = bond_standards["C-O"]
+                    if abs(actual_length - expected_length) > tolerance:
+                        self.violations.append(
+                            f"Bond length violation: Chain {chain_id}, Residue {res_num} {c_atom['residue_name']} "
+                            f"C-O bond ({actual_length:.2f}Å) deviates from standard ({expected_length:.2f}Å) "
+                            f"by more than {tolerance}Å. Actual: {actual_length:.2f}"
+                        )
+
+                # Check C (current) - N (next) peptide bond
+                if i + 1 < len(sorted_res_numbers):
+                    next_res_num = sorted_res_numbers[i + 1]
+                    next_res_atoms = residues_in_chain.get(next_res_num)
+
+                    if c_atom and next_res_atoms and next_res_atoms.get("N"):
+                        next_n_atom = next_res_atoms["N"]
+                        actual_length = self._calculate_distance(
+                            c_atom["coords"], next_n_atom["coords"]
+                        )
+                        expected_length = bond_standards["C-N_peptide"]
+                        if abs(actual_length - expected_length) > tolerance:
+                            self.violations.append(
+                                f"Bond length violation: Chain {chain_id}, Residue {res_num} {c_atom['residue_name']}-"
+                                f"Residue {next_res_num} {next_n_atom['residue_name']} peptide bond ({actual_length:.2f}Å) "
+                                f"deviates from standard ({expected_length:.2f}Å) by more than {tolerance}Å. Actual: {actual_length:.2f}"
+                            )
+
+    def validate_bond_angles(self, tolerance: float = 5.0):
+        """
+        Validates backbone bond angles (N-CA-C, CA-C-O, CA-C-N_next) against standard values.
+        """
+        logger.info("Performing bond angle validation.")
+
+        angle_standards = {
+            "N-CA-C": ANGLE_N_CA_C,
+            "CA-C-O": ANGLE_CA_C_O,
+            "CA-C-N_peptide": ANGLE_C_N_CA,  # This is the C(i)-N(i+1)-CA(i+1) angle
+        }
+
+        for chain_id, residues_in_chain in self.grouped_atoms.items():
+            sorted_res_numbers = sorted(residues_in_chain.keys())
+            for i, res_num in enumerate(sorted_res_numbers):
+                current_res_atoms = residues_in_chain[res_num]
+
+                n_atom = current_res_atoms.get("N")
+                ca_atom = current_res_atoms.get("CA")
+                c_atom = current_res_atoms.get("C")
+                o_atom = current_res_atoms.get("O")
+
+                # Check N-CA-C angle
+                if n_atom and ca_atom and c_atom:
+                    actual_angle = self._calculate_angle(
+                        n_atom["coords"], ca_atom["coords"], c_atom["coords"]
+                    )
+                    expected_angle = angle_standards["N-CA-C"]
+                    if abs(actual_angle - expected_angle) > tolerance:
+                        self.violations.append(
+                            f"Bond angle violation: Chain {chain_id}, Residue {res_num} {ca_atom['residue_name']} "
+                            f"N-CA-C angle ({actual_angle:.2f}°) deviates from standard ({expected_angle:.2f}°) "
+                            f"by more than {tolerance}°. Actual: {actual_angle:.2f}"
+                        )
+
+                # Check CA-C-O angle
+                if ca_atom and c_atom and o_atom:
+                    actual_angle = self._calculate_angle(
+                        ca_atom["coords"], c_atom["coords"], o_atom["coords"]
+                    )
+                    expected_angle = angle_standards["CA-C-O"]
+                    if abs(actual_angle - expected_angle) > tolerance:
+                        self.violations.append(
+                            f"Bond angle violation: Chain {chain_id}, Residue {res_num} {c_atom['residue_name']} "
+                            f"CA-C-O angle ({actual_angle:.2f}°) deviates from standard ({expected_angle:.2f}°) "
+                            f"by more than {tolerance}°. Actual: {actual_angle:.2f}"
+                        )
+
+                # Check CA(i)-C(i)-N(i+1) angle (part of peptide bond)
+                # Note: The data.py 'ANGLE_C_N_CA' is for C(i-1)-N(i)-CA(i).
+                # We need C(i)-N(i+1)-CA(i+1) for the peptide linkage angle at C(i).
+                # Let's assume a standard angle for C(i)-N(i+1)-CA(i+1) which is close to 121.7 from data.py (C-N-CA)
+                if i + 1 < len(sorted_res_numbers):
+                    next_res_num = sorted_res_numbers[i + 1]
+                    next_res_atoms = residues_in_chain.get(next_res_num)
+
+                    if (
+                        ca_atom
+                        and c_atom
+                        and next_res_atoms
+                        and next_res_atoms.get("N")
+                    ):
+                        next_n_atom = next_res_atoms["N"]
+                        # The angle we are checking is C(i)-N(i+1)-CA(i+1)
+                        actual_angle = self._calculate_angle(
+                            c_atom["coords"],
+                            next_n_atom["coords"],
+                            next_res_atoms.get("CA")["coords"],
+                        )
+                        expected_angle = angle_standards[
+                            "CA-C-N_peptide"
+                        ]  # This is C-N-CA from data.py
+                        if abs(actual_angle - expected_angle) > tolerance:
+                            self.violations.append(
+                                f"Bond angle violation: Chain {chain_id}, Residue {res_num} {c_atom['residue_name']}-"
+                                f"Residue {next_res_num} {next_n_atom['residue_name']} "
+                                f"C-N-CA angle ({actual_angle:.2f}°) deviates from standard ({expected_angle:.2f}°) "
+                                f"by more than {tolerance}°. Actual: {actual_angle:.2f}"
+                            )
+
+    def validate_ramachandran(self):
+        """
+        Validates Ramachandran angles (Phi/Psi) against simplified allowed regions.
+        Reports angles outside very generous common regions.
+        """
+        logger.info("Performing Ramachandran angle validation (simplified regions).")
+
+        # Simplified allowed regions (approximate and broad for demonstration)
+        # These are *not* precise and real Ramachandran plots are much more detailed and AA-specific.
+        # Values in degrees.
+        # General residues (non-Gly, non-Pro)
+        GENERIC_ALLOWED_PHI = (-180, -30)
+        GENERIC_ALLOWED_PSI = (-100, 100) # Temporarily made more restrictive for testing
+
+        # Glycine has much broader allowed regions
+        GLYCINE_ALLOWED_PHI = (-180, 180)
+        GLYCINE_ALLOWED_PSI = (-180, 180)
+
+        # Proline has restricted regions
+        PROLINE_ALLOWED_PHI = (-80, -30)
+        PROLINE_ALLOWED_PSI = (-50, 50)
+
+        for chain_id, residues_in_chain in self.grouped_atoms.items():
+            sorted_res_numbers = sorted(residues_in_chain.keys())
+            for i, res_num in enumerate(sorted_res_numbers):
+                current_res_atoms = residues_in_chain[res_num]
+                res_name = current_res_atoms.get("CA", {}).get("residue_name")
+
+                phi = None
+                psi = None
+
+                # Calculate Phi (Φ): C(i-1) - N(i) - CA(i) - C(i)
+                # Requires previous residue's C atom
+                if i > 0:
+                    prev_res_num = sorted_res_numbers[i - 1]
+                    prev_res_atoms = residues_in_chain.get(prev_res_num)
+
+                    if (
+                        prev_res_atoms
+                        and prev_res_atoms.get("C")
+                        and current_res_atoms.get("N")
+                        and current_res_atoms.get("CA")
+                        and current_res_atoms.get("C")
+                    ):
+                        p1 = prev_res_atoms["C"]["coords"]
+                        p2 = current_res_atoms["N"]["coords"]
+                        p3 = current_res_atoms["CA"]["coords"]
+                        p4 = current_res_atoms["C"]["coords"]
+                        phi = self._calculate_dihedral_angle(p1, p2, p3, p4)
+
+                # Calculate Psi (Ψ): N(i) - CA(i) - C(i) - N(i+1)
+                # Requires next residue's N atom
+                if i < len(sorted_res_numbers) - 1:
+                    next_res_num = sorted_res_numbers[i + 1]
+                    next_res_atoms = residues_in_chain.get(next_res_num)
+
+                    if (
+                        current_res_atoms.get("N")
+                        and current_res_atoms.get("CA")
+                        and current_res_atoms.get("C")
+                        and next_res_atoms
+                        and next_res_atoms.get("N")
+                    ):
+                        p1 = current_res_atoms["N"]["coords"]
+                        p2 = current_res_atoms["CA"]["coords"]
+                        p3 = current_res_atoms["C"]["coords"]
+                        p4 = next_res_atoms["N"]["coords"]
+                        psi = self._calculate_dihedral_angle(p1, p2, p3, p4)
+
+                if phi is not None or psi is not None:
+                    phi_str = f"{phi:.2f}°" if phi is not None else "N/A"
+                    psi_str = f"{psi:.2f}°" if psi is not None else "N/A"
+                    print(f"DEBUG: Calculated Phi: {phi_str}, Psi: {psi_str} for Chain {chain_id}, Residue {res_num} {res_name}") # Debug print
+                    violation_detected = False
+
+                    if res_name == "GLY":
+                        allowed_phi = GLYCINE_ALLOWED_PHI
+                        allowed_psi = GLYCINE_ALLOWED_PSI
+                    elif res_name == "PRO":
+                        allowed_phi = PROLINE_ALLOWED_PHI
+                        allowed_psi = PROLINE_ALLOWED_PSI
+                    else:
+                        allowed_phi = GENERIC_ALLOWED_PHI
+                        allowed_psi = GENERIC_ALLOWED_PSI
+
+                    if phi is not None and (
+                        phi < allowed_phi[0] or phi > allowed_phi[1]
+                    ):
+                        self.violations.append(
+                            f"Ramachandran violation (Phi): Chain {chain_id}, Residue {res_num} {res_name} "
+                            f"Phi angle ({phi:.2f}°) outside allowed range {allowed_phi}."
+                        )
+                        violation_detected = True
+
+                    if psi is not None and (
+                        psi < allowed_psi[0] or psi > allowed_psi[1]
+                    ):
+                        self.violations.append(
+                            f"Ramachandran violation (Psi): Chain {chain_id}, Residue {res_num} {res_name} "
+                            f"Psi angle ({psi:.2f}°) outside allowed range {allowed_psi}."
+                        )
+                        violation_detected = True
+
+                    if not violation_detected and (phi is not None or psi is not None):
+                        phi_str = f"{phi:.2f}°" if phi is not None else "N/A"
+                        psi_str = f"{psi:.2f}°" if psi is not None else "N/A"
+                        logger.debug(
+                            f"Ramachandran angles for Chain {chain_id}, Residue {res_num} {res_name}: "
+                            f"Phi={phi_str}, Psi={psi_str} (within simplified allowed regions)"
+                        )
+
+    def validate_steric_clashes(
+        self,
+        min_atom_distance: float = 2.0,
+        min_ca_distance: float = 3.8,
+        vdw_overlap_factor: float = 0.8,
+    ):
+        """
+        Implements steric clash checks including:
+        - General atom-atom minimum distance (any atom-atom > min_atom_distance).
+        - Calpha-Calpha minimum distance (Calpha-Calpha > min_ca_distance for non-consecutive residues).
+        - Van der Waals radius overlap check.
+        Excludes covalently bonded atoms from these checks.
+        """
+        logger.info("Performing steric clash validation.")
+
+        num_atoms = len(self.atoms)
+        if num_atoms < 2:
+            return  # Not enough atoms to check for clashes
+
+        # Build a set of bonded pairs to exclude from clash checks.
+        # This is a simplification; a full bond perception algorithm would be more robust.
+        bonded_pairs = set()
+
+        # Intra-residue backbone bonds (N-CA, CA-C, C-O)
+        # Inter-residue peptide bond (C(i)-N(i+1))
+        for chain_id, residues_in_chain in self.grouped_atoms.items():
+            sorted_res_numbers = sorted(residues_in_chain.keys())
+            for i, res_num in enumerate(sorted_res_numbers):
+                current_res_atoms = residues_in_chain[res_num]
+
+                n_atom = current_res_atoms.get("N")
+                ca_atom = current_res_atoms.get("CA")
+                c_atom = current_res_atoms.get("C")
+                o_atom = current_res_atoms.get("O")
+
+                if n_atom and ca_atom:
+                    bonded_pairs.add(
+                        tuple(sorted((n_atom["atom_number"], ca_atom["atom_number"])))
+                    )
+                if ca_atom and c_atom:
+                    bonded_pairs.add(
+                        tuple(sorted((ca_atom["atom_number"], c_atom["atom_number"])))
+                    )
+                if c_atom and o_atom:
+                    bonded_pairs.add(
+                        tuple(sorted((c_atom["atom_number"], o_atom["atom_number"])))
+                    )
+
+                # Peptide bond C(i)-N(i+1)
+                if i + 1 < len(sorted_res_numbers):
+                    next_res_num = sorted_res_numbers[i + 1]
+                    next_res_atoms = residues_in_chain.get(next_res_num)
+                    if c_atom and next_res_atoms and next_res_atoms.get("N"):
+                        next_n_atom = next_res_atoms["N"]
+                        bonded_pairs.add(
+                            tuple(
+                                sorted(
+                                    (c_atom["atom_number"], next_n_atom["atom_number"])
+                                )
+                            )
+                        )
+
+        # Iterate over all unique pairs of atoms
+        for i in range(num_atoms):
+            atom1 = self.atoms[i]
+            for j in range(i + 1, num_atoms):
+                atom2 = self.atoms[j]
+
+                # Skip if atoms are identical (should not happen with range(i+1, num_atoms))
+                if atom1["atom_number"] == atom2["atom_number"]:
+                    continue
+
+                # Check if atoms are covalently bonded
+                if (
+                    tuple(sorted((atom1["atom_number"], atom2["atom_number"])))
+                    in bonded_pairs
+                ):
+                    continue
+
+                distance = self._calculate_distance(atom1["coords"], atom2["coords"])
+
+                # General atom-atom minimum distance check
+                if distance < min_atom_distance:
+                    self.violations.append(
+                        f"Steric clash (min distance): Atoms {atom1['atom_name']}-{atom1['residue_number']}-{atom1['chain_id']} "
+                        f"and {atom2['atom_name']}-{atom2['residue_number']}-{atom2['chain_id']} are too close ({distance:.2f}Å). "
+                        f"Minimum allowed: {min_atom_distance:.2f}Å."
+                    )
+
+                # Calpha-Calpha minimum distance check for non-consecutive residues
+                if (
+                    atom1["atom_name"] == "CA"
+                    and atom2["atom_name"] == "CA"
+                    and atom1["chain_id"] == atom2["chain_id"]
+                    and abs(atom1["residue_number"] - atom2["residue_number"]) > 1
+                ):  # Exclude adjacent CAs
+                    if distance < min_ca_distance:
+                        self.violations.append(
+                            f"Steric clash (CA-CA distance): Calpha atoms in "
+                            f"Residue {atom1['residue_number']} ({atom1['residue_name']}) and "
+                            f"Residue {atom2['residue_number']} ({atom2['residue_name']}) "
+                            f"in chain {atom1['chain_id']} are too close ({distance:.2f}Å). "
+                            f"Minimum allowed for non-adjacent: {min_ca_distance:.2f}Å."
+                        )
+
+                # Van der Waals overlap check
+                vdw1 = VAN_DER_WAALS_RADII.get(
+                    atom1["element"], 1.5
+                )  # Default to 1.5 if element not found
+                vdw2 = VAN_DER_WAALS_RADII.get(atom2["element"], 1.5)
+
+                expected_min_vdw_distance = (vdw1 + vdw2) * vdw_overlap_factor
+                if distance < expected_min_vdw_distance:
+                    self.violations.append(
+                        f"Steric clash (VdW overlap): Atoms {atom1['atom_name']}-{atom1['residue_number']}-{atom1['chain_id']} "
+                        f"({atom1['element']}) and {atom2['atom_name']}-{atom2['residue_number']}-{atom2['chain_id']} "
+                        f"({atom2['element']}) overlap significantly ({distance:.2f}Å). "
+                        f"Expected minimum vdW distance: {expected_min_vdw_distance:.2f}Å (radii sum: {vdw1 + vdw2:.2f}Å)."
+                    )
+
+    def validate_peptide_plane(self, tolerance_deg: float = 30.0):
+        """
+        Validates peptide bond planarity by checking the omega (ω) dihedral angle.
+        The omega angle is defined by Calpha(i) - C(i) - N(i+1) - Calpha(i+1).
+        Ideal trans-peptide omega is ~180 degrees, cis-peptide is ~0 degrees.
+        A violation is flagged if the angle deviates significantly from these values.
+        """
+        logger.info("Performing peptide plane validation.")
+
+        for chain_id, residues_in_chain in self.grouped_atoms.items():
+            sorted_res_numbers = sorted(residues_in_chain.keys())
+            for i in range(len(sorted_res_numbers) - 1):  # Iterate up to the second to last residue
+                current_res_num = sorted_res_numbers[i]
+                next_res_num = sorted_res_numbers[i + 1]
+
+                current_res_atoms = residues_in_chain.get(current_res_num)
+                next_res_atoms = residues_in_chain.get(next_res_num)
+
+                # Atoms for omega: Calpha(i) - C(i) - N(i+1) - Calpha(i+1)
+                p1_ca_i = current_res_atoms.get("CA")
+                p2_c_i = current_res_atoms.get("C")
+                p3_n_iplus1 = next_res_atoms.get("N")
+                p4_ca_iplus1 = next_res_atoms.get("CA")
+
+                if p1_ca_i and p2_c_i and p3_n_iplus1 and p4_ca_iplus1:
+                    omega_angle = self._calculate_dihedral_angle(
+                        p1_ca_i["coords"],
+                        p2_c_i["coords"],
+                        p3_n_iplus1["coords"],
+                        p4_ca_iplus1["coords"],
+                    )
+
+                    # Check for planarity (close to 180 or 0 degrees)
+                    is_trans = abs(abs(omega_angle) - 180.0) < tolerance_deg
+                    is_cis = abs(omega_angle) < tolerance_deg
+
+                    if not is_trans and not is_cis:
+                        self.violations.append(
+                            f"Peptide plane violation: Chain {chain_id}, "
+                            f"Peptide bond between Residue {current_res_num} ({current_res_atoms['CA']['residue_name']}) "
+                            f"and Residue {next_res_num} ({next_res_atoms['CA']['residue_name']}). "
+                            f"Omega angle ({omega_angle:.2f}°) deviates significantly from ideal trans/cis planarity."
+                        )
+                    else:
+                        logger.debug(
+                            f"Peptide bond between {current_res_num}-{current_res_atoms['CA']['residue_name']} and {next_res_num}-{next_res_atoms['CA']['residue_name']}: Omega={omega_angle:.2f}° (planar)"
+                        )
+
+    def validate_sequence_improbabilities(
+        self,
+        max_consecutive_charged: int = 4,
+        max_hydrophobic_stretch: int = 10,
+        pro_pro_pro_rare: int = 2,
+    ):
+        """
+        Checks for biologically improbable amino acid sequence patterns.
+        """
+        logger.info("Performing sequence improbability validation.")
+
+        for chain_id, sequence in self.sequences_by_chain.items():
+            if not sequence:
+                continue
+
+            # 1. Charge Clusters
+            consecutive_charged_count = 0
+            for i, res_name in enumerate(sequence):
+                if res_name in CHARGED_AMINO_ACIDS:
+                    consecutive_charged_count += 1
+                else:
+                    if consecutive_charged_count > max_consecutive_charged:
+                        self.violations.append(
+                            f"Sequence improbability (Charge Cluster): Chain {chain_id}, "
+                            f"Residues {i - consecutive_charged_count + 1} to {i} contain "
+                            f"{consecutive_charged_count} consecutive charged residues."
+                        )
+                    consecutive_charged_count = 0
+            # Check after loop for sequences ending with charged cluster
+            if consecutive_charged_count > max_consecutive_charged:
+                self.violations.append(
+                    f"Sequence improbability (Charge Cluster): Chain {chain_id}, "
+                    f"Residues {len(sequence) - consecutive_charged_count + 1} to {len(sequence)} contain "
+                    f"{consecutive_charged_count} consecutive charged residues."
+                )
+
+            # Alternating positive-negative charges (K-D-K-D-K-D)
+            for i in range(len(sequence) - 1):
+                res1 = sequence[i]
+                res2 = sequence[i + 1]
+                if (res1 in POSITIVE_AMINO_ACIDS and res2 in NEGATIVE_AMINO_ACIDS) or (
+                    res1 in NEGATIVE_AMINO_ACIDS and res2 in POSITIVE_AMINO_ACIDS
+                ):
+                    # Check for K-D-K, etc. (3 residues)
+                    if i + 2 < len(sequence):
+                        res3 = sequence[i + 2]
+                        if (res1 in POSITIVE_AMINO_ACIDS and res2 in NEGATIVE_AMINO_ACIDS and res3 in POSITIVE_AMINO_ACIDS) or (
+                            res1 in NEGATIVE_AMINO_ACIDS and res2 in POSITIVE_AMINO_ACIDS and res3 in NEGATIVE_AMINO_ACIDS
+                        ):
+                            self.violations.append(
+                                f"Sequence improbability (Alternating Charges): Chain {chain_id}, "
+                                f"Residues {i + 1}-{i + 3} show alternating charges: {res1}-{res2}-{res3}."
+                            )
+
+            # 2. Hydrophobic/Hydrophilic Patterns
+            consecutive_hydrophobic_count = 0
+            for i, res_name in enumerate(sequence):
+                if res_name in HYDROPHOBIC_AMINO_ACIDS:
+                    consecutive_hydrophobic_count += 1
+                else:
+                    if consecutive_hydrophobic_count > max_hydrophobic_stretch:
+                        self.violations.append(
+                            f"Sequence improbability (Hydrophobic Stretch): Chain {chain_id}, "
+                            f"Residues {i - consecutive_hydrophobic_count + 1} to {i} contain "
+                            f"{consecutive_hydrophobic_count} consecutive hydrophobic residues."
+                        )
+                    consecutive_hydrophobic_count = 0
+            # Check after loop for sequences ending with hydrophobic stretch
+            if consecutive_hydrophobic_count > max_hydrophobic_stretch:
+                self.violations.append(
+                    f"Sequence improbability (Hydrophobic Stretch): Chain {chain_id}, "
+                    f"Residues {len(sequence) - consecutive_hydrophobic_count + 1} to {len(sequence)} contain "
+                    f"{consecutive_hydrophobic_count} consecutive hydrophobic residues."
+                )
+
+            # Completely alternating (H-P-H-P) patterns
+            # Check for H-P-H or P-H-P (3 residues)
+            for i in range(len(sequence) - 1):
+                res1 = sequence[i]
+                res2 = sequence[i + 1]
+                if (res1 in HYDROPHOBIC_AMINO_ACIDS and res2 in POLAR_UNCHARGED_AMINO_ACIDS) or (
+                    res1 in POLAR_UNCHARGED_AMINO_ACIDS and res2 in HYDROPHOBIC_AMINO_ACIDS
+                ):
+                    if i + 2 < len(sequence):
+                        res3 = sequence[i + 2]
+                        if (res1 in HYDROPHOBIC_AMINO_ACIDS and res2 in POLAR_UNCHARGED_AMINO_ACIDS and res3 in HYDROPHOBIC_AMINO_ACIDS) or (
+                            res1 in POLAR_UNCHARGED_AMINO_ACIDS and res2 in HYDROPHOBIC_AMINO_ACIDS and res3 in POLAR_UNCHARGED_AMINO_ACIDS
+                        ):
+                            self.violations.append(
+                                f"Sequence improbability (Alternating H-P): Chain {chain_id}, "
+                                f"Residues {i + 1}-{i + 3} show alternating Hydrophobic-Polar pattern: {res1}-{res2}-{res3}."
+                            )
+
+            # 3. Proline Constraints
+            consecutive_proline_count = 0
+            for i, res_name in enumerate(sequence):
+                if res_name == "PRO":
+                    consecutive_proline_count += 1
+                else:
+                    if consecutive_proline_count > pro_pro_pro_rare:  # More than 2 consecutive Pro
+                        self.violations.append(
+                            f"Sequence improbability (Proline Cluster): Chain {chain_id}, "
+                            f"Residues {i - consecutive_proline_count + 1} to {i} contain "
+                            f"{consecutive_proline_count} consecutive Prolines (> {pro_pro_pro_rare})."
+                        )
+                    consecutive_proline_count = 0
+            if consecutive_proline_count > pro_pro_pro_rare:
+                self.violations.append(
+                    f"Sequence improbability (Proline Cluster): Chain {chain_id}, "
+                    f"Residues {len(sequence) - consecutive_proline_count + 1} to {len(sequence)} contain "
+                    f"{consecutive_proline_count} consecutive Prolines (> {pro_pro_pro_rare})."
+                )
+
+            # Proline after Glycine (GP) is uncommon
+            for i in range(len(sequence) - 1):
+                if sequence[i] == "GLY" and sequence[i + 1] == "PRO":
+                    self.violations.append(
+                        f"Sequence improbability (Gly-Pro): Chain {chain_id}, "
+                        f"Residue {i + 1}-{i + 2} shows uncommon Glycine-Proline sequence."
+                    )
+
+            # 4. Cysteine Patterns
+            cysteine_count = 0
+            for res_name in sequence:
+                if res_name == "CYS":
+                    cysteine_count += 1
+            if cysteine_count % 2 != 0:
+                self.violations.append(
+                    f"Sequence improbability (Cysteine Count): Chain {chain_id} contains "
+                    f"an odd number of Cysteine residues ({cysteine_count}). Odd Cys residues are rare without disulfide partners."
+                )
+
+            # Cys-Cys sequences (without geometry check for now)
+            for i in range(len(sequence) - 1):
+                if sequence[i] == "CYS" and sequence[i + 1] == "CYS":
+                    self.violations.append(
+                        f"Sequence improbability (Cys-Cys): Chain {chain_id}, "
+                        f"Residues {i + 1}-{i + 2} contains consecutive Cysteine residues. "
+                        f"Requires careful geometry for disulfide bonds."
+                    )
+
+            # 5. Turn Formation Constraints (checking for PG, NG patterns)
+            for i in range(len(sequence) - 1):
+                pair = (sequence[i], sequence[i + 1])
+                if pair == ("PRO", "GLY"):
+                    self.violations.append(
+                        f"Sequence improbability (Pro-Gly Turn Motif): Chain {chain_id}, "
+                        f"Residues {i + 1}-{i + 2} shows uncommon Proline-Glycine motif (PG). "
+                        f"Usually (GP) for beta-turns."
+                    )
+                if pair == ("ASN", "GLY"):
+                    self.violations.append(
+                        f"Sequence improbability (Asn-Gly Turn Motif): Chain {chain_id}, "
+                        f"Residues {i + 1}-{i + 2} shows uncommon Asparagine-Glycine motif (NG). "
+                        f"Often found in beta-turns, but flagging for review."
+                    )
