@@ -13,12 +13,22 @@ from .data import (
     ANGLE_N_CA_C,
     ANGLE_CA_C_N,
     ANGLE_CA_C_O,
+    BOND_LENGTH_C_N,
+    ANGLE_C_N_CA,
 )
+
+from stupid_pdb.validator import PDBValidator # Temporary import for debugging
 
 # Convert angles to radians for numpy trigonometric functions
 ANGLE_N_CA_C_RAD = np.deg2rad(ANGLE_N_CA_C)
 ANGLE_CA_C_N_RAD = np.deg2rad(ANGLE_CA_C_N)
 ANGLE_CA_C_O_RAD = np.deg2rad(ANGLE_CA_C_O)
+
+# Ideal Ramachandran angles for a generic alpha-helix
+PHI_ALPHA_HELIX = -57.0
+PSI_ALPHA_HELIX = -47.0
+# Ideal Omega for trans peptide bond
+OMEGA_TRANS = 180.0
 
 logger = logging.getLogger(__name__)
 
@@ -58,20 +68,95 @@ def create_atom_line(
         f"{element: >2}  "
     )
 
-def _rotate_coords_2d(coords: np.ndarray, angle_deg: float) -> np.ndarray:
+def _position_atom_3d_from_internal_coords(
+    p1: np.ndarray,
+    p2: np.ndarray,
+    p3: np.ndarray,
+    bond_length: float,
+    bond_angle_deg: float,
+    dihedral_angle_deg: float,
+) -> np.ndarray:
     """
-    Rotates 2D coordinates (x, y) by a given angle in degrees around the origin (0,0).
-    Assumes z-coordinate is 0 and maintains it.
+    Calculates the 3D coordinates of a new atom (P4) given the coordinates of three
+    preceding atoms (P1, P2, P3) and the internal coordinates:
+    - bond_length: distance P3-P4
+    - bond_angle_deg: angle P2-P3-P4 in degrees
+    - dihedral_angle_deg: dihedral angle P1-P2-P3-P4 in degrees
+
+    This function uses a standard method for constructing Cartesian coordinates from
+    internal coordinates.
     """
-    angle_rad = np.deg2rad(angle_deg)
-    rotation_matrix = np.array(
-        [
-            [np.cos(angle_rad), -np.sin(angle_rad), 0],
-            [np.sin(angle_rad), np.cos(angle_rad), 0],
-            [0, 0, 1],
-        ]
-    )
-    return np.dot(rotation_matrix, coords)
+    bond_angle_rad = np.deg2rad(bond_angle_deg)
+    dihedral_angle_rad = np.deg2rad(dihedral_angle_deg)
+
+    # Vectors of the reference bonds
+    vec_p3_p2 = p2 - p3  # Vector from P3 to P2
+    vec_p2_p1 = p1 - p2  # Vector from P2 to P1
+
+    norm_p3_p2 = np.linalg.norm(vec_p3_p2)
+    norm_p2_p1 = np.linalg.norm(vec_p2_p1)
+
+    # Handle degenerate cases (collinear points)
+    if norm_p3_p2 < 1e-6 or norm_p2_p1 < 1e-6:
+        logger.warning(
+            "Degenerate bond vector encountered in dihedral calculation. Placing linearly for P4."
+        )
+        if norm_p3_p2 > 1e-6:
+            return p3 + (vec_p3_p2 / norm_p3_p2) * bond_length
+        else:
+            return p3 + np.array([bond_length, 0, 0])
+
+
+    # Define an orthonormal basis (e1, e2, e3) for constructing P4
+    # e1: Unit vector along P3 -> P2
+    e1 = vec_p3_p2 / norm_p3_p2
+
+    # e3: Unit vector normal to the P1-P2-P3 plane
+    # The order of cross product determines the direction of the normal.
+    # It should be cross(vec_p2_p1, vec_p3_p2)
+    e3_vec_unnormalized = np.cross(vec_p2_p1, e1) # Corrected cross product order
+    norm_e3_vec = np.linalg.norm(e3_vec_unnormalized)
+
+    if norm_e3_vec < 1e-6: # P1, P2, P3 are collinear
+        logger.warning(
+            "P1, P2, P3 are collinear, normal vector to plane is ill-defined. Using arbitrary perpendicular for e3."
+        )
+        if np.isclose(e1[0], 0) and np.isclose(e1[1], 0):
+            e3 = np.array([1.0, 0.0, 0.0])
+        else:
+            e3 = np.array([-e1[1], e1[0], 0.0])
+        e3 /= np.linalg.norm(e3)
+    else:
+        e3 = e3_vec_unnormalized / norm_e3_vec
+
+    # e2: Unit vector in the P1-P2-P3 plane, orthogonal to e1 and e3
+    e2 = np.cross(e3, e1)
+
+    # Now, calculate the P3->P4 vector components in this (e1, e2, e3) basis
+    # The bond angle is between P2-P3 and P3-P4.
+    # The dihedral angle is between plane P1-P2-P3 and P2-P3-P4.
+
+    # P3->P4 vector components
+    x_comp = -bond_length * np.cos(bond_angle_rad)
+    y_comp = bond_length * np.sin(bond_angle_rad) * np.cos(-dihedral_angle_rad) # Apply sign flip here
+    z_comp = bond_length * np.sin(bond_angle_rad) * np.sin(-dihedral_angle_rad) # And here
+
+    # Transform these components back to global coordinates
+    global_p4_coords = p3 + \
+                       (x_comp * e1) + \
+                       (y_comp * e2) + \
+                       (z_comp * e3)
+
+    # For debugging, verify the dihedral angle formed
+    actual_dihedral = PDBValidator._calculate_dihedral_angle(p1, p2, p3, global_p4_coords)
+    logger.debug(f"P1: {p1}, P2: {p2}, P3: {p3}")
+    logger.debug(f"Bond Length: {bond_length}, Bond Angle: {bond_angle_deg}, Dihedral Angle: {dihedral_angle_deg}")
+    logger.debug(f"e1: {e1}, e2: {e2}, e3: {e3}")
+    logger.debug(f"x_comp: {x_comp}, y_comp: {y_comp}, z_comp: {z_comp}")
+    logger.debug(f"Calculated dihedral for P4: {actual_dihedral:.2f}° (Expected: {dihedral_angle_deg:.2f}°)")
+    logger.debug(f"norm_e3_vec: {norm_e3_vec}")
+
+    return global_p4_coords
 
 
 def _generate_random_amino_acid_sequence(
@@ -210,40 +295,109 @@ def generate_pdb_content(
                 )
             )
             atom_count += 1
-        else:
-            # Full atom generation (N, CA, C, O, and side chain)
-            # This is a simplified geometry, placing atoms in the XY plane for the first residue
-            # and maintaining a linear C-alpha progression along X.
+            # For CA-only generation, increment current_ca_coords linearly
+            current_ca_coords[0] += CA_DISTANCE
+        else: # full_atom is True, use Ramachandran-guided backbone generation
+            if i == 0:
+                # For the first residue (i=0), set initial N, CA, C, O coordinates.
+                # These are arbitrary starting points to define the initial local frame.
+                # N1 at origin (0,0,0)
+                n_coords = np.array([0.0, 0.0, 0.0])
+                
+                # CA1 relative to N1: Place along X-axis
+                ca_coords = n_coords + np.array([BOND_LENGTH_N_CA, 0.0, 0.0])
 
-            # CA atom is at current_ca_coords
-            ca_coords = current_ca_coords
+                # C1 relative to CA1 and N1: Bond N1-CA1-C1 angle
+                # To calculate C1: P3=CA1, P2=N1, P1 can be an arbitrary point to define a plane.
+                # Let's make P1 such that the N1-CA1-C1 plane is XY, and P1 is N1 shifted in Z.
+                c_coords = _position_atom_3d_from_internal_coords(
+                    p1=n_coords + np.array([0.0, 0.0, 1.0]), # P1: Arbitrary point not collinear with N1,CA1
+                    p2=n_coords, # P2: N1
+                    p3=ca_coords, # P3: CA1
+                    bond_length=BOND_LENGTH_CA_C,
+                    bond_angle_deg=ANGLE_N_CA_C, # Angle N1-CA1-C1
+                    dihedral_angle_deg=0.0 # Arbitrary dihedral for initial placement
+                )
+                
+                # O1 relative to C1 and CA1
+                # To calculate O1: P3=C1, P2=CA1, P1=N1.
+                # Dihedral N1-CA1-C1-O1 for trans-carbonyl
+                o_coords = _position_atom_3d_from_internal_coords(
+                    p1=n_coords, # P1: N1
+                    p2=ca_coords, # P2: CA1
+                    p3=c_coords, # P3: C1
+                    bond_length=BOND_LENGTH_C_O,
+                    bond_angle_deg=ANGLE_CA_C_O, # Angle CA1-C1-O1
+                    dihedral_angle_deg=180.0 # Dihedral N1-CA1-C1-O1 (trans)
+                )
+                
+                # Store these as the 'previous' atoms for the next residue's N
+                prev_n_coords = n_coords
+                prev_ca_coords = ca_coords
+                prev_c_coords = c_coords
+                
+            else: # Subsequent residues (i > 0)
+                # Calculate N(i) (P4)
+                # Dihedral: N(i-1)-CA(i-1)-C(i-1)-N(i) (OMEGA_TRANS)
+                # P1: N(i-1) (prev_n_coords)
+                # P2: CA(i-1) (prev_ca_coords)
+                # P3: C(i-1) (prev_c_coords)
+                n_coords = _position_atom_3d_from_internal_coords(
+                    p1=prev_n_coords,
+                    p2=prev_ca_coords,
+                    p3=prev_c_coords,
+                    bond_length=BOND_LENGTH_C_N,
+                    bond_angle_deg=ANGLE_CA_C_N, # Angle CA(i-1)-C(i-1)-N(i)
+                    dihedral_angle_deg=OMEGA_TRANS,
+                )
 
-            # C atom calculation: place along positive X-axis from CA
-            c_coords = ca_coords + np.array([BOND_LENGTH_CA_C, 0.0, 0.0])
+                # Calculate CA(i) (P4)
+                # Dihedral: CA(i-1)-C(i-1)-N(i)-CA(i) (PHI_ALPHA_HELIX)
+                # P1: CA(i-1) (prev_ca_coords)
+                # P2: C(i-1) (prev_c_coords)
+                # P3: N(i) (n_coords)
+                ca_coords = _position_atom_3d_from_internal_coords(
+                    p1=prev_ca_coords, # P1: CA(i-1)
+                    p2=prev_c_coords,  # P2: C(i-1)
+                    p3=n_coords,       # P3: N(i)
+                    bond_length=BOND_LENGTH_N_CA,
+                    bond_angle_deg=ANGLE_C_N_CA, # Angle C(i-1)-N(i)-CA(i)
+                    dihedral_angle_deg=PHI_ALPHA_HELIX,
+                )
 
-            # N atom calculation: forms ANGLE_N_CA_C with CA-C.
-            # CA-C vector is along positive X from CA.
-            # N-CA vector length is BOND_LENGTH_N_CA.
-            # Place N in the XY plane such that N-CA-C angle is correct.
-            n_x_offset = BOND_LENGTH_N_CA * np.cos(ANGLE_N_CA_C_RAD)
-            n_y_offset = BOND_LENGTH_N_CA * np.sin(ANGLE_N_CA_C_RAD)
-            n_coords = ca_coords + np.array([n_x_offset, n_y_offset, 0.0])
+                # Calculate C(i) (P4)
+                # Dihedral: C(i-1)-N(i)-CA(i)-C(i) (PSI_ALPHA_HELIX)
+                # P1: C(i-1) (prev_c_coords)
+                # P2: N(i) (n_coords)
+                # P3: CA(i) (ca_coords)
+                c_coords = _position_atom_3d_from_internal_coords(
+                    p1=prev_c_coords, # P1: C(i-1)
+                    p2=n_coords,      # P2: N(i)
+                    p3=ca_coords,     # P3: CA(i)
+                    bond_length=BOND_LENGTH_CA_C,
+                    bond_angle_deg=ANGLE_N_CA_C, # Angle N(i)-CA(i)-C(i)
+                    dihedral_angle_deg=PSI_ALPHA_HELIX,
+                )
 
-            # O atom calculation: forms ANGLE_CA_C_O with CA-C, with C as vertex.
-            # The C-CA vector points along negative X from C.
-            # C-O vector length is BOND_LENGTH_C_O.
-            # Place O in the XY plane such that CA-C-O angle is correct.
-            # The angle of C-O relative to the positive X-axis should be (180 - ANGLE_CA_C_O).
-            o_x_offset_relative_to_C = BOND_LENGTH_C_O * np.cos(
-                np.pi - ANGLE_CA_C_O_RAD
-            )
-            o_y_offset_relative_to_C = BOND_LENGTH_C_O * np.sin(
-                np.pi - ANGLE_CA_C_O_RAD
-            )
-            o_coords = c_coords + np.array(
-                [o_x_offset_relative_to_C, o_y_offset_relative_to_C, 0.0]
-            )
+                # Calculate O(i) (P4)
+                # Dihedral: N(i)-CA(i)-C(i)-O(i) for trans-carbonyl
+                # P1: N(i)
+                # P2: CA(i)
+                # P3: C(i)
+                o_coords = _position_atom_3d_from_internal_coords(
+                    p1=n_coords, # P1: N(i)
+                    p2=ca_coords, # P2: CA(i)
+                    p3=c_coords, # P3: C(i)
+                    bond_length=BOND_LENGTH_C_O,
+                    bond_angle_deg=ANGLE_CA_C_O, # Angle CA(i)-C(i)-O(i)
+                    dihedral_angle_deg=180.0, # Dihedral N(i)-CA(i)-C(i)-O(i) (trans)
+                )
 
+                # Update previous coordinates for the next iteration
+                prev_n_coords = n_coords
+                prev_ca_coords = ca_coords
+                prev_c_coords = c_coords
+            
             # Append N atom
             pdb_lines.append(
                 PDB_ATOM_FORMAT.format(
@@ -331,6 +485,8 @@ def generate_pdb_content(
             # Side chain atoms
             if aa_3l_code in AMINO_ACID_ATOMS:
                 for atom_data in AMINO_ACID_ATOMS[aa_3l_code]:
+                    # Side chain coords are relative to CA. We'll simply add them to the new CA coords.
+                    # This is a simplification and will need to be improved later for realism.
                     side_chain_coords = ca_coords + np.array(atom_data["coords"])
                     pdb_lines.append(
                         PDB_ATOM_FORMAT.format(
@@ -351,8 +507,6 @@ def generate_pdb_content(
                         )
                     )
                     atom_count += 1
-        # Move current_ca_coords for the next residue's CA based on CA_DISTANCE
-        current_ca_coords[0] += CA_DISTANCE
 
     # TER and END records
     if sequence:
@@ -365,6 +519,8 @@ def generate_pdb_content(
         pdb_lines.append(
             f"TER   {atom_count: >5}      {last_residue_name: >3} A{last_residue_number: >4}"
         )
+
+
 
     pdb_lines.append("ENDMDL")
     pdb_lines.append("END         ")  # 10 spaces to match typical PDB END record length

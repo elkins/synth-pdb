@@ -121,9 +121,42 @@ class PDBValidator:
     @staticmethod
     def atoms_to_pdb_content(atom_list: List[Dict[str, Any]]) -> str:
         """
-        Converts a list of atom dictionaries into a full PDB content string.
+        Converts a list of atom dictionaries into a PDB content string, with TER records after each chain.
         """
-        return "\n".join([PDBValidator.atoms_to_pdb_line(atom) for atom in atom_list]) + "\n"
+        if not atom_list:
+            return ""
+
+        # Group atoms by chain ID, preserving order
+        chains: Dict[str, List[Dict[str, Any]]] = {}
+        for atom in atom_list:
+            chain_id = atom.get("chain_id", "A") # Default to 'A' if no chain_id
+            if chain_id not in chains:
+                chains[chain_id] = []
+            chains[chain_id].append(atom)
+        
+        pdb_lines = []
+        last_atom_number = 0
+        
+        # Process chains in sorted order of their IDs for consistent output
+        for chain_id in sorted(chains.keys()):
+            chain_atoms = chains[chain_id]
+            for atom in chain_atoms:
+                pdb_lines.append(PDBValidator.atoms_to_pdb_line(atom))
+                last_atom_number = atom["atom_number"]
+            
+            # Add a TER record after the last atom of the chain
+            if chain_atoms:
+                last_atom_of_chain = chain_atoms[-1]
+                ter_atom_number = last_atom_of_chain.get("atom_number", 0) + 1
+                
+                # Format the TER record based on the last atom's residue info
+                ter_line = (
+                    f"TER   {ter_atom_number: >5}      {last_atom_of_chain['residue_name']: >3} "
+                    f"{chain_id: <1}{last_atom_of_chain['residue_number']: >4}"
+                )
+                pdb_lines.append(ter_line)
+
+        return "\n".join(pdb_lines) + "\n"
 
     def _group_atoms_by_residue(self) -> Dict[str, Dict[int, Dict[str, Dict[str, Any]]]]:
         """
@@ -456,7 +489,7 @@ class PDBValidator:
                 if phi is not None or psi is not None:
                     phi_str = f"{phi:.2f}°" if phi is not None else "N/A"
                     psi_str = f"{psi:.2f}°" if psi is not None else "N/A"
-                    print(f"DEBUG: Calculated Phi: {phi_str}, Psi: {psi_str} for Chain {chain_id}, Residue {res_num} {res_name}") # Debug print
+                    logger.debug(f"Calculated Phi: {phi_str}, Psi: {psi_str} for Chain {chain_id}, Residue {res_num} {res_name}") # Debug print
                     violation_detected = False
 
                     if res_name == "GLY":
@@ -575,7 +608,7 @@ class PDBValidator:
                     continue
 
                 distance = self._calculate_distance(atom1["coords"], atom2["coords"])
-                print(f"DEBUG: Steric clash check between atom {atom1['atom_number']} and {atom2['atom_number']}. Distance: {distance:.2f}Å")
+                logger.debug(f"Steric clash check between atom {atom1['atom_number']} and {atom2['atom_number']}. Distance: {distance:.2f}Å")
 
                 # General atom-atom minimum distance check
                 if distance < min_atom_distance:
@@ -584,7 +617,8 @@ class PDBValidator:
                         f"and {atom2['atom_name']}-{atom2['residue_number']}-{atom2['chain_id']} are too close ({distance:.2f}Å). "
                         f"Minimum allowed: {min_atom_distance:.2f}Å."
                     )
-                    print(f"DEBUG: Added violation: {self.violations[-1]}")
+                    logger.debug(f"Added violation: {self.violations[-1]}")
+
 
                 # Calpha-Calpha minimum distance check for non-consecutive residues
                 if (
@@ -601,7 +635,7 @@ class PDBValidator:
                             f"in chain {atom1['chain_id']} are too close ({distance:.2f}Å). "
                             f"Minimum allowed for non-adjacent: {min_ca_distance:.2f}Å."
                         )
-                        print(f"DEBUG: Added violation: {self.violations[-1]}")
+                        logger.debug(f"Added violation: {self.violations[-1]}")
 
                 # Van der Waals overlap check
                 vdw1 = VAN_DER_WAALS_RADII.get(
@@ -617,12 +651,12 @@ class PDBValidator:
                         f"({atom2['element']}) overlap significantly ({distance:.2f}Å). "
                         f"Expected minimum vdW distance: {expected_min_vdw_distance:.2f}Å (radii sum: {vdw1 + vdw2:.2f}Å)."
                     )
-                    print(f"DEBUG: Added violation: {self.violations[-1]}")
+                    logger.debug(f"Added violation: {self.violations[-1]}")
 
     def validate_peptide_plane(self, tolerance_deg: float = 30.0):
         """
         Validates peptide bond planarity by checking the omega (ω) dihedral angle.
-        The omega angle is defined by Calpha(i) - C(i) - N(i+1) - Calpha(i+1).
+        The omega angle is defined by N(i-1) - CA(i-1) - C(i-1) - N(i).
         Ideal trans-peptide omega is ~180 degrees, cis-peptide is ~0 degrees.
         A violation is flagged if the angle deviates significantly from these values.
         """
@@ -630,26 +664,34 @@ class PDBValidator:
 
         for chain_id, residues_in_chain in self.grouped_atoms.items():
             sorted_res_numbers = sorted(residues_in_chain.keys())
-            for i in range(len(sorted_res_numbers) - 1):  # Iterate up to the second to last residue
+            for i in range(1, len(sorted_res_numbers)):  # Start from second residue to get C(i-1)
                 current_res_num = sorted_res_numbers[i]
-                next_res_num = sorted_res_numbers[i + 1]
+                prev_res_num = sorted_res_numbers[i - 1]
 
                 current_res_atoms = residues_in_chain.get(current_res_num)
-                next_res_atoms = residues_in_chain.get(next_res_num)
+                prev_res_atoms = residues_in_chain.get(prev_res_num)
 
-                # Atoms for omega: Calpha(i) - C(i) - N(i+1) - Calpha(i+1)
-                p1_ca_i = current_res_atoms.get("CA")
-                p2_c_i = current_res_atoms.get("C")
-                p3_n_iplus1 = next_res_atoms.get("N")
-                p4_ca_iplus1 = next_res_atoms.get("CA")
+                # Atoms for omega: N(i-1) - CA(i-1) - C(i-1) - N(i)
+                p1_n_prev = prev_res_atoms.get("N")
+                p2_ca_prev = prev_res_atoms.get("CA")
+                p3_c_prev = prev_res_atoms.get("C")
+                p4_n_curr = current_res_atoms.get("N")
 
-                if p1_ca_i and p2_c_i and p3_n_iplus1 and p4_ca_iplus1:
+
+                if p1_n_prev and p2_ca_prev and p3_c_prev and p4_n_curr:
+                    logger.debug(f"Omega dihedral calculation for Chain {chain_id}, Residue {prev_res_num}-{current_res_num}:")
+                    logger.debug(f"  P1 (N(i-1)): {p1_n_prev['coords']}")
+                    logger.debug(f"  P2 (CA(i-1)):{p2_ca_prev['coords']}")
+                    logger.debug(f"  P3 (C(i-1)): {p3_c_prev['coords']}")
+                    logger.debug(f"  P4 (N(i)):   {p4_n_curr['coords']}")
+
                     omega_angle = self._calculate_dihedral_angle(
-                        p1_ca_i["coords"],
-                        p2_c_i["coords"],
-                        p3_n_iplus1["coords"],
-                        p4_ca_iplus1["coords"],
+                        p1_n_prev["coords"],  # P1 for dihedral = N(i-1)
+                        p2_ca_prev["coords"], # P2 for dihedral = CA(i-1)
+                        p3_c_prev["coords"],  # P3 for dihedral = C(i-1)
+                        p4_n_curr["coords"],  # P4 for dihedral = N(i)
                     )
+                    logger.debug(f"  Calculated Omega Angle: {omega_angle:.2f}°")
 
                     # Check for planarity (close to 180 or 0 degrees)
                     is_trans = abs(abs(omega_angle) - 180.0) < tolerance_deg
@@ -658,13 +700,13 @@ class PDBValidator:
                     if not is_trans and not is_cis:
                         self.violations.append(
                             f"Peptide plane violation: Chain {chain_id}, "
-                            f"Peptide bond between Residue {current_res_num} ({current_res_atoms['CA']['residue_name']}) "
-                            f"and Residue {next_res_num} ({next_res_atoms['CA']['residue_name']}). "
+                            f"Peptide bond between Residue {prev_res_num} ({p3_c_prev['residue_name']}) and "
+                            f"Residue {current_res_num} ({p4_n_curr['residue_name']}). "
                             f"Omega angle ({omega_angle:.2f}°) deviates significantly from ideal trans/cis planarity."
                         )
                     else:
                         logger.debug(
-                            f"Peptide bond between {current_res_num}-{current_res_atoms['CA']['residue_name']} and {next_res_num}-{next_res_atoms['CA']['residue_name']}: Omega={omega_angle:.2f}° (planar)"
+                            f"Peptide bond between {prev_res_num}-{p3_c_prev['residue_name']} and {current_res_num}-{p4_n_curr['residue_name']}: Omega={omega_angle:.2f}° (planar)"
                         )
 
     def validate_sequence_improbabilities(
@@ -934,3 +976,4 @@ class PDBValidator:
             logger.debug(f"Applied tweaks to {len(clashing_atom_indices)} atoms to resolve steric clashes.")
 
         return modified_atoms
+

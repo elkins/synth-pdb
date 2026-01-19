@@ -1,11 +1,14 @@
+import logging
 import pytest
 import numpy as np
 from stupid_pdb.validator import PDBValidator
 from stupid_pdb.data import (
     BOND_LENGTH_N_CA, BOND_LENGTH_CA_C, BOND_LENGTH_C_N, BOND_LENGTH_C_O,
-    ANGLE_N_CA_C, ANGLE_C_N_CA, ANGLE_CA_C_O
+    ANGLE_N_CA_C, ANGLE_C_N_CA, ANGLE_CA_C_O, ANGLE_CA_C_N
 )
-from stupid_pdb.generator import CA_DISTANCE, create_atom_line # Import create_atom_line
+from stupid_pdb.generator import CA_DISTANCE, create_atom_line, _position_atom_3d_from_internal_coords # Import create_atom_line
+
+logging.getLogger().setLevel(logging.DEBUG)
 
 def is_valid_pdb_file(file_path: str) -> bool:
     """
@@ -423,18 +426,42 @@ class TestPDBValidator:
 
     def test_validate_peptide_plane_violation(self):
         # Manually craft atoms to create a non-planar peptide bond
-        # Calpha(i) - C(i) - N(i+1) - Calpha(i+1)
+        # N(i-1) - CA(i-1) - C(i-1) - N(i)
         # Make the omega angle around 90 degrees
-        ca1 = np.array([0.0, 0.0, 0.0])
-        c1 = np.array([BOND_LENGTH_CA_C, 0.0, 0.0])
-        n2 = c1 + np.array([BOND_LENGTH_C_N * np.cos(np.deg2rad(90)), BOND_LENGTH_C_N * np.sin(np.deg2rad(90)), 0.0]) # N2 90deg from C1
-        ca2 = n2 + np.array([BOND_LENGTH_N_CA * np.cos(np.deg2rad(0)), BOND_LENGTH_N_CA * np.sin(np.deg2rad(0)), 1.0]) # CA2 non-planar with C1-N2
 
+        # Residue 1: N1-CA1-C1
+        n1 = np.array([0.0, 0.0, 0.0])
+        ca1 = n1 + np.array([BOND_LENGTH_N_CA, 0.0, 0.0]) # N1-CA1 along X
+        # C1 forms N1-CA1-C1 angle. Arbitrary non-zero Z to make it non-planar for subsequent N2
+        # C1 placed relative to CA1, making angle ANGLE_N_CA_C with N1. Set dihedral for N-N-CA-C to 90.
+        c1 = _position_atom_3d_from_internal_coords(
+            p1=n1 + np.array([0.0, 0.0, 1.0]), # dummy P1
+            p2=n1,
+            p3=ca1,
+            bond_length=BOND_LENGTH_CA_C,
+            bond_angle_deg=ANGLE_N_CA_C,
+            dihedral_angle_deg=0.0 # Place C1 in XY plane for simplicity of this test
+        )
+
+        # Residue 2: N2
+        # Place N2 such that the N1-CA1-C1-N2 dihedral is clearly not 0 or 180 (e.g., 90 degrees)
+        n2 = _position_atom_3d_from_internal_coords(
+            p1=n1,       # P1 = N1
+            p2=ca1,      # P2 = CA1
+            p3=c1,       # P3 = C1
+            bond_length=BOND_LENGTH_C_N,
+            bond_angle_deg=ANGLE_CA_C_N, # Angle CA1-C1-N2
+            dihedral_angle_deg=90.0 # Force a 90-degree omega violation
+        )
+        
+        # We don't need CA2 for this test, as the omega is C(i-1)-N(i)-CA(i)-C(i).
+        # We only need up to N(i) from the second residue for N(i-1)-CA(i-1)-C(i-1)-N(i).
+        
         pdb_content = (
-            create_atom_line(1, "CA", "ALA", "A", 1, *ca1, "C", alt_loc="", insertion_code="") + "\n" +
-            create_atom_line(2, "C", "ALA", "A", 1, *c1, "C", alt_loc="", insertion_code="") + "\n" +
-            create_atom_line(3, "N", "ALA", "A", 2, *n2, "N", alt_loc="", insertion_code="") + "\n" +
-            create_atom_line(4, "CA", "ALA", "A", 2, *ca2, "C", alt_loc="", insertion_code="")
+            create_atom_line(1, "N", "ALA", "A", 1, *n1, "N") + "\n" +
+            create_atom_line(2, "CA", "ALA", "A", 1, *ca1, "C") + "\n" +
+            create_atom_line(3, "C", "ALA", "A", 1, *c1, "C") + "\n" +
+            create_atom_line(4, "N", "ALA", "A", 2, *n2, "N")
         )
         validator = PDBValidator(pdb_content)
         validator.validate_peptide_plane(tolerance_deg=10.0)
@@ -442,6 +469,7 @@ class TestPDBValidator:
         assert len(violations) == 1
         assert "Peptide plane violation" in violations[0]
         assert "Omega angle" in violations[0]
+        assert "deviates significantly" in violations[0]
 
     # --- Sequence Improbabilities Tests ---
     def test_validate_sequence_improbabilities_no_violation(self):
