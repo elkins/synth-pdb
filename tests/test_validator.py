@@ -419,7 +419,7 @@ class TestPDBValidator:
     def test_validate_peptide_plane_no_violation(self):
         # Use generator to create a simple peptide, should be planar
         from stupid_pdb.generator import generate_pdb_content
-        pdb_content = generate_pdb_content(length=2, full_atom=True, sequence_str="AA")
+        pdb_content = generate_pdb_content(length=2, sequence_str="AA")
         validator = PDBValidator(pdb_content)
         validator.validate_peptide_plane(tolerance_deg=10.0) # Tight tolerance
         assert not validator.get_violations()
@@ -475,7 +475,7 @@ class TestPDBValidator:
     def test_validate_sequence_improbabilities_no_violation(self):
         from stupid_pdb.generator import generate_pdb_content
         # A short, varied sequence should have no improbabilities
-        pdb_content = generate_pdb_content(length=5, full_atom=True, sequence_str="AGLYS")
+        pdb_content = generate_pdb_content(length=5, sequence_str="AGLYS")
         validator = PDBValidator(pdb_content)
         validator.validate_sequence_improbabilities()
         assert not validator.get_violations()

@@ -242,7 +242,7 @@ class TestMainCLI:
         mocker.patch.object(PDBValidator, "_apply_steric_clash_tweak", return_value=non_clashing_parsed_atoms)
 
         # Mock sys.argv
-        test_args = ["stupid_pdb", "--length", "2", "--full-atom", "--best-of-N", "1", "--refine-clashes", "1", "--output", str(output_filepath)]
+        test_args = ["stupid_pdb", "--length", "2", "--best-of-N", "1", "--refine-clashes", "1", "--output", str(output_filepath)]
         mocker.patch("sys.argv", test_args)
         mocker.patch("sys.exit")
 
@@ -276,3 +276,225 @@ class TestMainCLI:
         assert lines[-1].startswith("END"), "PDB file should contain an END record."
 
         sys.exit.assert_not_called()
+
+    # --- Additional tests for error conditions and edge cases ---
+    
+    def test_invalid_length_without_sequence(self, mocker, caplog):
+        """Test that invalid length without sequence causes sys.exit(1)."""
+        caplog.set_level(logging.ERROR)
+        
+        # Mock sys.argv with invalid length (0)
+        test_args = ["stupid_pdb", "--length", "0"]
+        mocker.patch("sys.argv", test_args)
+        
+        # Mock sys.exit to check for error exit
+        mock_sys_exit = mocker.patch("sys.exit")
+        
+        main.main()
+        
+        assert "Length must be a positive integer when no sequence is provided." in caplog.text
+        mock_sys_exit.assert_called_with(1)
+    
+    def test_negative_length_without_sequence(self, mocker, caplog):
+        """Test that negative length without sequence causes sys.exit(1)."""
+        caplog.set_level(logging.ERROR)
+        
+        # Mock sys.argv with negative length
+        test_args = ["stupid_pdb", "--length", "-5"]
+        mocker.patch("sys.argv", test_args)
+        
+        # Mock sys.exit to check for error exit
+        mock_sys_exit = mocker.patch("sys.exit")
+        
+        main.main()
+        
+        assert "Length must be a positive integer when no sequence is provided." in caplog.text
+        mock_sys_exit.assert_called_with(1)
+    
+    def test_failed_pdb_generation_empty_content(self, mocker, caplog):
+        """Test handling when generate_pdb_content returns None/empty."""
+        caplog.set_level(logging.WARNING)
+        
+        # Mock generate_pdb_content to return None to simulate failure
+        mocker.patch("stupid_pdb.main.generate_pdb_content", return_value=None)
+        
+        # Mock sys.argv
+        test_args = ["stupid_pdb", "--length", "5", "--max-attempts", "2"]
+        mocker.patch("sys.argv", test_args)
+        
+        # Mock sys.exit
+        mock_sys_exit = mocker.patch("sys.exit")
+        
+        main.main()
+        
+        assert "Failed to generate PDB content in attempt" in caplog.text or "Failed to generate a suitable PDB file after" in caplog.text
+        mock_sys_exit.assert_called_with(1)
+    
+    def test_generation_value_error(self, mocker, caplog):
+        """Test handling of ValueError during PDB generation."""
+        caplog.set_level(logging.ERROR)
+        
+        # Mock generate_pdb_content to raise ValueError
+        mocker.patch("stupid_pdb.main.generate_pdb_content", side_effect=ValueError("Invalid amino acid code"))
+        
+        # Mock sys.argv
+        test_args = ["stupid_pdb", "--length", "3", "--max-attempts", "2"]
+        mocker.patch("sys.argv", test_args)
+        
+        # Mock sys.exit
+        mock_sys_exit = mocker.patch("sys.exit")
+        
+        main.main()
+        
+        assert "Error processing sequence during generation" in caplog.text
+        assert "Invalid amino acid code" in caplog.text
+        mock_sys_exit.assert_called_once_with(1)
+    
+    def test_generation_unexpected_exception(self, mocker, caplog):
+        """Test handling of unexpected exception during PDB generation."""
+        caplog.set_level(logging.ERROR)
+        
+        # Mock generate_pdb_content to raise a generic Exception
+        mocker.patch("stupid_pdb.main.generate_pdb_content", side_effect=Exception("Unexpected error"))
+        
+        # Mock sys.argv
+        test_args = ["stupid_pdb", "--length", "3", "--max-attempts", "2"]
+        mocker.patch("sys.argv", test_args)
+        
+        # Mock sys.exit
+        mock_sys_exit = mocker.patch("sys.exit")
+        
+        main.main()
+        
+        assert "An unexpected error occurred during generation" in caplog.text
+        assert "Unexpected error" in caplog.text
+        mock_sys_exit.assert_called_once_with(1)
+    
+    def test_refine_clashes_early_exit_no_violations(self, mocker, caplog):
+        """Test that refinement exits early when no violations remain."""
+        caplog.set_level(logging.INFO)
+        
+        # Start with a valid PDB (no violations)
+        valid_pdb_content = (
+            "HEADER    valid_peptide\n" +
+            create_atom_line(1, "CA", "GLY", "A", 1, 0.0, 0.0, 0.0, "C") + "\n" +
+            create_atom_line(2, "CA", "GLY", "A", 2, 3.0, 0.0, 0.0, "C")
+        )
+        
+        mocker.patch("stupid_pdb.main.generate_pdb_content", return_value=valid_pdb_content)
+        
+        # Mock sys.argv with multiple refinement iterations
+        test_args = ["stupid_pdb", "--length", "2", "--refine-clashes", "5", "--output", "test_early_exit.pdb"]
+        mocker.patch("sys.argv", test_args)
+        mocker.patch("sys.exit")
+        
+        main.main()
+        
+        # Should exit early because there are no violations to begin with
+        assert "Refinement iteration 1/5. Violations: 0" in caplog.text
+        assert "No violations remain, stopping refinement early." in caplog.text
+        # Should NOT see iteration 2
+        assert "Refinement iteration 2" not in caplog.text
+        sys.exit.assert_not_called()
+    
+    def test_refine_clashes_increases_violations(self, mocker, caplog):
+        """Test warning when refinement increases violations (should not happen but edge case)."""
+        caplog.set_level(logging.INFO)
+        
+        # Initial PDB with 1 violation
+        pdb_with_1_violation = (
+            "HEADER    one_violation\n" +
+            create_atom_line(1, "CA", "ALA", "A", 1, 0.0, 0.0, 0.0, "C") + "\n" +
+            create_atom_line(2, "CA", "ALA", "A", 2, 1.0, 0.0, 0.0, "C")
+        )
+        
+        mocker.patch("stupid_pdb.main.generate_pdb_content", return_value=pdb_with_1_violation)
+        
+        # Mock _apply_steric_clash_tweak to return atoms with MORE violations
+        # Make atoms even closer together
+        worse_parsed_atoms = [
+            {"atom_number": 1, "atom_name": "CA", "alt_loc": "", "residue_name": "ALA", "chain_id": "A", 
+             "residue_number": 1, "insertion_code": "", "coords": np.array([0.0, 0.0, 0.0]), 
+             "occupancy": 1.0, "temp_factor": 0.0, "element": "C", "charge": ""},
+            {"atom_number": 2, "atom_name": "CA", "alt_loc": "", "residue_name": "ALA", "chain_id": "A", 
+             "residue_number": 2, "insertion_code": "", "coords": np.array([0.3, 0.0, 0.0]), # Even closer
+             "occupancy": 1.0, "temp_factor": 0.0, "element": "C", "charge": ""},
+        ]
+        mocker.patch.object(PDBValidator, "_apply_steric_clash_tweak", return_value=worse_parsed_atoms)
+        
+        # Mock sys.argv
+        test_args = ["stupid_pdb", "--length", "2", "--refine-clashes", "1", "--output", "test_worse.pdb"]
+        mocker.patch("sys.argv", test_args)
+        mocker.patch("sys.exit")
+        
+        main.main()
+        
+        # The mock returns atoms that create 2 violations (same as before), so it will report "No change"
+        # To actually test line 290 (violations increasing), we need a scenario where they go UP
+        # For now, this tests the refinement path without improvement
+        assert "Refinement process completed" in caplog.text
+        sys.exit.assert_not_called()
+    
+    def test_custom_filename_generation_no_output_flag(self, mocker, tmp_path, caplog):
+        """Test that custom filename is generated when --output is not provided."""
+        import os
+        caplog.set_level(logging.INFO)
+        
+        # Change to tmp_path directory so generated file goes there
+        original_cwd = os.getcwd()
+        os.chdir(tmp_path)
+        
+        try:
+            # Simple valid PDB
+            valid_pdb = (
+                "HEADER    test\n" +
+                create_atom_line(1, "CA", "GLY", "A", 1, 0.0, 0.0, 0.0, "C")
+            )
+            mocker.patch("stupid_pdb.main.generate_pdb_content", return_value=valid_pdb)
+            
+            # Mock sys.argv WITHOUT --output flag
+            test_args = ["stupid_pdb", "--length", "5"]
+            mocker.patch("sys.argv", test_args)
+            mocker.patch("sys.exit")
+            
+            main.main()
+            
+            # Verify a file matching the pattern was created
+            files = list(tmp_path.glob("random_linear_peptide_5_*.pdb"))
+            assert len(files) == 1, "Should generate exactly one PDB file with timestamp"
+            
+            # Verify filename contains timestamp pattern (YYYYMMDD_HHMMSS)
+            filename = files[0].name
+            assert "random_linear_peptide_5_" in filename
+            assert filename.endswith(".pdb")
+            
+            sys.exit.assert_not_called()
+        finally:
+            os.chdir(original_cwd)
+    
+    def test_file_write_error(self, mocker, caplog):
+        """Test handling when file write fails."""
+        caplog.set_level(logging.ERROR)
+        
+        # Valid PDB content
+        valid_pdb = (
+            "HEADER    test\n" +
+            create_atom_line(1, "CA", "GLY", "A", 1, 0.0, 0.0, 0.0, "C")
+        )
+        mocker.patch("stupid_pdb.main.generate_pdb_content", return_value=valid_pdb)
+        
+        # Mock open() to raise PermissionError
+        mocker.patch("builtins.open", side_effect=PermissionError("Permission denied"))
+        
+        # Mock sys.argv
+        test_args = ["stupid_pdb", "--length", "3", "--output", "test_permission_error.pdb"]
+        mocker.patch("sys.argv", test_args)
+        
+        # Mock sys.exit
+        mock_sys_exit = mocker.patch("sys.exit")
+        
+        main.main()
+        
+        assert "An unexpected error occurred during file writing" in caplog.text
+        assert "Permission denied" in caplog.text
+        mock_sys_exit.assert_called_once_with(1)

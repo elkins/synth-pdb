@@ -308,3 +308,10 @@ AMINO_ACID_ATOMS: Dict[str, List[Dict[str, Any]]] = {
         {"name": "CG2", "element": "C", "coords": [2.5, -1.0, 0.0]},
     ],
 }
+
+ROTAMER_LIBRARY: Dict[str, Dict[str, List[float]]] = {
+    "LEU": {
+        "chi1": [-60.0, 180.0],
+    }
+}
+

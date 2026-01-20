@@ -15,6 +15,7 @@ from .data import (
     ANGLE_CA_C_O,
     BOND_LENGTH_C_N,
     ANGLE_C_N_CA,
+    ROTAMER_LIBRARY,
 )
 
 import biotite.structure as struc
@@ -35,6 +36,7 @@ PSI_ALPHA_HELIX = -47.0
 OMEGA_TRANS = 180.0
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.CRITICAL)
 
 
 def get_current_date_pdb_format() -> str:
@@ -82,85 +84,50 @@ def _position_atom_3d_from_internal_coords(
 ) -> np.ndarray:
     """
     Calculates the 3D coordinates of a new atom (P4) given the coordinates of three
-    preceding atoms (P1, P2, P3) and the internal coordinates:
-    - bond_length: distance P3-P4
-    - bond_angle_deg: angle P2-P3-P4 in degrees
-    - dihedral_angle_deg: dihedral angle P1-P2-P3-P4 in degrees
-
-    This function uses a standard method for constructing Cartesian coordinates from
-    internal coordinates.
+    preceding atoms (P1, P2, P3) and the internal coordinates.
     """
     bond_angle_rad = np.deg2rad(bond_angle_deg)
     dihedral_angle_rad = np.deg2rad(dihedral_angle_deg)
 
-    # Vectors of the reference bonds
-    vec_p3_p2 = p2 - p3  # Vector from P3 to P2
-    vec_p2_p1 = p1 - p2  # Vector from P2 to P1
-
-    norm_p3_p2 = np.linalg.norm(vec_p3_p2)
-    norm_p2_p1 = np.linalg.norm(vec_p2_p1)
-
-    # Handle degenerate cases (collinear points)
-    if norm_p3_p2 < 1e-6 or norm_p2_p1 < 1e-6:
-        logger.warning(
-            "Degenerate bond vector encountered in dihedral calculation. Placing linearly for P4."
-        )
-        if norm_p3_p2 > 1e-6:
-            return p3 + (vec_p3_p2 / norm_p3_p2) * bond_length
-        else:
-            return p3 + np.array([bond_length, 0, 0])
+    a = p2 - p1
+    b = p3 - p2
+    c = np.cross(a, b)
+    d = np.cross(c, b)
+    a /= np.linalg.norm(a)
+    b /= np.linalg.norm(b)
+    c /= np.linalg.norm(c)
+    d /= np.linalg.norm(d)
 
 
-    # Define an orthonormal basis (e1, e2, e3) for constructing P4
-    # e1: Unit vector along P3 -> P2
-    e1 = vec_p3_p2 / norm_p3_p2
+    p4 = p3 + bond_length * (
+        -b * np.cos(bond_angle_rad)
+        + d * np.sin(bond_angle_rad) * np.cos(dihedral_angle_rad)
+        + c * np.sin(bond_angle_rad) * np.sin(dihedral_angle_rad)
+    )
+    return p4
 
-    # e3: Unit vector normal to the P1-P2-P3 plane
-    # The order of cross product determines the direction of the normal.
-    # It should be cross(vec_p2_p1, vec_p3_p2)
-    e3_vec_unnormalized = np.cross(vec_p2_p1, e1) # Corrected cross product order
-    norm_e3_vec = np.linalg.norm(e3_vec_unnormalized)
 
-    if norm_e3_vec < 1e-6: # P1, P2, P3 are collinear
-        logger.warning(
-            "P1, P2, P3 are collinear, normal vector to plane is ill-defined. Using arbitrary perpendicular for e3."
-        )
-        if np.isclose(e1[0], 0) and np.isclose(e1[1], 0):
-            e3 = np.array([1.0, 0.0, 0.0])
-        else:
-            e3 = np.array([-e1[1], e1[0], 0.0])
-        e3 /= np.linalg.norm(e3)
-    else:
-        e3 = e3_vec_unnormalized / norm_e3_vec
+def _calculate_angle(
+    coord1: np.ndarray, coord2: np.ndarray, coord3: np.ndarray
+) -> float:
+    """
+    Calculates the angle (in degrees) formed by three coordinates, with coord2 as the vertex.
+    """
+    vec1 = coord1 - coord2
+    vec2 = coord3 - coord2
 
-    # e2: Unit vector in the P1-P2-P3 plane, orthogonal to e1 and e3
-    e2 = np.cross(e3, e1)
+    # Avoid division by zero for zero-length vectors
+    norm_vec1 = np.linalg.norm(vec1)
+    norm_vec2 = np.linalg.norm(vec2)
 
-    # Now, calculate the P3->P4 vector components in this (e1, e2, e3) basis
-    # The bond angle is between P2-P3 and P3-P4.
-    # The dihedral angle is between plane P1-P2-P3 and P2-P3-P4.
+    if norm_vec1 == 0 or norm_vec2 == 0:
+        return 0.0  # Or raise an error, depending on desired behavior for degenerate cases
 
-    # P3->P4 vector components
-    x_comp = -bond_length * np.cos(bond_angle_rad)
-    y_comp = bond_length * np.sin(bond_angle_rad) * np.cos(-dihedral_angle_rad) # Apply sign flip here
-    z_comp = bond_length * np.sin(bond_angle_rad) * np.sin(-dihedral_angle_rad) # And here
-
-    # Transform these components back to global coordinates
-    global_p4_coords = p3 + \
-                       (x_comp * e1) + \
-                       (y_comp * e2) + \
-                       (z_comp * e3)
-
-    # For debugging, verify the dihedral angle formed
-    actual_dihedral = PDBValidator._calculate_dihedral_angle(p1, p2, p3, global_p4_coords)
-    logger.debug(f"P1: {p1}, P2: {p2}, P3: {p3}")
-    logger.debug(f"Bond Length: {bond_length}, Bond Angle: {bond_angle_deg}, Dihedral Angle: {dihedral_angle_deg}")
-    logger.debug(f"e1: {e1}, e2: {e2}, e3: {e3}")
-    logger.debug(f"x_comp: {x_comp}, y_comp: {y_comp}, z_comp: {z_comp}")
-    logger.debug(f"Calculated dihedral for P4: {actual_dihedral:.2f}° (Expected: {dihedral_angle_deg:.2f}°)")
-    logger.debug(f"norm_e3_vec: {norm_e3_vec}")
-
-    return global_p4_coords
+    cosine_angle = np.dot(vec1, vec2) / (norm_vec1 * norm_vec2)
+    # Ensure cosine_angle is within [-1, 1] to avoid issues with arccos due to floating point inaccuracies
+    cosine_angle = np.clip(cosine_angle, -1.0, 1.0)
+    angle_rad = np.arccos(cosine_angle)
+    return np.degrees(angle_rad)
 
 
 def _generate_random_amino_acid_sequence(
@@ -205,7 +172,7 @@ def _resolve_sequence(
             # It's a single 3-letter amino acid code
             return [user_sequence_str_upper]
         else:
-            # Assume 1-letter code format like 'AGV'
+            # Assume 1-letter code format format 'AGV'
             amino_acids = []
             for one_letter_code in user_sequence_str_upper:
                 if one_letter_code not in ONE_TO_THREE_LETTER_CODE:
@@ -222,17 +189,12 @@ def _resolve_sequence(
 
 def generate_pdb_content(
     length: int = None,
-    full_atom: bool = False,
     sequence_str: str = None,
     use_plausible_frequencies: bool = False,
-    use_rotamers: bool = False,
 ) -> str:
     """
     Generates PDB content for a linear peptide chain.
     """
-    if use_rotamers and not full_atom:
-        raise ValueError("Rotamers can only be used with full_atom=True.")
-
     sequence = _resolve_sequence(
         length=length,
         user_sequence_str=sequence_str,
@@ -246,162 +208,171 @@ def generate_pdb_content(
             "Length must be a positive integer when no sequence is provided and no valid sequence string is given."
         )
 
-    if use_rotamers:
-        pdb_lines = []
-        current_date = get_current_date_pdb_format()
-        sequence_length = len(sequence)
-        pdb_lines.append(f"HEADER    PEPTIDE           {current_date}    ")
-        pdb_lines.append(f"TITLE     GENERATED LINEAR PEPTIDE OF LENGTH {sequence_length}")
-        pdb_lines.append("REMARK 1  This PDB file was generated by the CLI 'stupid-pdb' tool.")
-        pdb_lines.append("REMARK 2  It represents a simplified model of a linear peptide chain.")
-        pdb_lines.append("REMARK 2  Coordinates are idealized and do not reflect real-world physics.")
-        pdb_lines.append(f"COMPND    MOL_ID: 1; MOLECULE: LINEAR PEPTIDE; CHAIN: A; LENGTH: {sequence_length};")
-        pdb_lines.append("SOURCE    ENGINEERED; SYNTHETIC CONSTRUCT;")
-        pdb_lines.append("KEYWDS    PEPTIDE, LINEAR, GENERATED, THEORETICAL MODEL")
-        pdb_lines.append("EXPDTA    THEORETICAL MODEL")
-        pdb_lines.append("AUTHOR    STUPID PDB")
-        pdb_lines.append("MODEL        1")
+    pdb_header_lines = []
+    current_date = get_current_date_pdb_format()
+    sequence_length = len(sequence)
+    pdb_header_lines.append(f"HEADER    PEPTIDE           {current_date}    ")
+    pdb_header_lines.append(f"TITLE     GENERATED LINEAR PEPTIDE OF LENGTH {sequence_length}")
+    pdb_header_lines.append("REMARK 1  This PDB file was generated by the CLI 'stupid-pdb' tool.")
+    pdb_header_lines.append("REMARK 2  It represents a simplified model of a linear peptide chain.")
+    pdb_header_lines.append("REMARK 2  Coordinates are idealized and do not reflect real-world physics.")
+    pdb_header_lines.append(f"COMPND    MOL_ID: 1; MOLECULE: LINEAR PEPTIDE; CHAIN: A; LENGTH: {sequence_length};")
+    pdb_header_lines.append("SOURCE    ENGINEERED; SYNTHETIC CONSTRUCT;")
+    pdb_header_lines.append("KEYWDS    PEPTIDE, LINEAR, GENERATED, THEORETICAL MODEL")
+    pdb_header_lines.append("EXPDTA    THEORETICAL MODEL")
+    pdb_header_lines.append("AUTHOR    STUPID PDB")
+    pdb_header_lines.append("MODEL        1")
 
-        # Build backbone
-        backbone = struc.AtomArray(0)
-        for i, res_name in enumerate(sequence):
-            res_id = i + 1
-            if i == 0:
-                # Place N of first residue at origin
-                n_coord = np.array([0.0, 0.0, 0.0])
-                # Place CA of first residue on x-axis
-                ca_coord = n_coord + np.array([BOND_LENGTH_N_CA, 0.0, 0.0])
-                # Place C of first residue in xy-plane
-                c_coord = _position_atom_3d_from_internal_coords(
-                    p1=n_coord + np.array([0.0, 0.0, 1.0]), 
-                    p2=n_coord, 
-                    p3=ca_coord,
-                    bond_length=BOND_LENGTH_CA_C,
-                    bond_angle_deg=ANGLE_N_CA_C,
-                    dihedral_angle_deg=0.0
-                )
-            else:
-                prev_n = backbone[backbone.atom_name == "N"][-1]
-                prev_ca = backbone[backbone.atom_name == "CA"][-1]
-                prev_c = backbone[backbone.atom_name == "C"][-1]
-
-                n_coord = _position_atom_3d_from_internal_coords(
-                    prev_n.coord, prev_ca.coord, prev_c.coord,
-                    BOND_LENGTH_C_N, ANGLE_CA_C_N, OMEGA_TRANS
-                )
-                ca_coord = _position_atom_3d_from_internal_coords(
-                    prev_ca.coord, prev_c.coord, n_coord,
-                    BOND_LENGTH_N_CA, ANGLE_C_N_CA, PHI_ALPHA_HELIX
-                )
-                c_coord = _position_atom_3d_from_internal_coords(
-                    prev_c.coord, n_coord, ca_coord,
-                    BOND_LENGTH_CA_C, ANGLE_N_CA_C, PSI_ALPHA_HELIX
-                )
-
-            atom_n = struc.Atom(n_coord, atom_name="N", res_id=res_id, res_name=res_name, element="N")
-            atom_ca = struc.Atom(ca_coord, atom_name="CA", res_id=res_id, res_name=res_name, element="C")
-            atom_c = struc.Atom(c_coord, atom_name="C", res_id=res_id, res_name=res_name, element="C")
-            backbone += struc.array([atom_n, atom_ca, atom_c])
-
-        # Add side chains
-        peptide = backbone.copy()
-        for i, res_name in enumerate(sequence):
-            res_id = i + 1
-            
-            # Get reference residue from biotite
-            ref_res = struc.info.residue(res_name)
-            
-            # Get backbone atoms of reference and peptide
-            ref_backbone = ref_res[struc.filter_peptide_backbone(ref_res)]
-            peptide_backbone = peptide[(peptide.res_id == res_id) & (struc.filter_peptide_backbone(peptide))]
-            
-            # Superimpose
-            _, transformation = struc.superimpose(peptide_backbone, ref_backbone)
-            
-            # Add side chain atoms
-            side_chain_atoms = ref_res[~struc.filter_peptide_backbone(ref_res)]
-            side_chain_atoms.coord = transformation.apply(side_chain_atoms.coord)
-            peptide += side_chain_atoms
-            
-        # Add TER and END
-        pdb_file = pdb.PDBFile()
-        pdb_file.set_structure(peptide)
+    peptide = struc.AtomArray(0)
+    
+    # Build backbone and add side chains
+    for i, res_name in enumerate(sequence):
+        res_id = i + 1
         
-        # Use an in-memory stream
-        string_io = io.StringIO()
-        pdb_file.write(string_io)
-        
-        pdb_lines.append(string_io.getvalue())
-        pdb_lines.append("ENDMDL\n")
-        pdb_lines.append("END         ")
-        return "\n".join(pdb_lines)
+        # Determine backbone coordinates based on previous residue or initial placement
+        if i == 0:
+            n_coord = np.array([0.0, 0.0, 0.0])
+            ca_coord = np.array([BOND_LENGTH_N_CA, 0.0, 0.0])
+            c_coord = ca_coord + np.array([BOND_LENGTH_CA_C * np.cos(np.deg2rad(180-ANGLE_N_CA_C)), BOND_LENGTH_CA_C * np.sin(np.deg2rad(180-ANGLE_N_CA_C)), 0.0])
+        else:
+            # Extract previous C from the already built peptide
+            # Use unpadded atom names as biotite normalizes them
+            prev_c_atom = peptide[(peptide.res_id == res_id - 1) & (peptide.atom_name == "C")][-1]
+            prev_ca_atom = peptide[(peptide.res_id == res_id - 1) & (peptide.atom_name == "CA")][-1]
+            prev_n_atom = peptide[(peptide.res_id == res_id - 1) & (peptide.atom_name == "N")][-1]
 
-    else: # Original logic without rotamers
-        pdb_lines = []
-
-        current_date = get_current_date_pdb_format()
-        sequence_length = len(sequence)
-        pdb_lines.append(f"HEADER    PEPTIDE           {current_date}    ")
-        pdb_lines.append(f"TITLE     GENERATED LINEAR PEPTIDE OF LENGTH {sequence_length}")
-        pdb_lines.append("REMARK 1  This PDB file was generated by the CLI 'stupid-pdb' tool.")
-        pdb_lines.append("REMARK 2  It represents a simplified model of a linear peptide chain.")
-        pdb_lines.append("REMARK 2  Coordinates are idealized and do not reflect real-world physics.")
-        pdb_lines.append(f"COMPND    MOL_ID: 1; MOLECULE: LINEAR PEPTIDE; CHAIN: A; LENGTH: {sequence_length};")
-        pdb_lines.append("SOURCE    ENGINEERED; SYNTHETIC CONSTRUCT;")
-        pdb_lines.append("KEYWDS    PEPTIDE, LINEAR, GENERATED, THEORETICAL MODEL")
-        pdb_lines.append("EXPDTA    THEORETICAL MODEL")
-        pdb_lines.append("AUTHOR    STUPID PDB")
-        pdb_lines.append("MODEL        1")
-
-        atom_count = 1
-        current_ca_coords = np.array([0.0, 0.0, 0.0])
-
-        for i, aa_3l_code in enumerate(sequence):
-            residue_number = i + 1
-            if not full_atom:
-                pdb_lines.append(PDB_ATOM_FORMAT.format(atom_number=atom_count, atom_name="CA", alt_loc="", residue_name=aa_3l_code, chain_id="A", residue_number=residue_number, insertion_code="", x_coord=current_ca_coords[0], y_coord=current_ca_coords[1], z_coord=current_ca_coords[2], occupancy=1.00, temp_factor=0.00, element="C", charge=""))
-                atom_count += 1
-                current_ca_coords[0] += CA_DISTANCE
-            else:
-                if i == 0:
-                    n_coords = np.array([0.0, 0.0, 0.0])
-                    ca_coords = n_coords + np.array([BOND_LENGTH_N_CA, 0.0, 0.0])
-                    c_coords = _position_atom_3d_from_internal_coords(p1=n_coords + np.array([0.0, 0.0, 1.0]), p2=n_coords, p3=ca_coords, bond_length=BOND_LENGTH_CA_C, bond_angle_deg=ANGLE_N_CA_C, dihedral_angle_deg=0.0)
-                    o_coords = _position_atom_3d_from_internal_coords(p1=n_coords, p2=ca_coords, p3=c_coords, bond_length=BOND_LENGTH_C_O, bond_angle_deg=ANGLE_CA_C_O, dihedral_angle_deg=180.0)
-                    prev_n_coords = n_coords
-                    prev_ca_coords = ca_coords
-                    prev_c_coords = c_coords
-                else:
-                    n_coords = _position_atom_3d_from_internal_coords(p1=prev_n_coords, p2=prev_ca_coords, p3=prev_c_coords, bond_length=BOND_LENGTH_C_N, bond_angle_deg=ANGLE_CA_C_N, dihedral_angle_deg=OMEGA_TRANS)
-                    ca_coords = _position_atom_3d_from_internal_coords(p1=prev_ca_coords, p2=prev_c_coords, p3=n_coords, bond_length=BOND_LENGTH_N_CA, bond_angle_deg=ANGLE_C_N_CA, dihedral_angle_deg=PHI_ALPHA_HELIX)
-                    c_coords = _position_atom_3d_from_internal_coords(p1=prev_c_coords, p2=n_coords, p3=ca_coords, bond_length=BOND_LENGTH_CA_C, bond_angle_deg=ANGLE_N_CA_C, dihedral_angle_deg=PSI_ALPHA_HELIX)
-                    o_coords = _position_atom_3d_from_internal_coords(p1=n_coords, p2=ca_coords, p3=c_coords, bond_length=BOND_LENGTH_C_O, bond_angle_deg=ANGLE_CA_C_O, dihedral_angle_deg=180.0)
-                    prev_n_coords = n_coords
-                    prev_ca_coords = ca_coords
-                    prev_c_coords = c_coords
-                
-                pdb_lines.append(PDB_ATOM_FORMAT.format(atom_number=atom_count, atom_name="N", alt_loc="", residue_name=aa_3l_code, chain_id="A", residue_number=residue_number, insertion_code="", x_coord=n_coords[0], y_coord=n_coords[1], z_coord=n_coords[2], occupancy=1.00, temp_factor=0.00, element="N", charge=""))
-                atom_count += 1
-                pdb_lines.append(PDB_ATOM_FORMAT.format(atom_number=atom_count, atom_name="CA", alt_loc="", residue_name=aa_3l_code, chain_id="A", residue_number=residue_number, insertion_code="", x_coord=ca_coords[0], y_coord=ca_coords[1], z_coord=ca_coords[2], occupancy=1.00, temp_factor=0.00, element="C", charge=""))
-                atom_count += 1
-                pdb_lines.append(PDB_ATOM_FORMAT.format(atom_number=atom_count, atom_name="C", alt_loc="", residue_name=aa_3l_code, chain_id="A", residue_number=residue_number, insertion_code="", x_coord=c_coords[0], y_coord=c_coords[1], z_coord=c_coords[2], occupancy=1.00, temp_factor=0.00, element="C", charge=""))
-                atom_count += 1
-                pdb_lines.append(PDB_ATOM_FORMAT.format(atom_number=atom_count, atom_name="O", alt_loc="", residue_name=aa_3l_code, chain_id="A", residue_number=residue_number, insertion_code="", x_coord=o_coords[0], y_coord=o_coords[1], z_coord=o_coords[2], occupancy=1.00, temp_factor=0.00, element="O", charge=""))
-                atom_count += 1
-
-                if aa_3l_code in AMINO_ACID_ATOMS:
-                    for atom_data in AMINO_ACID_ATOMS[aa_3l_code]:
-                        side_chain_coords = ca_coords + np.array(atom_data["coords"])
-                        pdb_lines.append(PDB_ATOM_FORMAT.format(atom_number=atom_count, atom_name=atom_data["name"], alt_loc="", residue_name=aa_3l_code, chain_id="A", residue_number=residue_number, insertion_code="", x_coord=side_chain_coords[0], y_coord=side_chain_coords[1], z_coord=side_chain_coords[2], occupancy=1.00, temp_factor=0.00, element=atom_data["element"], charge=""))
-                        atom_count += 1
-        
-        if sequence:
-            last_residue_name = sequence[-1]
-            last_residue_number = len(sequence)
-            pdb_lines.append(
-                f"TER   {atom_count: >5}      {last_residue_name: >3} A{last_residue_number: >4}"
+            n_coord = _position_atom_3d_from_internal_coords(
+                prev_n_atom.coord, prev_ca_atom.coord, prev_c_atom.coord,
+                BOND_LENGTH_C_N, ANGLE_CA_C_N, OMEGA_TRANS
+            )
+            ca_coord = _position_atom_3d_from_internal_coords(
+                prev_ca_atom.coord, prev_c_atom.coord, n_coord,
+                BOND_LENGTH_N_CA, ANGLE_C_N_CA, PHI_ALPHA_HELIX
+            )
+            c_coord = _position_atom_3d_from_internal_coords(
+                prev_c_atom.coord, n_coord, ca_coord,
+                BOND_LENGTH_CA_C, ANGLE_N_CA_C, PSI_ALPHA_HELIX
             )
         
-        pdb_lines.append("ENDMDL")
-        pdb_lines.append("END         ")
-        return "\n".join(pdb_lines)
+        # Get reference residue from biotite
+        # Use appropriate terminal definitions
+        if i == 0: # N-terminal residue
+            ref_res_template = struc.info.residue(res_name, 'N_TERM')
+        elif i == len(sequence) - 1: # C-terminal residue
+            ref_res_template = struc.info.residue(res_name, 'C_TERM')
+        else: # Internal residue
+            ref_res_template = struc.info.residue(res_name, 'INTERNAL')
+
+        if res_name in ROTAMER_LIBRARY:
+            chi1_target = ROTAMER_LIBRARY[res_name]["chi1"][0]
+            
+            n_template = ref_res_template[ref_res_template.atom_name == "N"][0]
+            ca_template = ref_res_template[ref_res_template.atom_name == "CA"][0]
+            cb_template = ref_res_template[ref_res_template.atom_name == "CB"][0]
+            cg_template = ref_res_template[ref_res_template.atom_name == "CG"][0]
+            
+            bond_length_cb_cg = np.linalg.norm(cg_template.coord - cb_template.coord)
+            angle_ca_cb_cg = _calculate_angle(ca_template.coord, cb_template.coord, cg_template.coord)
+
+            cg_coord = _position_atom_3d_from_internal_coords(
+                n_template.coord, ca_template.coord, cb_template.coord,
+                bond_length_cb_cg, angle_ca_cb_cg, chi1_target
+            )
+            ref_res_template.coord[ref_res_template.atom_name == "CG"][0] = cg_coord
+            
+        # Extract N, CA, C from ref_res_template
+        # Ensure these atoms are present in the template. Some templates might not have N or C (e.g., non-standard)
+        template_backbone_n = ref_res_template[ref_res_template.atom_name == "N"]
+        template_backbone_ca = ref_res_template[ref_res_template.atom_name == "CA"]
+        template_backbone_c = ref_res_template[ref_res_template.atom_name == "C"]
+
+        # Filter out empty AtomArrays for robustness
+        mobile_atoms = []
+        if template_backbone_n.array_length() > 0:
+            mobile_atoms.append(template_backbone_n)
+        if template_backbone_ca.array_length() > 0:
+            mobile_atoms.append(template_backbone_ca)
+        if template_backbone_c.array_length() > 0:
+            mobile_atoms.append(template_backbone_c)
+        
+        if not mobile_atoms:
+            raise ValueError(f"Reference residue template for {res_name} is missing N, CA, or C atoms needed for superimposition.")
+
+        mobile_backbone_from_template = struc.array(mobile_atoms)
+
+        # Create the 'target' structure for superimposition from the *constructed* coordinates
+        target_backbone_constructed = struc.array([
+            struc.Atom(n_coord, atom_name="N", res_id=res_id, res_name=res_name, element="N", hetero=False),
+            struc.Atom(ca_coord, atom_name="CA", res_id=res_id, res_name=res_name, element="C", hetero=False),
+            struc.Atom(c_coord, atom_name="C", res_id=res_id, res_name=res_name, element="C", hetero=False)
+        ])
+        
+        # Perform superimposition
+        _, transformation = struc.superimpose(mobile_backbone_from_template, target_backbone_constructed)
+        
+        # Apply transformation to the entire reference residue template
+        transformed_res = ref_res_template
+        transformed_res.coord = transformation.apply(transformed_res.coord)
+        
+        # Set residue ID and name for the transformed residue
+        transformed_res.res_id[:] = res_id
+        transformed_res.res_name[:] = res_name
+        transformed_res.chain_id[:] = "A" # Ensure chain ID is set
+        
+        # Append the transformed residue to the peptide
+        peptide += transformed_res
+    
+    # After all residues are added, ensure global chain_id is 'A' (redundant if already set above, but good safeguard)
+    peptide.chain_id = np.array(["A"] * peptide.array_length(), dtype="U1")
+    
+    # Assign sequential atom_id to all atoms in the peptide AtomArray
+    peptide.atom_id = np.arange(1, peptide.array_length() + 1)
+
+    pdb_file = pdb.PDBFile()
+    pdb_file.set_structure(peptide)
+    
+    string_io = io.StringIO()
+    pdb_file.write(string_io)
+    
+    # Construct the final PDB content including header and footer
+    header_content = "\n".join(pdb_header_lines) # The pdb_lines already contain the header
+    
+    # Biotite's PDBFile.write() will write ATOM records, which can be 78 or 80 chars.
+    # It also handles TER records between chains, but not necessarily at the end of a single chain.
+    atomic_and_ter_content = string_io.getvalue()
+
+    # Manually add TER record if biotite doesn't add one at the end of the last chain.
+    # Check if the last record written by biotite is an ATOM/HETATM, if so, add TER manually.
+    last_line = atomic_and_ter_content.strip().splitlines()[-1]
+    if last_line.startswith("ATOM") or last_line.startswith("HETATM"):
+        # Get last atom details from the peptide AtomArray
+        last_atom = peptide[-1]
+        ter_atom_num = peptide.array_length() + 1 # TER serial number is last ATOM serial + 1
+        ter_res_name = last_atom.res_name
+        ter_chain_id = last_atom.chain_id
+        ter_res_num = last_atom.res_id
+        ter_record = f"TER   {ter_atom_num: >5}      {ter_res_name: >3} {ter_chain_id: <1}{ter_res_num: >4}".ljust(80)
+        atomic_and_ter_content = atomic_and_ter_content.strip() + "\n" + ter_record + "\n"
+
+
+    # Ensure each line is 80 characters by padding with spaces if necessary
+    padded_atomic_and_ter_content_lines = []
+    for line in atomic_and_ter_content.splitlines():
+
+        if len(line) < 80:
+            padded_atomic_and_ter_content_lines.append(line.ljust(80))
+        else:
+            padded_atomic_and_ter_content_lines.append(line)
+    
+    # Join with newline and then strip any trailing whitespace from the overall block
+    final_atomic_content_block = "\n".join(padded_atomic_and_ter_content_lines).strip()
+    
+    # Final assembly of content
+    final_pdb_content_lines = pdb_header_lines.copy()
+    final_pdb_content_lines.append(final_atomic_content_block)
+    
+    # ENDMDL and END are part of the full PDB format, usually coming after the atom/ter records
+    final_pdb_content_lines.append("ENDMDL")
+    final_pdb_content_lines.append("END         ") # 10 spaces for standard PDB END
+
+    return "\n".join(final_pdb_content_lines)

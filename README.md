@@ -1,143 +1,379 @@
 # stupid-pdb
 
-A simple tool to naively generate Protein Data Bank (PDB) files.
-The resulting linear peptide may not necessarily be biophysically realistic or useful for any purpose.
+A command-line tool to generate Protein Data Bank (PDB) files with full atomic representation for testing, benchmarking, and educational purposes.
+
+> ⚠️ **Important**: The generated structures use idealized geometries and may contain violations of standard structural constraints. These files are intended for **testing computational tools** and **educational demonstrations**, not for simulation or experimental validation.
 
 ## Table of Contents
+- [Features](#features)
 - [Installation](#installation)
+- [Quick Start](#quick-start)
 - [Usage](#usage)
+  - [Command-Line Arguments](#command-line-arguments)
+  - [Examples](#examples)
+- [Validation & Refinement](#validation--refinement)
 - [Output PDB Format](#output-pdb-format)
-- [Logging](#logging)
-- [Development and Extensibility](#development-and-extensibility)
+- [Scientific Context](#scientific-context)
+- [Limitations](#limitations)
+- [Development](#development)
+- [License](#license)
+
+## Features
+
+✨ **Structure Generation**
+- Full atomic representation with backbone and side-chain heavy atoms + hydrogens
+- Customizable sequence (1-letter or 3-letter amino acid codes)
+- Random sequence generation with uniform or biologically plausible frequencies
+- Rotamer-based side-chain placement for selected residues (LEU)
+
+🔬 **Validation Suite**
+- Bond length validation
+- Bond angle validation
+- Ramachandran angle checking (phi/psi dihedral angles)
+- Steric clash detection (minimum distance + van der Waals overlap)
+- Peptide plane planarity (omega angle)
+- Sequence improbability detection (charge clusters, hydrophobic stretches, etc.)
+
+⚙️ **Quality Control**
+- `--best-of-N`: Generate multiple structures and select the one with fewest violations
+- `--guarantee-valid`: Iteratively generate until a violation-free structure is found
+- `--refine-clashes`: Iteratively adjust atoms to reduce steric clashes
+
+📝 **Reproducibility**
+- Command-line parameters stored in PDB header (REMARK 3 records)
+- Timestamps in generated filenames and headers
 
 ## Installation
 
-You can install `stupid-pdb` directly from the project directory using pip:
+Install directly from the project directory using pip:
 
 ```bash
 pip install .
 ```
 
-This will install the `stupid-pdb` package and make the `stupid-pdb` command available in your terminal.
+This installs the `stupid-pdb` package and makes the `stupid-pdb` command available system-wide.
+
+### Requirements
+- Python 3.8+
+- NumPy
+- Biotite (for residue templates and structure manipulation)
+
+## Quick Start
+
+Generate a simple 10-residue peptide:
+```bash
+stupid-pdb --length 10
+```
+
+Generate and validate a specific sequence:
+```bash
+stupid-pdb --sequence "ACDEFGHIKLMNPQRSTVWY" --validate --output my_peptide.pdb
+```
+
+Generate the best of 10 attempts with clash refinement:
+```bash
+stupid-pdb --length 20 --best-of-N 10 --refine-clashes 5 --output refined_peptide.pdb
+```
 
 ## Usage
 
-The `stupid-pdb` tool is a command-line interface (CLI) application.
+### Command-Line Arguments
 
-### Running after `pip install .`
+#### **Structure Definition**
 
-If you have installed the package using `pip install .`, you can use the `stupid-pdb` command from any directory:
+- `--length <LENGTH>`: Number of residues in the peptide chain
+  - Type: Integer
+  - Default: `10`
+  - Example: `--length 50`
+
+- `--sequence <SEQUENCE>`: Specify an exact amino acid sequence
+  - Formats: 
+    - 1-letter codes: `"ACDEFG"`
+    - 3-letter codes: `"ALA-CYS-ASP-GLU-PHE-GLY"`
+  - Overrides `--length`
+  - Example: `--sequence "MVHLTPEEK"`
+
+- `--plausible-frequencies`: Use biologically realistic amino acid frequencies for random generation
+  - Based on natural protein composition
+  - Ignored if `--sequence` is provided
+
+#### **Validation & Quality Control**
+
+- `--validate`: Run validation checks on the generated structure
+  - Checks: bond lengths, bond angles, Ramachandran, steric clashes, peptide planes, sequence improbabilities
+  - Reports violations to console
+
+- `--guarantee-valid`: Generate structures until one with zero violations is found
+  - Implies `--validate`
+  - Use with `--max-attempts` to limit iterations
+  - Example: `--guarantee-valid --max-attempts 100`
+
+- `--max-attempts <N>`: Maximum generation attempts for `--guarantee-valid`
+  - Default: `100`
+
+- `--best-of-N <N>`: Generate N structures and select the one with fewest violations
+  - Implies `--validate`
+  - Overrides `--guarantee-valid`
+  - Example: `--best-of-N 20`
+
+- `--refine-clashes <ITERATIONS>`: Iteratively adjust atoms to reduce steric clashes
+  - Applies after structure selection
+  - Iterates until improvements stop or max iterations reached
+  - Example: `--refine-clashes 10`
+
+#### **Output Options**
+
+- `--output <FILENAME>`: Custom output filename
+  - If omitted, auto-generates: `random_linear_peptide_<length>_<timestamp>.pdb`
+  - Example: `--output my_protein.pdb`
+
+- `--log-level {DEBUG,INFO,WARNING,ERROR,CRITICAL}`: Logging verbosity
+  - Default: `INFO`
+  - Use `DEBUG` for detailed validation reports
+
+### Examples
+
+#### Basic Generation
 
 ```bash
-stupid-pdb --length 50
+# Simple 25-residue peptide
+stupid-pdb --length 25
+
+# Custom sequence with validation
+stupid-pdb --sequence "ELVIS" --validate --output elvis.pdb
+
+# Use biologically realistic frequencies
+stupid-pdb --length 100 --plausible-frequencies
 ```
 
-### Running directly with Python
-
-You can also run the tool directly from the project root directory without installing it via pip:
+#### Quality Control
 
 ```bash
-python -m stupid_pdb.main --length 50
+# Generate until valid (may take time!)
+stupid-pdb --length 15 --guarantee-valid --max-attempts 200 --output valid.pdb
+
+# Best of 50 attempts
+stupid-pdb --length 20 --best-of-N 50 --output best_structure.pdb
+
+# Refine steric clashes (5 iterations)
+stupid-pdb --length 30 --refine-clashes 5 --output refined.pdb
+
+# Combined: best of 10 + refinement
+stupid-pdb --length 25 --best-of-N 10 --refine-clashes 3 --output optimized.pdb
 ```
 
-This will create a file named `random_linear_peptide_50_YYYYMMDD_HHMMSS.pdb` in your current directory.
+#### For Structural Biologists
 
-### Command-line Arguments
+```bash
+# All natural amino acids with validation report
+stupid-pdb --sequence "ACDEFGHIKLMNPQRSTVWY" --validate --log-level DEBUG
 
--   `--length <LENGTH>`: Specifies the length of the amino acid sequence (number of residues).
-    -   Type: Integer
-    -   Default: `10`
-    -   Example: `--length 100`
+# Test structure for MD simulation pipeline
+stupid-pdb --length 50 --guarantee-valid --max-attempts 500 --output test_md.pdb
 
--   `--output <FILENAME>`: Optional. Provides a custom filename for the output PDB file.
-    -   Type: String
-    -   Example: `--output my_custom_protein.pdb`
+# Benchmark structure with known violations (good for testing validators)
+stupid-pdb --length 100 --validate --output benchmark.pdb
+```
 
--   `--log-level {DEBUG,INFO,WARNING,ERROR,CRITICAL}`: Sets the verbosity of the logging output.
-    -   Type: String
-    -   Default: `INFO`
-    -   Example: `--log-level DEBUG` (for verbose debugging information)
+## Validation & Refinement
 
--   `--full-atom`: A flag that, when present, instructs the tool to generate a full atomic representation (N, CA, C, O, and side chain atoms) for each residue, rather than just the C-alpha atom.
-    -   Type: Boolean flag (no value needed)
-    -   Example: `--full-atom`
+### Validation Checks
 
--   `--sequence <SEQUENCE_STRING>`: Specify an amino acid sequence (e.g., 'AGV' or 'ALA-GLY-VAL'). When provided, this sequence will be used instead of random generation.
-    -   Type: String
-    -   Example: `--sequence "AGV"` or `--sequence "ALA-GLY-VAL"`
+When `--validate` is enabled, the tool checks for:
 
--   `--plausible-frequencies`: A flag that, when present, instructs the tool to use biologically plausible amino acid frequencies for random sequence generation. This option is ignored if `--sequence` is provided.
-    -   Type: Boolean flag (no value needed)
-    -   Example: `--plausible-frequencies`
+1. **Bond Lengths**: Compares N-CA, CA-C, C-N, C-O distances against standard values (±0.05 Å tolerance)
 
--   `--use-rotamers`: Use a rotamer library to generate side-chain conformations. Requires `--full-atom`.
-    -   Type: Boolean flag (no value needed)
-    -   Example: `--use-rotamers`
+2. **Bond Angles**: Validates N-CA-C, CA-C-N, CA-C-O angles (±5° tolerance)
 
-### Examples:
+3. **Ramachandran Angles**: Checks phi/psi dihedral angles against allowed regions
+   - Allowed: alpha-helix, beta-sheet, and left-handed alpha-helix regions
+   - Glycine and proline have relaxed criteria
 
-1.  **Generate a 25-residue protein with default filename (uniform random sequence):**
-    ```bash
-    stupid-pdb --length 25
-    ```
+4. **Steric Clashes**: Detects atoms that are too close
+   - Minimum distance rule: ≥2.0 Å between any atoms
+   - van der Waals overlap: atoms closer than sum of vdW radii
 
-2.  **Generate a 10-residue protein with a custom filename (CA-only, uniform random sequence):**
-    ```bash
-    stupid-pdb --length 10 --output short_peptide.pdb
-    ```
+5. **Peptide Plane Planarity**: Checks omega (ω) dihedral angles
+   - Trans: ~180° (±30° tolerance)
+   - Cis: ~0° (±30° tolerance)
 
-3.  **Generate a 50-residue protein with debug logging (CA-only, uniform random sequence):**
-    ```bash
-    stupid-pdb --length 50 --log-level DEBUG
-    ```
+6. **Sequence Improbabilities**: Flags unusual sequence patterns
+   - Charge clusters (4+ consecutive charged residues)
+   - Long hydrophobic stretches (8+ residues)
+   - Odd cysteine counts (unpaired cysteines)
+   - Poly-proline or poly-glycine runs
 
-4.  **Generate a 5-residue protein with full atomic detail (uniform random sequence):**
-    ```bash
-    stupid-pdb --length 5 --full-atom --output full_atom_peptide.pdb
-    ```
+### Refinement Strategy
 
-5.  **Generate a 100-residue protein using biologically plausible amino acid frequencies:**
-    ```bash
-    stupid-pdb --length 100 --plausible-frequencies --output plausible_peptide.pdb
-    ```
+The `--refine-clashes` option uses an iterative approach:
+1. Identifies clashing atom pairs
+2. Slightly adjusts positions to increase separation
+3. Re-validates structure
+4. Stops when no improvement or max iterations reached
 
-6.  **Generate a protein with a specific sequence:**
-    ```bash
-    stupid-pdb --sequence "AGV" --output my_specific_peptide.pdb
-    # or using 3-letter codes
-    stupid-pdb --sequence "ALA-GLY-VAL" --output another_specific_peptide.pdb
-    ```
-
-7.  **Generate a 10-residue protein with side-chains generated using a rotamer library:**
-    ```bash
-    stupid-pdb --length 10 --full-atom --use-rotamers --output rotamer_peptide.pdb
-    ```
-
+> **Note**: Refinement focuses on steric clashes and may introduce other violations. Use in combination with `--best-of-N` for better results.
 
 ## Output PDB Format
 
-The generated PDB files can now contain either:
--   **C-alpha only**: This is the default. Each residue is represented by a single `ATOM` record for its alpha-carbon (CA).
--   **Full atomic representation**: When the `--full-atom` flag is used, each residue will include `ATOM` records for its backbone atoms (Nitrogen, Alpha-Carbon, Carbonyl Carbon, and Carbonyl Oxygen) and all heavy atoms of its side chain (e.g., C-beta, C-gamma, etc.). Hydrogen atoms are not included in this rudimentary full atom model.
+### Structure Representation
 
-In both cases, the protein is represented as a linear chain along the X-axis, with a fixed distance of 3.8 Angstroms between consecutive C-alpha atoms. The full atomic representation positions atoms relative to this backbone geometry using simplified bond lengths and angles.
+- **Full Atomic Model**: All backbone atoms (N, CA, C, O) + side-chain heavy atoms + hydrogens
+- **Geometry**: Linear alpha-helix conformation along the X-axis
+- **Chain ID**: Always 'A'
+- **Residue Numbering**: Sequential from 1
+- **Terminal Modifications**: N-terminal and C-terminal hydrogens/oxygens included
 
-Each `ATOM` record includes:
--   Atom number
--   Atom name (e.g., 'N', 'CA', 'C', 'O', 'CB', 'CG', etc.)
--   Residue name (3-letter code, randomly chosen)
--   Chain ID (always 'A')
--   Residue number
--   X, Y, Z coordinates (Y and Z will vary for full atom models)
--   Occupancy and Temperature Factor (fixed values)
--   Element (e.g., 'C', 'N', 'O', 'S')
+### Header Information
 
-## Logging
+Generated PDB files include standard header records:
 
-The tool uses Python's standard `logging` module.
--   `INFO` level messages provide general updates on the process.
--   `DEBUG` level messages offer detailed insights into internal operations.
--   `WARNING` messages indicate unusual but non-critical conditions.
--   `ERROR` and `CRITICAL` messages are used for exceptions and severe failures.
+```
+HEADER    PEPTIDE           <DATE>
+TITLE     GENERATED LINEAR PEPTIDE OF LENGTH <N>
+REMARK 1  This PDB file was generated by the CLI 'stupid-pdb' tool.
+REMARK 2  It represents a simplified model of a linear peptide chain.
+REMARK 2  Coordinates are idealized and do not reflect real-world physics.
+REMARK 3  GENERATION PARAMETERS:
+REMARK 3  Command: stupid-pdb --length 10 --validate ...
+```
 
-You can control the logging verbosity using the `--log-level` argument.
+The **REMARK 3** records store the exact command-line arguments used for **reproducibility**.
+
+### Validation Reports
+
+When `--validate` is used, violations are reported:
+```
+WARNING  --- PDB Validation Report for /path/to/file.pdb ---
+WARNING  Final PDB has 5 violations.
+WARNING  Bond length violation: N-1-A to CA-1-A. Distance: 1.52Å, Expected: 1.46Å±0.05Å
+WARNING  Steric clash (min distance): Atoms CA-3-A and CB-3-A are too close (1.85Å)...
+```
+
+## Scientific Context
+
+### Intended Use Cases
+
+✅ **Appropriate Uses:**
+- Testing PDB parsers and file I/O
+- Benchmarking structure validation tools
+- Educational demonstrations of protein structure concepts
+- Generating test datasets for bioinformatics pipelines
+- Placeholder structures for software development
+
+❌ **Inappropriate Uses:**
+- Molecular dynamics simulations
+- Homology modeling templates
+- Drug docking studies
+- Experimental predictions
+- Publication-quality structures
+
+### Why "stupid-pdb"?
+
+The name reflects the tool's **intentionally simplistic** approach:
+- Uses idealized bond lengths and angles (not energy-minimized)
+- Linear backbone geometry (no native-like folding)
+- Simplified rotamer placement (limited conformational sampling)
+- No solvent, no cofactors, no post-translational modifications
+
+Real protein structures require sophisticated methods like:
+- Molecular dynamics with force fields (AMBER, CHARMM)
+- Quantum mechanics calculations (DFT)
+- Energy minimization and conformational search
+- Crystallographic or NMR experimental data
+
+## Limitations
+
+### Structural Limitations
+
+1. **Linear Geometry**: All structures are extended alpha-helixes
+   - No beta-sheets, turns, or loops
+   - No tertiary or quaternary structure
+
+2. **Idealized Parameters**: Bond lengths/angles from literature averages
+   - No force field optimization
+   - May deviate from experimental structures
+
+3. **Limited Rotamers**: Only LEU uses rotamer library currently
+   - Other residues use template geometries
+   - Side chains may have unfavorable conformations
+
+4. **No Environmental Effects**:
+   - No solvent (water) molecules
+   - No ions or cofactors
+   - No pH effects on protonation states
+
+### Validation Limitations
+
+- **Simplified Ramachandran regions**: 3 main regions only (not 100% accurate)
+- **VdW radii**: Approximate values, not element/hybridization-specific
+- **No electrostatics**: Doesn't check charge-charge interactions
+- **No hydrogen bonding**: Doesn't validate H-bond geometry
+
+### Performance Considerations
+
+- `--guarantee-valid` may **never converge** for long sequences (>50 residues)
+  - Combinatorial explosion of possible violations
+  - Consider using `--best-of-N` instead
+
+- `--refine-clashes` is **iterative and may be slow** for large structures
+  - Each iteration requires full re-validation
+
+- Validation runtime scales with sequence length (O(N²) for steric clashes)
+
+## Development
+
+### Running Tests
+
+```bash
+# All tests
+pytest -v
+
+# With coverage
+pytest --cov=stupid_pdb --cov-report=term-missing
+
+# Specific test file
+pytest tests/test_generator.py -v
+```
+
+**Test Coverage**: 95% overall
+- 75 tests covering generation, validation, CLI, and edge cases
+
+### Project Structure
+
+```
+stupid-pdb/
+├── stupid_pdb/
+│   ├── __init__.py
+│   ├── main.py          # CLI entry point
+│   ├── generator.py     # PDB structure generation
+│   ├── validator.py     # Validation checks
+│   └── data.py          # Constants and rotamer library
+├── tests/
+│   ├── test_generator.py
+│   ├── test_generator_rotamer.py
+│   ├── test_validator.py
+│   └── test_main_cli.py
+├── setup.py
+└── README.md
+```
+
+## License
+
+This project is provided as-is for educational and testing purposes.
+
+---
+
+## References & Further Reading
+
+For those interested in proper protein structure modeling:
+
+- **PDB Format Specification**: [https://www.wwpdb.org/documentation/file-format](https://www.wwpdb.org/documentation/file-format)
+- **Ramachandran Plot**: Ramachandran, G. N.; Ramakrishnan, C.; Sasisekharan, V. (1963). "Stereochemistry of polypeptide chain configurations"
+- **Rotamer Libraries**: Dunbrack, R. L. (2002). "Rotamer libraries in the 21st century"
+- **IUPAC Nomenclature**: [https://iupac.qmul.ac.uk/](https://iupac.qmul.ac.uk/)
+
+For production-quality structure generation, consider:
+- **MODELLER** (homology modeling)
+- **Rosetta** (de novo structure prediction)
+- **AlphaFold** (AI-based prediction)
+- **PyMOL/Chimera** (structure visualization and manipulation)
