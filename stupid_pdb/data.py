@@ -81,6 +81,32 @@ ONE_TO_THREE_LETTER_CODE: Dict[str, str] = {
     "V": "VAL",
 }
 
+# --- Ramachandran Angle Presets for Different Secondary Structures ---
+# These presets define typical phi/psi backbone dihedral angles for common conformations
+# Values are in degrees
+# References:
+#   - Ramachandran et al. (1963) J. Mol. Biol.
+#   - Lovell et al. (2003) Proteins: Structure, Function, and Bioinformatics
+
+RAMACHANDRAN_PRESETS: Dict[str, Dict[str, float]] = {
+    'alpha': {
+        'phi': -57.0,   # Alpha helix (right-handed)
+        'psi': -47.0,
+    },
+    'beta': {
+        'phi': -135.0,  # Beta sheet (antiparallel)
+        'psi': 135.0,
+    },
+    'ppii': {
+        'phi': -75.0,   # Polyproline II helix (left-handed)
+        'psi': 145.0,
+    },
+    'extended': {
+        'phi': -120.0,  # Extended/stretched conformation
+        'psi': 120.0,
+    },
+}
+
 # --- Standard Bond Lengths and Angles (Approximations) ---
 
 # Values are in Angstroms for bond lengths and degrees for angles

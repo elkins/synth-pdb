@@ -15,6 +15,7 @@ from .data import (
     BOND_LENGTH_C_N,
     ANGLE_C_N_CA,
     ROTAMER_LIBRARY,
+    RAMACHANDRAN_PRESETS,
 )
 from .pdb_utils import create_pdb_header, create_pdb_footer
 
@@ -184,9 +185,24 @@ def generate_pdb_content(
     length: Optional[int] = None,
     sequence_str: Optional[str] = None,
     use_plausible_frequencies: bool = False,
+    conformation: str = 'alpha',
 ) -> str:
     """
     Generates PDB content for a linear peptide chain.
+    
+    Args:
+        length: Number of residues (ignored if sequence_str provided)
+        sequence_str: Explicit amino acid sequence (1-letter or 3-letter codes)
+        use_plausible_frequencies: Use biologically realistic amino acid frequencies
+        conformation: Secondary structure conformation to generate.
+                     Options: 'alpha', 'beta', 'ppii', 'extended', 'random'
+                     Default: 'alpha' (alpha helix)
+    
+    Returns:
+        str: Complete PDB file content
+        
+    Raises:
+        ValueError: If invalid conformation name provided
     """
     sequence = _resolve_sequence(
         length=length,
@@ -199,6 +215,24 @@ def generate_pdb_content(
             raise ValueError("Provided sequence string cannot be empty.")
         raise ValueError(
             "Length must be a positive integer when no sequence is provided and no valid sequence string is given."
+        )
+
+    # Validate and select conformation angles
+    if conformation == 'random':
+        # For random, we'll sample from allowed Ramachandran regions for each residue
+        # This will be implemented per-residue in the loop below
+        phi_psi_mode = 'random'
+        phi_angle = None
+        psi_angle = None
+    elif conformation in RAMACHANDRAN_PRESETS:
+        phi_psi_mode = 'fixed'
+        phi_angle = RAMACHANDRAN_PRESETS[conformation]['phi']
+        psi_angle = RAMACHANDRAN_PRESETS[conformation]['psi']
+    else:
+        valid_conformations = list(RAMACHANDRAN_PRESETS.keys()) + ['random']
+        raise ValueError(
+            f"Invalid conformation '{conformation}'. "
+            f"Valid options are: {', '.join(valid_conformations)}"
         )
 
     sequence_length = len(sequence)
@@ -221,17 +255,37 @@ def generate_pdb_content(
             prev_ca_atom = peptide[(peptide.res_id == res_id - 1) & (peptide.atom_name == "CA")][-1]
             prev_n_atom = peptide[(peptide.res_id == res_id - 1) & (peptide.atom_name == "N")][-1]
 
+            # Determine phi/psi angles for this residue
+            if phi_psi_mode == 'random':
+                # Sample from allowed Ramachandran regions
+                # Simplified: sample from general allowed regions
+                # Alpha region: phi ~ -60, psi ~ -45
+                # Beta region: phi ~ -120, psi ~ 120
+                # Choose randomly between these regions
+                if np.random.random() < 0.5:
+                    # Alpha-like region
+                    current_phi = -60.0 + np.random.uniform(-30, 30)
+                    current_psi = -45.0 + np.random.uniform(-30, 30)
+                else:
+                    # Beta-like region
+                    current_phi = -120.0 + np.random.uniform(-30, 30)
+                    current_psi = 120.0 + np.random.uniform(-30, 30)
+            else:
+                # Use fixed angles from preset
+                current_phi = phi_angle
+                current_psi = psi_angle
+
             n_coord = _position_atom_3d_from_internal_coords(
                 prev_n_atom.coord, prev_ca_atom.coord, prev_c_atom.coord,
                 BOND_LENGTH_C_N, ANGLE_CA_C_N, OMEGA_TRANS
             )
             ca_coord = _position_atom_3d_from_internal_coords(
                 prev_ca_atom.coord, prev_c_atom.coord, n_coord,
-                BOND_LENGTH_N_CA, ANGLE_C_N_CA, PHI_ALPHA_HELIX
+                BOND_LENGTH_N_CA, ANGLE_C_N_CA, current_phi
             )
             c_coord = _position_atom_3d_from_internal_coords(
                 prev_c_atom.coord, n_coord, ca_coord,
-                BOND_LENGTH_CA_C, ANGLE_N_CA_C, PSI_ALPHA_HELIX
+                BOND_LENGTH_CA_C, ANGLE_N_CA_C, current_psi
             )
         
         # Get reference residue from biotite
