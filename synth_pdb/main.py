@@ -1,13 +1,16 @@
 """
-CLI entry point for the stupid-pdb tool.
+CLI entry point for the synth-pdb tool.
+
+This module provides the main() function that serves as the command-line interface
+for generating PDB files.
 """
 
-import argparse
+import sys
 import logging
+import argparse
 import datetime
 import os
-import sys
-from typing import List
+from pathlib import Path
 
 from .generator import generate_pdb_content
 from .validator import PDBValidator
@@ -18,16 +21,8 @@ logger = logging.getLogger(__name__)
 
 
 def _build_command_string(args: argparse.Namespace) -> str:
-    """
-    Builds the command-line string from parsed arguments for reproducibility.
-    
-    Args:
-        args: Parsed command-line arguments
-        
-    Returns:
-        str: Command string representation
-    """
-    cmd_parts = ["stupid-pdb"]
+    """Build a command string from parsed arguments for PDB header."""
+    cmd_parts = ["synth-pdb"]
     if args.sequence:
         cmd_parts.append(f"--sequence {args.sequence}")
     else:

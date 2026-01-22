@@ -3,9 +3,9 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "stupid-pdb"
+name = "synth-pdb"
 version = "0.1.0"
-description = "A simple tool to generate PDB files with random linear amino acid sequences for testing and educational purposes"
+description = "A tool to generate synthetic PDB files with customizable conformations for testing and educational purposes"
 readme = "README.md"
 requires-python = ">=3.8"
 license = {text = "MIT"}
@@ -40,15 +40,15 @@ dev = [
 ]
 
 [project.scripts]
-stupid-pdb = "stupid_pdb.main:main"
+synth-pdb = "synth_pdb.main:main"
 
 [project.urls]
-Homepage = "https://github.com/your-username/stupid-pdb"
-Repository = "https://github.com/your-username/stupid-pdb"
+Homepage = "https://github.com/your-username/synth-pdb"
+Repository = "https://github.com/your-username/synth-pdb"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["stupid_pdb*"]
+include = ["synth_pdb*"]
 
 [tool.black]
 line-length = 100
@@ -124,7 +124,7 @@ module = [
 ignore_missing_imports = true
 
 [tool.coverage.run]
-source = ["stupid_pdb"]
+source = ["synth_pdb"]
 omit = [
     "*/tests/*",
     "*/__pycache__/*",

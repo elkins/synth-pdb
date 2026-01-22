@@ -8,9 +8,9 @@ import biotite.structure.io.pdb as biotite_pdb # Use alias to avoid conflict wit
 import io
 import tempfile
 import os
-from stupid_pdb.generator import _resolve_sequence, generate_pdb_content, CA_DISTANCE
-from stupid_pdb.data import STANDARD_AMINO_ACIDS, ONE_TO_THREE_LETTER_CODE, BOND_LENGTH_N_CA, BOND_LENGTH_CA_C, BOND_LENGTH_C_O, ANGLE_N_CA_C, ANGLE_CA_C_N, ANGLE_CA_C_O
-from stupid_pdb.validator import PDBValidator
+from synth_pdb.generator import _resolve_sequence, generate_pdb_content, CA_DISTANCE
+from synth_pdb.data import STANDARD_AMINO_ACIDS, ONE_TO_THREE_LETTER_CODE, BOND_LENGTH_N_CA, BOND_LENGTH_CA_C, BOND_LENGTH_C_O, ANGLE_N_CA_C, ANGLE_CA_C_N, ANGLE_CA_C_O
+from synth_pdb.validator import PDBValidator
 
 # Suppress logging during tests to keep output clean
 logging.getLogger().setLevel(logging.CRITICAL)
@@ -167,7 +167,7 @@ class TestGenerator(unittest.TestCase):
         Test if random sequence generation with plausible frequencies
         adheres to the expected distribution within a tolerance.
         """
-        from stupid_pdb.data import AMINO_ACID_FREQUENCIES
+        from synth_pdb.data import AMINO_ACID_FREQUENCIES
         test_length = 10000
         tolerance = 0.02 # 2% deviation allowed
 

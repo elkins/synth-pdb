@@ -1,8 +1,8 @@
 import unittest
 import logging
 
-from stupid_pdb.generator import generate_pdb_content
-from stupid_pdb.validator import PDBValidator
+from synth_pdb.generator import generate_pdb_content
+from synth_pdb.validator import PDBValidator
 
 # Suppress logging during tests to keep output clean
 logging.getLogger().setLevel(logging.CRITICAL)

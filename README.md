@@ -1,4 +1,4 @@
-# stupid-pdb
+# synth-pdb
 
 A command-line tool to generate Protein Data Bank (PDB) files with full atomic representation for testing, benchmarking, and educational purposes.
 
@@ -52,7 +52,7 @@ Install directly from the project directory using pip:
 pip install .
 ```
 
-This installs the `stupid-pdb` package and makes the `stupid-pdb` command available system-wide.
+This installs the `synth-pdb` package and makes the `synth-pdb` command available system-wide.
 
 ### Requirements
 - Python 3.8+
@@ -63,17 +63,17 @@ This installs the `stupid-pdb` package and makes the `stupid-pdb` command availa
 
 Generate a simple 10-residue peptide:
 ```bash
-stupid-pdb --length 10
+synth-pdb --length 10
 ```
 
 Generate and validate a specific sequence:
 ```bash
-stupid-pdb --sequence "ACDEFGHIKLMNPQRSTVWY" --validate --output my_peptide.pdb
+synth-pdb --sequence "ACDEFGHIKLMNPQRSTVWY" --validate --output my_peptide.pdb
 ```
 
 Generate the best of 10 attempts with clash refinement:
 ```bash
-stupid-pdb --length 20 --best-of-N 10 --refine-clashes 5 --output refined_peptide.pdb
+synth-pdb --length 20 --best-of-N 10 --refine-clashes 5 --output refined_peptide.pdb
 ```
 
 ## Usage
@@ -149,38 +149,38 @@ stupid-pdb --length 20 --best-of-N 10 --refine-clashes 5 --output refined_peptid
 
 ```bash
 # Simple 25-residue peptide
-stupid-pdb --length 25
+synth-pdb --length 25
 
 # Custom sequence with validation
-stupid-pdb --sequence "ELVIS" --validate --output elvis.pdb
+synth-pdb --sequence "ELVIS" --validate --output elvis.pdb
 
 # Use biologically realistic frequencies
-stupid-pdb --length 100 --plausible-frequencies
+synth-pdb --length 100 --plausible-frequencies
 
 # Generate beta sheet conformation
-stupid-pdb --length 20 --conformation beta --output beta_sheet.pdb
+synth-pdb --length 20 --conformation beta --output beta_sheet.pdb
 
 # Generate extended conformation
-stupid-pdb --length 15 --conformation extended
+synth-pdb --length 15 --conformation extended
 
 # Generate random conformation (mixed alpha/beta regions)
-stupid-pdb --length 30 --conformation random
+synth-pdb --length 30 --conformation random
 ```
 
 #### Quality Control
 
 ```bash
 # Generate until valid (may take time!)
-stupid-pdb --length 15 --guarantee-valid --max-attempts 200 --output valid.pdb
+synth-pdb --length 15 --guarantee-valid --max-attempts 200 --output valid.pdb
 
 # Best of 50 attempts
-stupid-pdb --length 20 --best-of-N 50 --output best_structure.pdb
+synth-pdb --length 20 --best-of-N 50 --output best_structure.pdb
 
 # Refine steric clashes (5 iterations)
-stupid-pdb --length 30 --refine-clashes 5 --output refined.pdb
+synth-pdb --length 30 --refine-clashes 5 --output refined.pdb
 
 # Combined: best of 10 + refinement
-stupid-pdb --length 25 --best-of-N 10 --refine-clashes 3 --output optimized.pdb
+synth-pdb --length 25 --best-of-N 10 --refine-clashes 3 --output optimized.pdb
 ```
 
 #### Biologically-Inspired Examples
@@ -190,43 +190,43 @@ Generate structures that mimic real protein motifs for educational demonstration
 ```bash
 # Collagen-like triple helix motif (polyproline II)
 # Collagen is rich in proline and glycine with PPII conformation
-stupid-pdb --sequence "GPGPPGPPGPPGPPGPPGPP" --conformation ppii --output collagen_like.pdb
+synth-pdb --sequence "GPGPPGPPGPPGPPGPPGPP" --conformation ppii --output collagen_like.pdb
 
 # Silk fibroin-like beta sheet
 # Silk proteins contain repeating (GAGAGS) motifs forming beta sheets
-stupid-pdb --sequence "GAGAGSGAGAGSGAGAGS" --conformation beta --output silk_like.pdb
+synth-pdb --sequence "GAGAGSGAGAGSGAGAGS" --conformation beta --output silk_like.pdb
 
 # Amyloid fibril-like beta structure
 # Amyloid fibrils are rich in beta sheets, often with hydrophobic residues
-stupid-pdb --sequence "LVEALYLVCGERGFFYTPKA" --conformation beta --best-of-N 10 --output amyloid_like.pdb
+synth-pdb --sequence "LVEALYLVCGERGFFYTPKA" --conformation beta --best-of-N 10 --output amyloid_like.pdb
 
 # Leucine zipper motif (alpha helix)
 # Leucine zippers are alpha-helical with leucine repeats every 7 residues
-stupid-pdb --sequence "LKELEKELEKELEKELEKELEKEL" --conformation alpha --output leucine_zipper.pdb
+synth-pdb --sequence "LKELEKELEKELEKELEKELEKEL" --conformation alpha --output leucine_zipper.pdb
 
 # Intrinsically disordered region (random conformation)
 # IDRs lack stable structure, rich in charged/polar residues
-stupid-pdb --sequence "GGSEGGSEGGSEGGSEGGSE" --conformation random --output disordered_region.pdb
+synth-pdb --sequence "GGSEGGSEGGSEGGSEGGSE" --conformation random --output disordered_region.pdb
 
 # Transmembrane helix-like structure (extended alpha helix)
 # Membrane-spanning regions are often long alpha helices with hydrophobic residues
-stupid-pdb --sequence "LVIVLLVIVLLVIVLLVIVL" --conformation alpha --output transmembrane_like.pdb
+synth-pdb --sequence "LVIVLLVIVLLVIVLLVIVL" --conformation alpha --output transmembrane_like.pdb
 
 # Beta-turn rich structure (mixed conformations)
 # Proline and glycine favor turns and loops
-stupid-pdb --sequence "GPGPGPGPGPGPGPGP" --conformation random --output beta_turn_rich.pdb
+synth-pdb --sequence "GPGPGPGPGPGPGPGP" --conformation random --output beta_turn_rich.pdb
 
 # Elastin-like peptide (extended/random)
 # Elastin contains repeating VPGVG motifs with flexible structure
-stupid-pdb --sequence "VPGVGVPGVGVPGVGVPGVG" --conformation extended --output elastin_like.pdb
+synth-pdb --sequence "VPGVGVPGVGVPGVGVPGVG" --conformation extended --output elastin_like.pdb
 
 # Antimicrobial peptide-like (alpha helix)
 # Many AMPs are short amphipathic alpha helices
-stupid-pdb --sequence "KWKLFKKIGAVLKVL" --conformation alpha --validate --output amp_like.pdb
+synth-pdb --sequence "KWKLFKKIGAVLKVL" --conformation alpha --validate --output amp_like.pdb
 
 # Zinc finger motif-like (mixed structure)
 # Zinc fingers have beta sheets and alpha helices
-stupid-pdb --sequence "CPHCGKSFSQKSDLVKHQRT" --conformation random --best-of-N 5 --output zinc_finger_like.pdb
+synth-pdb --sequence "CPHCGKSFSQKSDLVKHQRT" --conformation random --best-of-N 5 --output zinc_finger_like.pdb
 ```
 
 **Educational Notes:**
@@ -240,13 +240,13 @@ stupid-pdb --sequence "CPHCGKSFSQKSDLVKHQRT" --conformation random --best-of-N 5
 
 ```bash
 # All natural amino acids with validation report
-stupid-pdb --sequence "ACDEFGHIKLMNPQRSTVWY" --validate --log-level DEBUG
+synth-pdb --sequence "ACDEFGHIKLMNPQRSTVWY" --validate --log-level DEBUG
 
 # Test structure for MD simulation pipeline
-stupid-pdb --length 50 --guarantee-valid --max-attempts 500 --output test_md.pdb
+synth-pdb --length 50 --guarantee-valid --max-attempts 500 --output test_md.pdb
 
 # Benchmark structure with known violations (good for testing validators)
-stupid-pdb --length 100 --validate --output benchmark.pdb
+synth-pdb --length 100 --validate --output benchmark.pdb
 ```
 
 ## Validation & Refinement
@@ -304,11 +304,11 @@ Generated PDB files include standard header records:
 ```
 HEADER    PEPTIDE           <DATE>
 TITLE     GENERATED LINEAR PEPTIDE OF LENGTH <N>
-REMARK 1  This PDB file was generated by the CLI 'stupid-pdb' tool.
+REMARK 1  This PDB file was generated by the CLI 'synth-pdb' tool.
 REMARK 2  It represents a simplified model of a linear peptide chain.
 REMARK 2  Coordinates are idealized and do not reflect real-world physics.
 REMARK 3  GENERATION PARAMETERS:
-REMARK 3  Command: stupid-pdb --length 10 --validate ...
+REMARK 3  Command: synth-pdb --length 10 --validate ...
 ```
 
 The **REMARK 3** records store the exact command-line arguments used for **reproducibility**.
@@ -341,7 +341,7 @@ WARNING  Steric clash (min distance): Atoms CA-3-A and CB-3-A are too close (1.8
 - Experimental predictions
 - Publication-quality structures
 
-### Why "stupid-pdb"?
+### Why "synth-pdb"?
 
 The name reflects the tool's **intentionally simplistic** approach:
 - Uses idealized bond lengths and angles (not energy-minimized)
@@ -403,7 +403,7 @@ Real protein structures require sophisticated methods like:
 pytest -v
 
 # With coverage
-pytest --cov=stupid_pdb --cov-report=term-missing
+pytest --cov=synth_pdb --cov-report=term-missing
 
 # Specific test file
 pytest tests/test_generator.py -v
@@ -415,8 +415,8 @@ pytest tests/test_generator.py -v
 ### Project Structure
 
 ```
-stupid-pdb/
-├── stupid_pdb/
+synth-pdb/
+├── synth_pdb/
 │   ├── __init__.py
 │   ├── main.py          # CLI entry point
 │   ├── generator.py     # PDB structure generation

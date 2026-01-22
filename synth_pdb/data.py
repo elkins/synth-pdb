@@ -1,7 +1,7 @@
 from typing import List, Dict, Set, Any
 
 """
-This module contains data definitions for the stupid_pdb package, starting
+This module contains data definitions for the synth_pdb package, starting
 with the 20 standard amino acids and their atomic configurations.
 """
 

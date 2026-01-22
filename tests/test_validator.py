@@ -1,12 +1,12 @@
 import logging
 import pytest
 import numpy as np
-from stupid_pdb.validator import PDBValidator
-from stupid_pdb.data import (
+from synth_pdb.validator import PDBValidator
+from synth_pdb.data import (
     BOND_LENGTH_N_CA, BOND_LENGTH_CA_C, BOND_LENGTH_C_N, BOND_LENGTH_C_O,
     ANGLE_N_CA_C, ANGLE_C_N_CA, ANGLE_CA_C_O, ANGLE_CA_C_N
 )
-from stupid_pdb.generator import CA_DISTANCE, create_atom_line, _position_atom_3d_from_internal_coords # Import create_atom_line
+from synth_pdb.generator import CA_DISTANCE, create_atom_line, _position_atom_3d_from_internal_coords # Import create_atom_line
 
 logging.getLogger().setLevel(logging.DEBUG)
 
@@ -418,7 +418,7 @@ class TestPDBValidator:
     # --- Peptide Plane Tests ---
     def test_validate_peptide_plane_no_violation(self):
         # Use generator to create a simple peptide, should be planar
-        from stupid_pdb.generator import generate_pdb_content
+        from synth_pdb.generator import generate_pdb_content
         pdb_content = generate_pdb_content(length=2, sequence_str="AA")
         validator = PDBValidator(pdb_content)
         validator.validate_peptide_plane(tolerance_deg=10.0) # Tight tolerance
@@ -473,7 +473,7 @@ class TestPDBValidator:
 
     # --- Sequence Improbabilities Tests ---
     def test_validate_sequence_improbabilities_no_violation(self):
-        from stupid_pdb.generator import generate_pdb_content
+        from synth_pdb.generator import generate_pdb_content
         # A short, varied sequence should have no improbabilities
         pdb_content = generate_pdb_content(length=5, sequence_str="AGLYS")
         validator = PDBValidator(pdb_content)

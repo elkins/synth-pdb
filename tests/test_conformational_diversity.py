@@ -3,9 +3,9 @@ Tests for conformational diversity feature.
 Following TDD methodology - these tests should fail initially.
 """
 import pytest
-from stupid_pdb.generator import generate_pdb_content
-from stupid_pdb.validator import PDBValidator
-from stupid_pdb.data import RAMACHANDRAN_PRESETS
+from synth_pdb.generator import generate_pdb_content
+from synth_pdb.validator import PDBValidator
+from synth_pdb.data import RAMACHANDRAN_PRESETS
 import numpy as np
 
 

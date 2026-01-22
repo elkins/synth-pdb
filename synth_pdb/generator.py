@@ -23,7 +23,7 @@ import biotite.structure as struc
 import biotite.structure.io.pdb as pdb
 import io
 
-from stupid_pdb.validator import PDBValidator  # Temporary import for debugging
+from synth_pdb.validator import PDBValidator  # Temporary import for debugging
 
 # Convert angles to radians for numpy trigonometric functions
 ANGLE_N_CA_C_RAD = np.deg2rad(ANGLE_N_CA_C)

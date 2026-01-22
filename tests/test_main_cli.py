@@ -5,9 +5,9 @@ import logging # Import logging to set level for caplog
 from unittest import mock
 import numpy as np # Import numpy for array creation
 
-from stupid_pdb import main
-from stupid_pdb.validator import PDBValidator
-from stupid_pdb.generator import create_atom_line # Import the helper function
+from synth_pdb import main
+from synth_pdb.validator import PDBValidator
+from synth_pdb.generator import create_atom_line # Import the helper function
 
 class TestMainCLI:
     # --- Tests for --guarantee-valid ---
@@ -31,7 +31,7 @@ class TestMainCLI:
             create_atom_line(2, "CA", "GLY", "A", 2, 3.0, 0.0, 0.0, "C", alt_loc="", insertion_code="") + "\n" +
             create_atom_line(3, "CA", "GLY", "A", 3, 6.0, 0.0, 0.0, "C", alt_loc="", insertion_code="")
         )    
-        mocker.patch("stupid_pdb.main.generate_pdb_content", side_effect=[
+        mocker.patch("synth_pdb.main.generate_pdb_content", side_effect=[
             clashing_pdb_content,
             clashing_pdb_content,
             valid_pdb_content
@@ -40,7 +40,7 @@ class TestMainCLI:
         # No need to mock PDBValidator or its methods, let the real one run.
 
         # Mock sys.argv to simulate CLI arguments, including --log-level DEBUG
-        test_args = ["stupid_pdb", "--length", "1", "--guarantee-valid", "--max-attempts", "3", "--output", "test_gv_success.pdb", "--log-level", "DEBUG"]
+        test_args = ["synth_pdb", "--length", "1", "--guarantee-valid", "--max-attempts", "3", "--output", "test_gv_success.pdb", "--log-level", "DEBUG"]
         mocker.patch("sys.argv", test_args)
 
         # Mock sys.exit to prevent actual exit
@@ -65,12 +65,12 @@ class TestMainCLI:
             create_atom_line(2, "CA", "ALA", "A", 2, 0.500, 0.0, 0.0, "C", alt_loc="", insertion_code="")
         )
 
-        mocker.patch("stupid_pdb.main.generate_pdb_content", return_value=clashing_pdb_content) # Always return clashing PDB
+        mocker.patch("synth_pdb.main.generate_pdb_content", return_value=clashing_pdb_content) # Always return clashing PDB
 
         # No need to mock PDBValidator or its methods, let the real one run.
 
         # Mock sys.argv
-        test_args = ["stupid_pdb", "--length", "1", "--guarantee-valid", "--max-attempts", "2"]
+        test_args = ["synth_pdb", "--length", "1", "--guarantee-valid", "--max-attempts", "2"]
         mocker.patch("sys.argv", test_args)
 
         # Mock sys.exit to check for error exit
@@ -106,7 +106,7 @@ class TestMainCLI:
             create_atom_line(2, "CA", "GLY", "A", 2, 3.0, 0.0, 0.0, "C", alt_loc="", insertion_code="")
         )
 
-        mocker.patch("stupid_pdb.main.generate_pdb_content", side_effect=[
+        mocker.patch("synth_pdb.main.generate_pdb_content", side_effect=[
             pdb_content_2_violations, # First generated PDB will have 2 violations
             pdb_content_1_violation,  # Second generated PDB will have 1 violation
             pdb_content_0_violations, # Third generated PDB will have 0 violations
@@ -115,7 +115,7 @@ class TestMainCLI:
         # No need to mock PDBValidator or its methods, let the real one run.
 
         # Mock sys.argv
-        test_args = ["stupid_pdb", "--length", "1", "--best-of-N", "3", "--output", "test_best_of_N.pdb"]
+        test_args = ["synth_pdb", "--length", "1", "--best-of-N", "3", "--output", "test_best_of_N.pdb"]
         mocker.patch("sys.argv", test_args)
         mocker.patch("sys.exit") # Should not exit with error
 
@@ -145,13 +145,13 @@ class TestMainCLI:
             {"atom_number": 2, "atom_name": "CA", "alt_loc": "", "residue_name": "ALA", "chain_id": "A", "residue_number": 2, "insertion_code": "", "coords": np.array([3.0, 0.0, 0.0]), "occupancy": 1.0, "temp_factor": 0.0, "element": "C", "charge": ""},
         ]
 
-        mocker.patch("stupid_pdb.main.generate_pdb_content", return_value=initial_clashing_pdb_content)
+        mocker.patch("synth_pdb.main.generate_pdb_content", return_value=initial_clashing_pdb_content)
 
         # Mock _apply_steric_clash_tweak to simulate it working
         mocker.patch.object(PDBValidator, "_apply_steric_clash_tweak", return_value=non_clashing_parsed_atoms)
         
         # Mock sys.argv
-        test_args = ["stupid_pdb", "--length", "1", "--output", "test_refine.pdb", "--refine-clashes", "1"]
+        test_args = ["synth_pdb", "--length", "1", "--output", "test_refine.pdb", "--refine-clashes", "1"]
         mocker.patch("sys.argv", test_args)
         mocker.patch("sys.exit")
 
@@ -174,7 +174,7 @@ class TestMainCLI:
             create_atom_line(1, "CA", "ALA", "A", 1, 0.0, 0.0, 0.0, "C", alt_loc="", insertion_code="") + "\n" +
             create_atom_line(2, "CA", "ALA", "A", 2, 0.500, 0.0, 0.0, "C", alt_loc="", insertion_code="")
         )
-        mocker.patch("stupid_pdb.main.generate_pdb_content", return_value=initial_clashing_pdb_content)
+        mocker.patch("synth_pdb.main.generate_pdb_content", return_value=initial_clashing_pdb_content)
 
         # Mock _apply_steric_clash_tweak to return modified atoms (but still clashing)
         # Ensure coords are numpy arrays as the validator expects them for calculation
@@ -185,7 +185,7 @@ class TestMainCLI:
         mocker.patch.object(PDBValidator, "_apply_steric_clash_tweak", return_value=still_clashing_parsed_atoms)
         
         # Mock sys.argv
-        test_args = ["stupid_pdb", "--length", "1", "--output", "test_refine_no_improve.pdb", "--refine-clashes", "2"]
+        test_args = ["synth_pdb", "--length", "1", "--output", "test_refine_no_improve.pdb", "--refine-clashes", "2"]
         mocker.patch("sys.argv", test_args)
         mocker.patch("sys.exit")
 
@@ -223,7 +223,7 @@ class TestMainCLI:
             "ENDMDL\n"
             "END         "
         )
-        mocker.patch("stupid_pdb.main.generate_pdb_content", return_value=initial_pdb_content)
+        mocker.patch("synth_pdb.main.generate_pdb_content", return_value=initial_pdb_content)
 
         # Mock _apply_steric_clash_tweak to simulate it fixing the clash
         # We need to ensure the number of violations reduces.
@@ -242,7 +242,7 @@ class TestMainCLI:
         mocker.patch.object(PDBValidator, "_apply_steric_clash_tweak", return_value=non_clashing_parsed_atoms)
 
         # Mock sys.argv
-        test_args = ["stupid_pdb", "--length", "2", "--best-of-N", "1", "--refine-clashes", "1", "--output", str(output_filepath)]
+        test_args = ["synth_pdb", "--length", "2", "--best-of-N", "1", "--refine-clashes", "1", "--output", str(output_filepath)]
         mocker.patch("sys.argv", test_args)
         mocker.patch("sys.exit")
 
@@ -284,7 +284,7 @@ class TestMainCLI:
         caplog.set_level(logging.ERROR)
         
         # Mock sys.argv with invalid length (0)
-        test_args = ["stupid_pdb", "--length", "0"]
+        test_args = ["synth_pdb", "--length", "0"]
         mocker.patch("sys.argv", test_args)
         
         # Mock sys.exit to check for error exit
@@ -300,7 +300,7 @@ class TestMainCLI:
         caplog.set_level(logging.ERROR)
         
         # Mock sys.argv with negative length
-        test_args = ["stupid_pdb", "--length", "-5"]
+        test_args = ["synth_pdb", "--length", "-5"]
         mocker.patch("sys.argv", test_args)
         
         # Mock sys.exit to check for error exit
@@ -316,10 +316,10 @@ class TestMainCLI:
         caplog.set_level(logging.WARNING)
         
         # Mock generate_pdb_content to return None to simulate failure
-        mocker.patch("stupid_pdb.main.generate_pdb_content", return_value=None)
+        mocker.patch("synth_pdb.main.generate_pdb_content", return_value=None)
         
         # Mock sys.argv
-        test_args = ["stupid_pdb", "--length", "5", "--max-attempts", "2"]
+        test_args = ["synth_pdb", "--length", "5", "--max-attempts", "2"]
         mocker.patch("sys.argv", test_args)
         
         # Mock sys.exit
@@ -335,10 +335,10 @@ class TestMainCLI:
         caplog.set_level(logging.ERROR)
         
         # Mock generate_pdb_content to raise ValueError
-        mocker.patch("stupid_pdb.main.generate_pdb_content", side_effect=ValueError("Invalid amino acid code"))
+        mocker.patch("synth_pdb.main.generate_pdb_content", side_effect=ValueError("Invalid amino acid code"))
         
         # Mock sys.argv
-        test_args = ["stupid_pdb", "--length", "3", "--max-attempts", "2"]
+        test_args = ["synth_pdb", "--length", "3", "--max-attempts", "2"]
         mocker.patch("sys.argv", test_args)
         
         # Mock sys.exit
@@ -355,10 +355,10 @@ class TestMainCLI:
         caplog.set_level(logging.ERROR)
         
         # Mock generate_pdb_content to raise a generic Exception
-        mocker.patch("stupid_pdb.main.generate_pdb_content", side_effect=Exception("Unexpected error"))
+        mocker.patch("synth_pdb.main.generate_pdb_content", side_effect=Exception("Unexpected error"))
         
         # Mock sys.argv
-        test_args = ["stupid_pdb", "--length", "3", "--max-attempts", "2"]
+        test_args = ["synth_pdb", "--length", "3", "--max-attempts", "2"]
         mocker.patch("sys.argv", test_args)
         
         # Mock sys.exit
@@ -381,10 +381,10 @@ class TestMainCLI:
             create_atom_line(2, "CA", "GLY", "A", 2, 3.0, 0.0, 0.0, "C")
         )
         
-        mocker.patch("stupid_pdb.main.generate_pdb_content", return_value=valid_pdb_content)
+        mocker.patch("synth_pdb.main.generate_pdb_content", return_value=valid_pdb_content)
         
         # Mock sys.argv with multiple refinement iterations
-        test_args = ["stupid_pdb", "--length", "2", "--refine-clashes", "5", "--output", "test_early_exit.pdb"]
+        test_args = ["synth_pdb", "--length", "2", "--refine-clashes", "5", "--output", "test_early_exit.pdb"]
         mocker.patch("sys.argv", test_args)
         mocker.patch("sys.exit")
         
@@ -408,7 +408,7 @@ class TestMainCLI:
             create_atom_line(2, "CA", "ALA", "A", 2, 1.0, 0.0, 0.0, "C")
         )
         
-        mocker.patch("stupid_pdb.main.generate_pdb_content", return_value=pdb_with_1_violation)
+        mocker.patch("synth_pdb.main.generate_pdb_content", return_value=pdb_with_1_violation)
         
         # Mock _apply_steric_clash_tweak to return atoms with MORE violations
         # Make atoms even closer together
@@ -423,7 +423,7 @@ class TestMainCLI:
         mocker.patch.object(PDBValidator, "_apply_steric_clash_tweak", return_value=worse_parsed_atoms)
         
         # Mock sys.argv
-        test_args = ["stupid_pdb", "--length", "2", "--refine-clashes", "1", "--output", "test_worse.pdb"]
+        test_args = ["synth_pdb", "--length", "2", "--refine-clashes", "1", "--output", "test_worse.pdb"]
         mocker.patch("sys.argv", test_args)
         mocker.patch("sys.exit")
         
@@ -450,10 +450,10 @@ class TestMainCLI:
                 "HEADER    test\n" +
                 create_atom_line(1, "CA", "GLY", "A", 1, 0.0, 0.0, 0.0, "C")
             )
-            mocker.patch("stupid_pdb.main.generate_pdb_content", return_value=valid_pdb)
+            mocker.patch("synth_pdb.main.generate_pdb_content", return_value=valid_pdb)
             
             # Mock sys.argv WITHOUT --output flag
-            test_args = ["stupid_pdb", "--length", "5"]
+            test_args = ["synth_pdb", "--length", "5"]
             mocker.patch("sys.argv", test_args)
             mocker.patch("sys.exit")
             
@@ -481,13 +481,13 @@ class TestMainCLI:
             "HEADER    test\n" +
             create_atom_line(1, "CA", "GLY", "A", 1, 0.0, 0.0, 0.0, "C")
         )
-        mocker.patch("stupid_pdb.main.generate_pdb_content", return_value=valid_pdb)
+        mocker.patch("synth_pdb.main.generate_pdb_content", return_value=valid_pdb)
         
         # Mock open() to raise PermissionError
         mocker.patch("builtins.open", side_effect=PermissionError("Permission denied"))
         
         # Mock sys.argv
-        test_args = ["stupid_pdb", "--length", "3", "--output", "test_permission_error.pdb"]
+        test_args = ["synth_pdb", "--length", "3", "--output", "test_permission_error.pdb"]
         mocker.patch("sys.argv", test_args)
         
         # Mock sys.exit
