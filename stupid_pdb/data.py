@@ -344,25 +344,90 @@ AMINO_ACID_ATOMS: Dict[str, List[Dict[str, Any]]] = {
 # Based on Dunbrack rotamer library (backbone-independent)
 # Values are in degrees
 # Reference: Dunbrack & Cohen (1997) Protein Science
+# Note: Only the most common rotamer is included for each amino acid
 
 ROTAMER_LIBRARY: Dict[str, Dict[str, List[float]]] = {
-    'LEU': {
-        'chi1': [-60, 180],  # Gauche-, trans
-        'chi2': [65],         # Gauche+
-    },
+    # Aliphatic amino acids
+    'ALA': {},  # No side-chain dihedrals (only CB)
     'VAL': {
-        'chi1': [-60, 180],  # Gauche-, trans (most common rotamers)
+        'chi1': [-60],  # Gauche- (most common)
+    },
+    'LEU': {
+        'chi1': [-60],  # Gauche-
+        'chi2': [65],   # Gauche+
     },
     'ILE': {
-        'chi1': [-60, 180],  # Gauche-, trans
-        'chi2': [170],        # Trans (most common)
+        'chi1': [-60],  # Gauche-
+        'chi2': [170],  # Trans
     },
-    'ARG': {
-        'chi1': [-60, 180],  # Gauche-, trans
-        'chi2': [180],        # Trans (extended side chain)
+    'MET': {
+        'chi1': [-60],  # Gauche-
+        'chi2': [180],  # Trans
+        'chi3': [70],   # Gauche+
+    },
+    
+    # Aromatic amino acids
+    'PHE': {
+        'chi1': [-60],  # Gauche-
+        'chi2': [90],   # Gauche+
+    },
+    'TYR': {
+        'chi1': [-60],  # Gauche-
+        'chi2': [90],   # Gauche+
+    },
+    'TRP': {
+        'chi1': [-60],  # Gauche-
+        'chi2': [-90],  # Gauche-
+    },
+    
+    # Polar uncharged amino acids
+    'SER': {
+        'chi1': [60],   # Gauche+ (most common)
+    },
+    'THR': {
+        'chi1': [60],   # Gauche+
+    },
+    'CYS': {
+        'chi1': [-60],  # Gauche-
+    },
+    'ASN': {
+        'chi1': [-60],  # Gauche-
+        'chi2': [-20],  # Near-cis
+    },
+    'GLN': {
+        'chi1': [-60],  # Gauche-
+        'chi2': [60],   # Gauche+
+        'chi3': [0],    # Cis
+    },
+    
+    # Charged amino acids
+    'ASP': {
+        'chi1': [-60],  # Gauche-
+        'chi2': [0],    # Cis
+    },
+    'GLU': {
+        'chi1': [-60],  # Gauche-
+        'chi2': [180],  # Trans
+        'chi3': [0],    # Cis
     },
     'LYS': {
-        'chi1': [-60, 180],  # Gauche-, trans
-        'chi2': [180],        # Trans (extended side chain)
+        'chi1': [-60],  # Gauche-
+        'chi2': [180],  # Trans
+        'chi3': [180],  # Trans
+        'chi4': [180],  # Trans (extended)
     },
+    'ARG': {
+        'chi1': [-60],  # Gauche-
+        'chi2': [180],  # Trans
+        'chi3': [180],  # Trans
+        'chi4': [-85],  # Gauche- (for guanidinium)
+    },
+    'HIS': {
+        'chi1': [-60],  # Gauche-
+        'chi2': [-75],  # Gauche-
+    },
+    
+    # Special cases
+    'GLY': {},  # No side chain
+    'PRO': {},  # Cyclic - chi angles constrained by ring
 }

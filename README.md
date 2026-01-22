@@ -25,7 +25,7 @@ A command-line tool to generate Protein Data Bank (PDB) files with full atomic r
 - Customizable sequence (1-letter or 3-letter amino acid codes)
 - Random sequence generation with uniform or biologically plausible frequencies
 - **Conformational diversity**: Generate alpha helices, beta sheets, extended chains, or random conformations
-- Rotamer-based side-chain placement for selected residues (LEU, VAL, ILE, ARG, LYS)
+- **Rotamer-based side-chain placement** for all 20 standard amino acids (Dunbrack library)
 
 🔬 **Validation Suite**
 - Bond length validation

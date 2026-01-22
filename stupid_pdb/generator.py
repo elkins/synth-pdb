@@ -306,26 +306,32 @@ def generate_pdb_content(
             ref_res_template = struc.info.residue(res_name, 'INTERNAL')
 
         if res_name in ROTAMER_LIBRARY:
-            chi1_target = ROTAMER_LIBRARY[res_name]["chi1"][0]
+            rotamer_data = ROTAMER_LIBRARY[res_name]
             
-            # Check if this residue has the required atoms for rotamer application
-            # Not all amino acids have CG (e.g., VAL has CG1/CG2, not CG)
-            has_cg = len(ref_res_template[ref_res_template.atom_name == "CG"]) > 0
-            
-            if has_cg:
-                n_template = ref_res_template[ref_res_template.atom_name == "N"][0]
-                ca_template = ref_res_template[ref_res_template.atom_name == "CA"][0]
-                cb_template = ref_res_template[ref_res_template.atom_name == "CB"][0]
-                cg_template = ref_res_template[ref_res_template.atom_name == "CG"][0]
+            # Skip if this amino acid has no chi angles (e.g., ALA, GLY, PRO)
+            if not rotamer_data or 'chi1' not in rotamer_data:
+                pass  # No rotamer to apply
+            else:
+                chi1_target = rotamer_data["chi1"][0]
                 
-                bond_length_cb_cg = np.linalg.norm(cg_template.coord - cb_template.coord)
-                angle_ca_cb_cg = _calculate_angle(ca_template.coord, cb_template.coord, cg_template.coord)
+                # Check if this residue has the required atoms for rotamer application
+                # Not all amino acids have CG (e.g., VAL has CG1/CG2, not CG)
+                has_cg = len(ref_res_template[ref_res_template.atom_name == "CG"]) > 0
+                
+                if has_cg:
+                    n_template = ref_res_template[ref_res_template.atom_name == "N"][0]
+                    ca_template = ref_res_template[ref_res_template.atom_name == "CA"][0]
+                    cb_template = ref_res_template[ref_res_template.atom_name == "CB"][0]
+                    cg_template = ref_res_template[ref_res_template.atom_name == "CG"][0]
+                    
+                    bond_length_cb_cg = np.linalg.norm(cg_template.coord - cb_template.coord)
+                    angle_ca_cb_cg = _calculate_angle(ca_template.coord, cb_template.coord, cg_template.coord)
 
-                cg_coord = _position_atom_3d_from_internal_coords(
-                    n_template.coord, ca_template.coord, cb_template.coord,
-                    bond_length_cb_cg, angle_ca_cb_cg, chi1_target
-                )
-                ref_res_template.coord[ref_res_template.atom_name == "CG"][0] = cg_coord
+                    cg_coord = _position_atom_3d_from_internal_coords(
+                        n_template.coord, ca_template.coord, cb_template.coord,
+                        bond_length_cb_cg, angle_ca_cb_cg, chi1_target
+                    )
+                    ref_res_template.coord[ref_res_template.atom_name == "CG"][0] = cg_coord
             
         # Extract N, CA, C from ref_res_template
         # Ensure these atoms are present in the template. Some templates might not have N or C (e.g., non-standard)
