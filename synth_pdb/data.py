@@ -107,6 +107,35 @@ RAMACHANDRAN_PRESETS: Dict[str, Dict[str, float]] = {
     },
 }
 
+# --- Ramachandran Probability Regions for Random Sampling ---
+# Based on Lovell et al. (2003) Proteins: Structure, Function, and Bioinformatics
+# Used for realistic random conformation sampling
+
+RAMACHANDRAN_REGIONS: Dict[str, Dict[str, Any]] = {
+    'general': {
+        'favored': [
+            {'name': 'alpha', 'phi': -60.0, 'psi': -45.0, 'std': 15.0, 'weight': 0.60},
+            {'name': 'beta', 'phi': -135.0, 'psi': 135.0, 'std': 20.0, 'weight': 0.30},
+            {'name': 'left', 'phi': 60.0, 'psi': 45.0, 'std': 15.0, 'weight': 0.10},
+        ],
+    },
+    'GLY': {
+        # Glycine is more flexible (no side chain)
+        'favored': [
+            {'name': 'alpha', 'phi': -60.0, 'psi': -45.0, 'std': 20.0, 'weight': 0.40},
+            {'name': 'beta', 'phi': -135.0, 'psi': 135.0, 'std': 25.0, 'weight': 0.30},
+            {'name': 'left', 'phi': 60.0, 'psi': 45.0, 'std': 20.0, 'weight': 0.30},
+        ],
+    },
+    'PRO': {
+        # Proline is restricted (cyclic structure)
+        'favored': [
+            {'name': 'ppii', 'phi': -75.0, 'psi': 145.0, 'std': 15.0, 'weight': 0.70},
+            {'name': 'alpha', 'phi': -60.0, 'psi': -30.0, 'std': 10.0, 'weight': 0.30},
+        ],
+    },
+}
+
 # --- Standard Bond Lengths and Angles (Approximations) ---
 
 # Values are in Angstroms for bond lengths and degrees for angles

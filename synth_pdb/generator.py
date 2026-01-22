@@ -16,6 +16,7 @@ from .data import (
     ANGLE_C_N_CA,
     ROTAMER_LIBRARY,
     RAMACHANDRAN_PRESETS,
+    RAMACHANDRAN_REGIONS,
 )
 from .pdb_utils import create_pdb_header, create_pdb_footer
 
@@ -182,6 +183,48 @@ def _resolve_sequence(
         )
 
 
+def _sample_ramachandran_angles(res_name: str) -> tuple[float, float]:
+    """
+    Sample phi/psi angles from Ramachandran probability distribution.
+    
+    Uses residue-specific distributions for GLY and PRO, general distribution
+    for all other amino acids. Samples from favored regions using weighted
+    Gaussian distributions.
+    
+    Args:
+        res_name: Three-letter amino acid code
+        
+    Returns:
+        Tuple of (phi, psi) angles in degrees
+        
+    Reference:
+        Lovell et al. (2003) Proteins: Structure, Function, and Bioinformatics
+    """
+    # Get residue-specific or general distribution
+    if res_name in RAMACHANDRAN_REGIONS:
+        regions = RAMACHANDRAN_REGIONS[res_name]
+    else:
+        regions = RAMACHANDRAN_REGIONS['general']
+    
+    # Get favored regions
+    favored_regions = regions['favored']
+    weights = [r['weight'] for r in favored_regions]
+    
+    # Choose region based on weights
+    region_idx = np.random.choice(len(favored_regions), p=weights)
+    chosen_region = favored_regions[region_idx]
+    
+    # Sample angles from Gaussian around region center
+    phi = np.random.normal(chosen_region['phi'], chosen_region['std'])
+    psi = np.random.normal(chosen_region['psi'], chosen_region['std'])
+    
+    # Wrap to [-180, 180]
+    phi = ((phi + 180) % 360) - 180
+    psi = ((psi + 180) % 360) - 180
+    
+    return phi, psi
+
+
 def generate_pdb_content(
     length: Optional[int] = None,
     sequence_str: Optional[str] = None,
@@ -258,19 +301,9 @@ def generate_pdb_content(
 
             # Determine phi/psi angles for this residue
             if phi_psi_mode == 'random':
-                # Sample from allowed Ramachandran regions
-                # Simplified: sample from general allowed regions
-                # Alpha region: phi ~ -60, psi ~ -45
-                # Beta region: phi ~ -120, psi ~ 120
-                # Choose randomly between these regions
-                if np.random.random() < 0.5:
-                    # Alpha-like region
-                    current_phi = -60.0 + np.random.uniform(-30, 30)
-                    current_psi = -45.0 + np.random.uniform(-30, 30)
-                else:
-                    # Beta-like region
-                    current_phi = -120.0 + np.random.uniform(-30, 30)
-                    current_psi = 120.0 + np.random.uniform(-30, 30)
+                # Sample from Ramachandran probability distributions
+                # Uses residue-specific distributions for GLY and PRO
+                current_phi, current_psi = _sample_ramachandran_angles(res_name)
             else:
                 # Use fixed angles from preset
                 current_phi = phi_angle
