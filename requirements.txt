@@ -1,3 +1,4 @@
-numpy
-biotite
-biopython
+# Development dependencies
+# Install with: pip install -e ".[dev]"
+# This installs the package in editable mode with all development dependencies
+-e .[dev]
