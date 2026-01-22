@@ -89,7 +89,7 @@ def create_pdb_header(
     header_lines.append("SOURCE    ENGINEERED; SYNTHETIC CONSTRUCT;")
     header_lines.append("KEYWDS    PEPTIDE, LINEAR, GENERATED, THEORETICAL MODEL")
     header_lines.append("EXPDTA    THEORETICAL MODEL")
-    header_lines.append("AUTHOR    STUPID PDB")
+    header_lines.append("AUTHOR    SYNTH PDB")
     header_lines.append("MODEL        1")
     
     return "\n".join(header_lines)

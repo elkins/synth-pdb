@@ -1,7 +1,7 @@
 import random
 import numpy as np
 import logging
-from typing import List, Optional
+from typing import List, Optional, Dict
 from .data import (
     STANDARD_AMINO_ACIDS,
     ONE_TO_THREE_LETTER_CODE,
@@ -225,28 +225,203 @@ def _sample_ramachandran_angles(res_name: str) -> tuple[float, float]:
     return phi, psi
 
 
+def _parse_structure_regions(structure_str: str, sequence_length: int) -> Dict[int, str]:
+    """
+    Parse structure region specification into per-residue conformations.
+    
+    This function enables users to specify different secondary structure conformations
+    for different regions of their peptide. This is crucial for creating realistic
+    protein-like structures that have mixed secondary structures (e.g., helix-turn-sheet).
+    
+    EDUCATIONAL NOTE - Why This Matters:
+    Real proteins don't have uniform secondary structure throughout. They typically
+    have regions of alpha helices, beta sheets, turns, and loops. This function
+    allows users to specify these regions explicitly, making the generated structures
+    much more realistic and useful for educational demonstrations.
+    
+    Args:
+        structure_str: Region specification string in format "start-end:conformation,..."
+                      Example: "1-10:alpha,11-20:beta,21-30:random"
+                      - Residue numbering is 1-indexed (first residue is 1)
+                      - Conformations: alpha, beta, ppii, extended, random
+                      - Multiple regions separated by commas
+        sequence_length: Total number of residues in the sequence
+        
+    Returns:
+        Dictionary mapping residue index (0-based) to conformation name.
+        Only includes explicitly specified residues (gaps are allowed).
+        
+        EDUCATIONAL NOTE - Return Format:
+        We use 0-based indexing internally (Python convention) even though
+        the input uses 1-based indexing (PDB/biology convention). This is
+        a common pattern in bioinformatics software.
+        
+    Raises:
+        ValueError: If syntax is invalid, regions overlap, or ranges are out of bounds
+        
+    Examples:
+        >>> _parse_structure_regions("1-10:alpha,11-20:beta", 20)
+        {0: 'alpha', 1: 'alpha', ..., 9: 'alpha', 10: 'beta', ..., 19: 'beta'}
+        
+        >>> _parse_structure_regions("1-5:alpha,10-15:beta", 20)
+        {0: 'alpha', ..., 4: 'alpha', 9: 'beta', ..., 14: 'beta'}
+        # Note: Residues 6-9 and 16-20 are not in the dictionary (gaps allowed)
+    
+    EDUCATIONAL NOTE - Design Decisions:
+    1. We allow gaps in coverage - unspecified residues will use the default conformation
+    2. We strictly forbid overlaps - each residue can only have one conformation
+    3. We validate all inputs before processing to give clear error messages
+    """
+    # Handle empty input - return empty dictionary (all residues will use default)
+    if not structure_str:
+        return {}
+    
+    # EDUCATIONAL NOTE - Data Structure Choice:
+    # We use a dictionary to map residue indices to conformations because:
+    # 1. Fast lookup: O(1) to check if a residue has a specified conformation
+    # 2. Sparse representation: Only stores specified residues (memory efficient)
+    # 3. Easy to check for overlaps: Just check if key already exists
+    residue_conformations = {}
+    
+    # Split the input string by commas to get individual region specifications
+    # Example: "1-10:alpha,11-20:beta" -> ["1-10:alpha", "11-20:beta"]
+    regions = structure_str.split(',')
+    
+    # Process each region specification
+    for region in regions:
+        # Remove any leading/trailing whitespace for robustness
+        # This allows users to write "1-10:alpha, 11-20:beta" (with spaces)
+        region = region.strip()
+        
+        # VALIDATION STEP 1: Check for colon separator
+        # Expected format: "start-end:conformation"
+        if ':' not in region:
+            raise ValueError(
+                f"Invalid region syntax: '{region}'. "
+                f"Expected format: 'start-end:conformation' (e.g., '1-10:alpha')"
+            )
+        
+        # Split by colon to separate range from conformation
+        # Example: "1-10:alpha" -> range_part="1-10", conformation="alpha"
+        range_part, conformation = region.split(':', 1)
+        
+        # VALIDATION STEP 2: Check conformation name
+        # Build list of valid conformations from presets plus 'random'
+        valid_conformations = list(RAMACHANDRAN_PRESETS.keys()) + ['random']
+        if conformation not in valid_conformations:
+            raise ValueError(
+                f"Invalid conformation '{conformation}'. "
+                f"Valid options are: {', '.join(valid_conformations)}"
+            )
+        
+        # VALIDATION STEP 3: Check for dash separator in range
+        # Expected format: "start-end"
+        if '-' not in range_part:
+            raise ValueError(
+                f"Invalid range syntax: '{range_part}'. "
+                f"Expected format: 'start-end' (e.g., '1-10')"
+            )
+        
+        # Split range by dash to get start and end positions
+        # Example: "1-10" -> start_str="1", end_str="10"
+        start_str, end_str = range_part.split('-', 1)
+        
+        # VALIDATION STEP 4: Parse numbers
+        # Try to convert strings to integers, give clear error if they're not numbers
+        try:
+            start = int(start_str)
+            end = int(end_str)
+        except ValueError:
+            raise ValueError(
+                f"Invalid range numbers: '{range_part}'. "
+                f"Start and end must be integers (e.g., '1-10')"
+            )
+        
+        # VALIDATION STEP 5: Check range bounds
+        # EDUCATIONAL NOTE - Why These Checks Matter:
+        # 1. start < 1: PDB/biology uses 1-based indexing, so 0 or negative makes no sense
+        # 2. end > sequence_length: Can't specify residues that don't exist
+        # 3. start > end: Range would be backwards (e.g., "10-5"), which is nonsensical
+        if start < 1 or end > sequence_length:
+            raise ValueError(
+                f"Range {start}-{end} is out of bounds for sequence length {sequence_length}. "
+                f"Valid range is 1 to {sequence_length}"
+            )
+        if start > end:
+            raise ValueError(
+                f"Invalid range: start ({start}) is greater than end ({end}). "
+                f"Range must be in format 'smaller-larger' (e.g., '1-10', not '10-1')"
+            )
+        
+        # VALIDATION STEP 6: Check for overlaps and assign conformations
+        # EDUCATIONAL NOTE - Why We Forbid Overlaps:
+        # If residue 5 is specified as both "alpha" and "beta", which should we use?
+        # Rather than making an arbitrary choice (like "last one wins"), we require
+        # the user to be explicit and not specify overlapping regions.
+        for res_idx in range(start - 1, end):  # Convert to 0-based indexing
+            # Check if this residue was already specified in a previous region
+            if res_idx in residue_conformations:
+                # EDUCATIONAL NOTE - Error Message Design:
+                # We convert back to 1-based indexing in the error message because
+                # that's what the user specified. This makes errors easier to understand.
+                raise ValueError(
+                    f"Overlapping regions detected: residue {res_idx + 1} is specified "
+                    f"in multiple regions. Each residue can only have one conformation."
+                )
+            
+            # Assign the conformation to this residue (using 0-based indexing internally)
+            residue_conformations[res_idx] = conformation
+    
+    # Return the mapping of residue indices to conformations
+    # EDUCATIONAL NOTE - What Happens to Gaps:
+    # If a residue index is not in this dictionary, the calling code will use
+    # the default conformation specified by the --conformation parameter.
+    # This allows users to specify only the interesting regions and let the
+    # rest use a sensible default.
+    return residue_conformations
+
+
 def generate_pdb_content(
     length: Optional[int] = None,
     sequence_str: Optional[str] = None,
     use_plausible_frequencies: bool = False,
     conformation: str = 'alpha',
+    structure: Optional[str] = None,
 ) -> str:
     """
     Generates PDB content for a linear peptide chain.
+    
+    EDUCATIONAL NOTE - New Feature: Per-Region Conformation Control
+    This function now supports specifying different conformations for different
+    regions of the peptide, enabling creation of realistic mixed secondary structures.
     
     Args:
         length: Number of residues (ignored if sequence_str provided)
         sequence_str: Explicit amino acid sequence (1-letter or 3-letter codes)
         use_plausible_frequencies: Use biologically realistic amino acid frequencies
-        conformation: Secondary structure conformation to generate.
+        conformation: Default secondary structure conformation.
                      Options: 'alpha', 'beta', 'ppii', 'extended', 'random'
                      Default: 'alpha' (alpha helix)
+                     Used for all residues if structure is not provided,
+                     or for residues not specified in structure parameter.
+        structure: Per-region conformation specification (NEW!)
+                  Format: "start-end:conformation,start-end:conformation,..."
+                  Example: "1-10:alpha,11-15:random,16-30:beta"
+                  If provided, overrides conformation for specified regions.
+                  Unspecified residues use the default conformation parameter.
     
     Returns:
         str: Complete PDB file content
         
     Raises:
-        ValueError: If invalid conformation name provided
+        ValueError: If invalid conformation name or structure syntax provided
+        
+    EDUCATIONAL NOTE - Why Per-Region Conformations Matter:
+    Real proteins have mixed secondary structures. For example:
+    - Zinc fingers: beta sheets + alpha helices
+    - Immunoglobulins: multiple beta sheets connected by loops
+    - Helix-turn-helix motifs: two alpha helices connected by a turn
+    This feature allows users to create these realistic structures.
     """
     sequence = _resolve_sequence(
         length=length,
@@ -261,25 +436,50 @@ def generate_pdb_content(
             "Length must be a positive integer when no sequence is provided and no valid sequence string is given."
         )
 
-    # Validate and select conformation angles
-    if conformation == 'random':
-        # For random, we'll sample from allowed Ramachandran regions for each residue
-        # This will be implemented per-residue in the loop below
-        phi_psi_mode = 'random'
-        phi_angle = None
-        psi_angle = None
-    elif conformation in RAMACHANDRAN_PRESETS:
-        phi_psi_mode = 'fixed'
-        phi_angle = RAMACHANDRAN_PRESETS[conformation]['phi']
-        psi_angle = RAMACHANDRAN_PRESETS[conformation]['psi']
-    else:
-        valid_conformations = list(RAMACHANDRAN_PRESETS.keys()) + ['random']
+    # Calculate sequence length first - we need this for parsing structure regions
+    sequence_length = len(sequence)
+
+    # EDUCATIONAL NOTE - Input Validation:
+    # We validate the default conformation early to give clear error messages.
+    # Even if structure parameter overrides it for some residues, we need to
+    # ensure the default is valid for any gaps or when structure is not provided.
+    valid_conformations = list(RAMACHANDRAN_PRESETS.keys()) + ['random']
+    if conformation not in valid_conformations:
         raise ValueError(
             f"Invalid conformation '{conformation}'. "
             f"Valid options are: {', '.join(valid_conformations)}"
         )
 
-    sequence_length = len(sequence)
+    # EDUCATIONAL NOTE - Per-Residue Conformation Assignment:
+    # We now support two modes:
+    # 1. Uniform conformation (old behavior): All residues use same conformation
+    # 2. Per-region conformation (new!): Different regions can have different conformations
+    
+    # Parse per-residue conformations if structure parameter is provided
+    if structure:
+        # Parse the structure specification into a dictionary
+        # mapping residue index (0-based) to conformation name
+        residue_conformations = _parse_structure_regions(structure, sequence_length)
+        
+        # Fill in any gaps with the default conformation
+        # EDUCATIONAL NOTE - Gap Handling:
+        # If a residue is not specified in the structure parameter,
+        # we use the default conformation. This allows users to specify
+        # only the interesting regions and let the rest use a sensible default.
+        for i in range(sequence_length):
+            if i not in residue_conformations:
+                residue_conformations[i] = conformation
+    else:
+        # No structure parameter provided - use uniform conformation for all residues
+        # This maintains backward compatibility with existing code
+        residue_conformations = {i: conformation for i in range(sequence_length)}
+
+    
+    # EDUCATIONAL NOTE - Why We Don't Validate Conformations Here:
+    # We already validated conformations in _parse_structure_regions(),
+    # so we don't need to re-validate them here. The default conformation
+    # will be validated when we actually use it below.
+
 
     peptide = struc.AtomArray(0)
     
@@ -299,15 +499,34 @@ def generate_pdb_content(
             prev_ca_atom = peptide[(peptide.res_id == res_id - 1) & (peptide.atom_name == "CA")][-1]
             prev_n_atom = peptide[(peptide.res_id == res_id - 1) & (peptide.atom_name == "N")][-1]
 
-            # Determine phi/psi angles for this residue
-            if phi_psi_mode == 'random':
+            # EDUCATIONAL NOTE - Per-Residue Conformation Selection:
+            # For each residue, we now look up its specific conformation from
+            # the residue_conformations dictionary. This allows different residues
+            # to have different secondary structures (e.g., residues 1-10 alpha helix,
+            # residues 11-20 beta sheet).
+            current_conformation = residue_conformations[i]
+            
+            # Determine phi/psi angles based on this residue's conformation
+            if current_conformation == 'random':
                 # Sample from Ramachandran probability distributions
                 # Uses residue-specific distributions for GLY and PRO
+                # EDUCATIONAL NOTE - Why Random Sampling:
+                # Random sampling creates structural diversity, useful for:
+                # 1. Modeling intrinsically disordered regions
+                # 2. Generating diverse structures for testing
+                # 3. Creating realistic loop/turn regions
                 current_phi, current_psi = _sample_ramachandran_angles(res_name)
             else:
-                # Use fixed angles from preset
-                current_phi = phi_angle
-                current_psi = psi_angle
+                # Use fixed angles from the conformation preset
+                # EDUCATIONAL NOTE - Preset Conformations:
+                # Each conformation (alpha, beta, ppii, extended) has characteristic
+                # phi/psi angles that define its 3D structure:
+                # - Alpha helix: φ=-57°, ψ=-47° (right-handed helix)
+                # - Beta sheet: φ=-135°, ψ=135° (extended strand)
+                # - PPII: φ=-75°, ψ=145° (left-handed helix, common in collagen)
+                # - Extended: φ=-120°, ψ=120° (stretched conformation)
+                current_phi = RAMACHANDRAN_PRESETS[current_conformation]['phi']
+                current_psi = RAMACHANDRAN_PRESETS[current_conformation]['psi']
 
             # Add slight variation to omega angle to mimic thermal fluctuations
             # This adds realistic structural diversity (±5° variation)

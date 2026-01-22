@@ -32,6 +32,8 @@ def _build_command_string(args: argparse.Namespace) -> str:
         cmd_parts.append("--plausible-frequencies")
     if args.conformation != 'alpha':  # Only add if not default
         cmd_parts.append(f"--conformation {args.conformation}")
+    if hasattr(args, 'structure') and args.structure:  # NEW: add structure if provided
+        cmd_parts.append(f"--structure '{args.structure}'")
     if args.validate:
         cmd_parts.append("--validate")
     if args.guarantee_valid:
@@ -118,6 +120,12 @@ def main() -> None:
         choices=["alpha", "beta", "ppii", "extended", "random"],
         help="Secondary structure conformation to generate. Options: alpha (default, alpha helix), beta (beta sheet), ppii (polyproline II), extended (stretched), random (random sampling).",
     )
+    parser.add_argument(
+        "--structure",
+        type=str,
+        default=None,
+        help="Per-region conformation specification (NEW!). Format: 'start-end:conformation,...' Example: '1-10:alpha,11-20:beta'. Allows mixed secondary structures. Unspecified residues use --conformation default.",
+    )
 
     args = parser.parse_args()
 
@@ -177,6 +185,7 @@ def main() -> None:
                 sequence_str=args.sequence,
                 use_plausible_frequencies=args.plausible_frequencies,
                 conformation=args.conformation,
+                structure=args.structure,  # NEW: per-region conformation support
             )
 
             if not current_pdb_content:

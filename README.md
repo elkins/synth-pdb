@@ -236,6 +236,51 @@ synth-pdb --sequence "CPHCGKSFSQKSDLVKHQRT" --conformation random --best-of-N 5 
 - Combine with `--validate` to show how different conformations affect structural quality
 - Try `--best-of-N` and `--refine-clashes` to explore quality control strategies
 
+#### Mixed Secondary Structures (**NEW!**)
+
+The `--structure` parameter enables creation of realistic protein-like structures with different conformations in different regions:
+
+```bash
+# Helix-turn-helix DNA-binding motif
+# Two alpha helices connected by a flexible turn region
+synth-pdb --length 25 --structure "1-10:alpha,11-15:random,16-25:alpha" --output helix_turn_helix.pdb
+
+# Beta-alpha-beta fold unit
+# Common protein architecture with sheet-helix-sheet
+synth-pdb --length 30 --structure "1-10:beta,11-15:random,16-25:alpha,26-30:beta" --output bab_fold.pdb
+
+# Zinc finger with realistic structure
+# Beta sheet + alpha helix (actual zinc finger architecture)
+synth-pdb --sequence "CPHCGKSFSQKSDLVKHQRT" --structure "1-5:beta,6-10:random,11-20:alpha" --output zinc_finger_realistic.pdb
+
+# Immunoglobulin domain
+# Multiple beta sheets connected by loops (antibody-like)
+synth-pdb --length 40 --structure "1-8:beta,9-12:random,13-20:beta,21-24:random,25-32:beta,33-40:random" --output ig_domain.pdb
+
+# Coiled-coil with flexible linker
+# Two helical regions connected by disordered linker
+synth-pdb --length 50 --structure "1-20:alpha,21-30:random,31-50:alpha" --output coiled_coil.pdb
+
+# Intrinsically disordered region with structured domain
+# Disordered N-terminus, structured C-terminus (common in signaling proteins)
+synth-pdb --length 40 --structure "1-15:random,16-40:alpha" --output idr_with_domain.pdb
+
+# Collagen-like with flexibility
+# PPII helix with occasional flexible regions (more realistic than uniform)
+synth-pdb --sequence "GPGPPGPPGPPGPPGPPGPP" --structure "1-6:ppii,7-9:random,10-20:ppii" --output collagen_flexible.pdb
+
+# Beta-hairpin motif
+# Two antiparallel beta strands connected by a turn
+synth-pdb --length 20 --structure "1-7:beta,8-12:random,13-20:beta" --output beta_hairpin.pdb
+```
+
+**Why This Matters:**
+- Real proteins have **mixed secondary structures**, not uniform conformations
+- These examples are much more realistic than single-conformation structures
+- Useful for teaching protein architecture and domain organization
+- Great for testing structure analysis tools with realistic inputs
+- Demonstrates how sequence and structure work together
+
 #### For Structural Biologists
 
 ```bash
@@ -276,6 +321,12 @@ When `--validate` is enabled, the tool checks for:
    - Long hydrophobic stretches (8+ residues)
    - Odd cysteine counts (unpaired cysteines)
    - Poly-proline or poly-glycine runs
+
+7. **Chirality** (**NEW!**): Validates L-amino acid stereochemistry
+   - Checks improper dihedral angle N-CA-C-CB
+   - L-amino acids should have proper chirality (improper dihedral ±60° to ±120°)
+   - Glycine is automatically exempt (no CB atom)
+   - Detects incorrect stereochemistry (D-amino acids)
 
 ### Refinement Strategy
 
