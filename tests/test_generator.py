@@ -549,7 +549,9 @@ class TestGenerator(unittest.TestCase):
                     # Temp Factor (61-66) - 6 chars, 2 decimal places
                     self.assertEqual(len(line[60:66]), 6)
                     self.assertRegex(line[60:66], OCC_TEMP_REGEX, f"Temp factor format incorrect: '{line[60:66]}'" )
-                    self.assertAlmostEqual(atom_data["temp_factor"], 0.00, places=2)
+                    # B-factors should now be realistic (5-60 Ų), not 0.00
+                    self.assertGreaterEqual(atom_data["temp_factor"], 5.00, "B-factor should be >= 5.00")
+                    self.assertLessEqual(atom_data["temp_factor"], 60.00, "B-factor should be <= 60.00")
 
                     # Element (77-78) - 2 chars, right justified
                     self.assertEqual(len(line[76:78]), 2)

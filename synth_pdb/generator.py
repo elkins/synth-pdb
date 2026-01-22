@@ -49,6 +49,91 @@ CA_DISTANCE = (
 
 PDB_ATOM_FORMAT = "ATOM  {atom_number: >5} {atom_name: <4}{alt_loc: <1}{residue_name: >3} {chain_id: <1}{residue_number: >4}{insertion_code: <1}   {x_coord: >8.3f}{y_coord: >8.3f}{z_coord: >8.3f}{occupancy: >6.2f}{temp_factor: >6.2f}          {element: >2}{charge: >2}"
 
+
+def _calculate_bfactor(
+    atom_name: str,
+    residue_number: int,
+    total_residues: int,
+    residue_name: str
+) -> float:
+    """
+    Calculate realistic B-factor (temperature factor) for an atom.
+    
+    EDUCATIONAL NOTE - B-factors (Temperature Factors):
+    ===================================================
+    B-factors represent atomic displacement due to thermal motion and static disorder.
+    They are measured in Ų (square Angstroms) and indicate atomic mobility.
+    
+    Physical Interpretation:
+    - B = 8π²<u²> where <u²> is mean square displacement
+    - Higher B-factor = more mobile/flexible atom
+    - Lower B-factor = more rigid/constrained atom
+    
+    Typical Patterns in Real Protein Structures:
+    1. Backbone vs Side Chains:
+       - Backbone atoms (N, CA, C, O): 15-25 Ų (constrained by peptide bonds)
+       - Side chain atoms (CB, CG, etc.): 20-35 Ų (more conformational freedom)
+    
+    2. Position Along Chain:
+       - Core residues: 10-20 Ų (buried, constrained)
+       - Surface residues: 20-30 Ų (solvent-exposed, more mobile)
+       - Terminal residues: 30-50 Ų ("terminal fraying" - fewer constraints)
+    
+    3. Residue-Specific Effects:
+       - Glycine: Higher (no side chain constraints, more flexible)
+       - Proline: Lower (cyclic structure, rigid backbone)
+    
+    For Linear Peptides (our case):
+    - No folding/packing, so all residues are "surface-like"
+    - Terminal fraying effect is prominent
+    - Backbone still more rigid than side chains
+    
+    Args:
+        atom_name: Atom name (e.g., 'N', 'CA', 'CB', 'CG')
+        residue_number: Residue number (1-indexed)
+        total_residues: Total number of residues in chain
+        residue_name: Three-letter residue code (e.g., 'ALA', 'GLY')
+        
+    Returns:
+        B-factor value in Ų, rounded to 2 decimal places
+    """
+    # Define backbone atoms (more rigid due to peptide bond constraints)
+    BACKBONE_ATOMS = {'N', 'CA', 'C', 'O', 'H', 'HA'}
+    
+    # Base B-factors for different atom types
+    if atom_name in BACKBONE_ATOMS:
+        base_bfactor = 18.0  # Backbone is constrained by peptide bonds
+    else:
+        base_bfactor = 25.0  # Side chains have more conformational freedom
+    
+    # Calculate distance from nearest terminus (normalized 0-1)
+    # This simulates "terminal fraying" - termini are more mobile
+    dist_from_n_term = (residue_number - 1) / max(total_residues - 1, 1)
+    dist_from_c_term = (total_residues - residue_number) / max(total_residues - 1, 1)
+    dist_from_nearest_term = min(dist_from_n_term, dist_from_c_term)
+    
+    # Terminal mobility factor: increases B-factor near termini
+    # Adds up to 15 Ų at termini
+    terminal_factor = 15.0 * (1.0 - dist_from_nearest_term)
+    
+    # Residue-specific adjustments
+    if residue_name == 'GLY':
+        base_bfactor += 5.0  # Glycine is more flexible
+    elif residue_name == 'PRO':
+        base_bfactor -= 3.0  # Proline is more rigid
+    
+    # Add small random variation
+    random_variation = np.random.uniform(-2.0, 2.0)
+    
+    # Calculate final B-factor
+    bfactor = base_bfactor + terminal_factor + random_variation
+    
+    # Clamp to realistic range (5-60 Ų)
+    bfactor = max(5.0, min(60.0, bfactor))
+    
+    return round(bfactor, 2)
+
+
 # Helper function to create a minimal PDB ATOM line
 def create_atom_line(
     atom_number: int,
@@ -61,12 +146,20 @@ def create_atom_line(
     z: float,
     element: str,
     alt_loc: str = "",
-    insertion_code: str = ""
+    insertion_code: str = "",
+    temp_factor: float = 0.00  # B-factor (temperature factor) in Ų
 ) -> str:
+    """
+    Create a PDB ATOM line.
+    
+    EDUCATIONAL NOTE - PDB ATOM Record Format:
+    The temp_factor (B-factor) appears in columns 61-66 of the ATOM record.
+    It represents atomic mobility/flexibility. See _calculate_bfactor() for details.
+    """
     return (
         f"ATOM  {atom_number: >5} {atom_name: <4}{alt_loc: <1}{residue_name: >3} {chain_id: <1}"
         f"{residue_number: >4}{insertion_code: <1}   "
-        f"{x: >8.3f}{y: >8.3f}{z: >8.3f}{1.00: >6.2f}{0.00: >6.2f}          "
+        f"{x: >8.3f}{y: >8.3f}{z: >8.3f}{1.00: >6.2f}{temp_factor: >6.2f}          "
         f"{element: >2}  "
     )
 
@@ -642,6 +735,34 @@ def generate_pdb_content(
     # Biotite's PDBFile.write() will write ATOM records, which can be 78 or 80 chars.
     # It also handles TER records between chains, but not necessarily at the end of a single chain.
     atomic_and_ter_content = string_io.getvalue()
+    
+    # EDUCATIONAL NOTE - Adding Realistic B-factors:
+    # Biotite sets all B-factors to 0.00 by default. We post-process the PDB string
+    # to replace these with realistic values based on atom type, position, and residue type.
+    # This makes the output look more professional and realistic.
+    
+    # Get total number of residues for B-factor calculation
+    total_residues = len(set(peptide.res_id))
+    
+    # Process each line and add realistic B-factors
+    processed_lines = []
+    for line in atomic_and_ter_content.splitlines():
+        if line.startswith("ATOM"):
+            # Extract atom information from PDB line (PDB format is column-based)
+            atom_name = line[12:16].strip()
+            res_name = line[17:20].strip()
+            res_num = int(line[22:26].strip())
+            
+            # Calculate realistic B-factor for this atom
+            bfactor = _calculate_bfactor(atom_name, res_num, total_residues, res_name)
+            
+            # Replace the B-factor in the line (columns 61-66, 0-indexed: 60-66)
+            # Keep everything before column 60, insert new B-factor, keep everything after column 66
+            line = line[:60] + f"{bfactor:6.2f}" + line[66:]
+        
+        processed_lines.append(line)
+    
+    atomic_and_ter_content = "\n".join(processed_lines) + "\n"
 
     # Manually add TER record if biotite doesn't add one at the end of the last chain.
     # Check if the last record written by biotite is an ATOM/HETATM, if so, add TER manually.
