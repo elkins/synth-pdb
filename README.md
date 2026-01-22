@@ -1,5 +1,9 @@
 # synth-pdb
 
+[![PyPI version](https://badge.fury.io/py/synth-pdb.svg)](https://badge.fury.io/py/synth-pdb)
+[![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 A command-line tool to generate Protein Data Bank (PDB) files with full atomic representation for testing, benchmarking, and educational purposes.
 
 > ⚠️ **Important**: The generated structures use idealized geometries and may contain violations of standard structural constraints. These files are intended for **testing computational tools** and **educational demonstrations**, not for simulation or experimental validation.
@@ -46,18 +50,32 @@ A command-line tool to generate Protein Data Bank (PDB) files with full atomic r
 
 ## Installation
 
-Install directly from the project directory using pip:
+### From PyPI (Recommended)
+
+Install the latest stable release from PyPI:
 
 ```bash
-pip install .
+pip install synth-pdb
 ```
 
 This installs the `synth-pdb` package and makes the `synth-pdb` command available system-wide.
+
+### From Source (For Development)
+
+Install directly from the project directory:
+
+```bash
+git clone https://github.com/georgeelkins/synth-pdb.git
+cd synth-pdb
+pip install .
+```
 
 ### Requirements
 - Python 3.8+
 - NumPy
 - Biotite (for residue templates and structure manipulation)
+
+Dependencies are automatically installed with pip.
 
 ## Quick Start
 
