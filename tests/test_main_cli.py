@@ -279,37 +279,35 @@ class TestMainCLI:
 
     # --- Additional tests for error conditions and edge cases ---
     
-    def test_invalid_length_without_sequence(self, mocker, caplog):
-        """Test that invalid length without sequence causes sys.exit(1)."""
-        caplog.set_level(logging.ERROR)
+    def test_invalid_length_without_sequence(self, tmp_path):
+        """Test that length=0 without sequence uses default length=10."""
+        output_file = tmp_path / "test.pdb"
         
         # Mock sys.argv with invalid length (0)
-        test_args = ["synth_pdb", "--length", "0"]
-        mocker.patch("sys.argv", test_args)
+        test_args = ["synth_pdb", "--length", "0", "--output", str(output_file)]
+        import sys
+        sys.argv = test_args
         
-        # Mock sys.exit to check for error exit
-        mock_sys_exit = mocker.patch("sys.exit")
-        
+        # Should not exit - uses default length=10
         main.main()
         
-        assert "Length must be a positive integer when no sequence is provided." in caplog.text
-        mock_sys_exit.assert_called_with(1)
+        # Should successfully create file with default length
+        assert output_file.exists()
     
-    def test_negative_length_without_sequence(self, mocker, caplog):
-        """Test that negative length without sequence causes sys.exit(1)."""
-        caplog.set_level(logging.ERROR)
+    def test_negative_length_without_sequence(self, tmp_path):
+        """Test that negative length without sequence uses default length=10."""
+        output_file = tmp_path / "test.pdb"
         
         # Mock sys.argv with negative length
-        test_args = ["synth_pdb", "--length", "-5"]
-        mocker.patch("sys.argv", test_args)
+        test_args = ["synth_pdb", "--length", "-5", "--output", str(output_file)]
+        import sys
+        sys.argv = test_args
         
-        # Mock sys.exit to check for error exit
-        mock_sys_exit = mocker.patch("sys.exit")
-        
+        # Should not exit - uses default length=10
         main.main()
         
-        assert "Length must be a positive integer when no sequence is provided." in caplog.text
-        mock_sys_exit.assert_called_with(1)
+        # Should successfully create file with default length
+        assert output_file.exists()
     
     def test_failed_pdb_generation_empty_content(self, mocker, caplog):
         """Test handling when generate_pdb_content returns None/empty."""

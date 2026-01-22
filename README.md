@@ -71,6 +71,11 @@ Generate and validate a specific sequence:
 synth-pdb --sequence "ACDEFGHIKLMNPQRSTVWY" --validate --output my_peptide.pdb
 ```
 
+Generate with mixed secondary structures and visualize:
+```bash
+synth-pdb --structure "1-10:alpha,11-20:beta" --visualize
+```
+
 Generate the best of 10 attempts with clash refinement:
 ```bash
 synth-pdb --length 20 --best-of-N 10 --refine-clashes 5 --output refined_peptide.pdb
@@ -235,6 +240,46 @@ synth-pdb --sequence "CPHCGKSFSQKSDLVKHQRT" --conformation random --best-of-N 5 
 - Use these for teaching secondary structure concepts, not for actual molecular modeling
 - Combine with `--validate` to show how different conformations affect structural quality
 - Try `--best-of-N` and `--refine-clashes` to explore quality control strategies
+
+#### Visualization-Optimized Examples (**NEW!**)
+
+These examples are specifically designed to look great in the 3D viewer with `--visualize`:
+
+```bash
+# 🧬 Compact Alpha Helix (BEST for visualization)
+# Short, tight helix - perfect for interactive viewing
+synth-pdb --length 15 --conformation alpha --visualize
+
+# 🔗 Helix-Turn-Helix DNA-Binding Motif
+# Classic protein architecture with two helices and a turn
+synth-pdb --sequence "AAAAAAGGGAAAAA" --structure "1-6:alpha,7-9:random,10-14:alpha" --visualize
+
+# 🎀 Beta Hairpin
+# Two antiparallel beta strands connected by a turn
+synth-pdb --sequence "VVVVVGGVVVVV" --structure "1-5:beta,6-8:random,9-12:beta" --visualize
+
+# 🌀 Coiled-Coil Motif
+# Two alpha helices - common in structural proteins
+synth-pdb --sequence "LKELEKELEKELEKEL" --conformation alpha --visualize
+
+# 🧲 Leucine Zipper
+# Alpha helix with leucine repeats every 7 residues
+synth-pdb --sequence "LKELEKELEKELEKELEKELEKEL" --conformation alpha --visualize
+
+# 🦠 Antimicrobial Peptide-like
+# Short amphipathic alpha helix
+synth-pdb --sequence "KWKLFKKIGAVLKVL" --conformation alpha --visualize
+
+# 🧪 Polyproline II Helix (Collagen-like)
+# Left-handed helix, compact and visually distinct
+synth-pdb --sequence "GPGPPGPPGPPGPP" --conformation ppii --visualize
+```
+
+**Visualization Tips:**
+- **Best conformations for viewing**: `alpha` (most compact), `ppii` (distinctive shape)
+- **Optimal length**: 10-20 residues for clear visualization
+- **In the viewer**: Use "Cartoon" style and "Spectrum" color for best results
+- **Interactive**: Rotate with left-click, zoom with scroll, pan with right-click
 
 #### Mixed Secondary Structures (**NEW!**)
 
