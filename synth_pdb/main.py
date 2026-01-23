@@ -178,6 +178,24 @@ def main() -> None:
         type=str,
         help="Input PDB file path (required for --mode docking).",
     )
+    
+    # Phase 7: Synthetic NMR Data
+    parser.add_argument(
+        "--gen-nef",
+        action="store_true",
+        help="Generate synthetic NMR data (NOE restraints) in NEF format.",
+    )
+    parser.add_argument(
+        "--noe-cutoff",
+        type=float,
+        default=5.0,
+        help="Distance cutoff (Angstroms) for synthetic NOEs (default 5.0).",
+    )
+    parser.add_argument(
+        "--nef-output",
+        type=str,
+        help="Optional: Output NEF filename.",
+    )
 
     args = parser.parse_args()
 
@@ -458,6 +476,51 @@ def main() -> None:
                     except Exception as e:
                         logger.error(f"Failed to open 3D viewer: {e}")
                         # Don't fail the entire program if visualization fails
+                
+                # Phase 7: Generate NEF if requested
+                if args.gen_nef:
+                    if args.mode != "generate":
+                        logger.warning("NEF generation is currently only supported in single structure 'generate' mode (for now).")
+                    else:
+                        from .nmr import calculate_synthetic_noes
+                        from .nef_io import write_nef_file
+                        import biotite.structure.io.pdb as pdb_io
+                        
+                        logger.info("Generating Synthetic NMR Data (NEF)...")
+                        
+                        # We need the generated structure as an AtomArray
+                        # Ideally we reuse the object, but here we have the string.
+                        # Re-parsing ensures we use exactly what was written to disk.
+                        pdb_file = pdb_io.PDBFile.read(io.StringIO(final_full_pdb_content_to_write))
+                        structure = pdb_file.get_structure(model=1)
+                        
+                        # Validation: Check for Hydrogens
+                        if not np.any(structure.element == "H"):
+                             logger.error("Generated structure has no hydrogens! NEF generation requires protons. Did you use --minimize (Phase 2)?")
+                        else:
+                            restraints = calculate_synthetic_noes(structure, cutoff=args.noe_cutoff)
+                            
+                            nef_filename = args.nef_output
+                            if not nef_filename:
+                                nef_filename = output_filename.replace(".pdb", ".nef")
+                                
+                            # Sequence: get from args or infer
+                            seq_str = args.sequence if args.sequence else ""
+                            # If random, we need to infer.
+                            if not seq_str:
+                                # Quick inference from structure
+                                # (omitted for brevity, relying on args.sequence or minimal fallback in nef_io if needed)
+                                # Actually nef_io handles this if we pass the inferred sequence length? No, it needs string.
+                                # Let's try to get it from the 1-letter code map or just pass "UNK" if strictly random without tracking.
+                                # Better: generator returns sequence. But here in main we might have lost it.
+                                # For V1.4, let's assume args.sequence OR we parse residue names.
+                                # Parse residues:
+                                res_names = [structure[structure.res_id == i][0].res_name for i in sorted(list(set(structure.res_id)))]
+                                from .data import THREE_TO_ONE_LETTER_CODE
+                                seq_str = "".join([THREE_TO_ONE_LETTER_CODE.get(r, "X") for r in res_names])
+
+                            write_nef_file(nef_filename, seq_str, restraints)
+                            logger.info(f"NEF file generated: {os.path.abspath(nef_filename)}")
 
 
             except Exception as e:

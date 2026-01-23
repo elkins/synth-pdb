@@ -227,6 +227,21 @@ This effectively demonstrates:
   - Default: `amber14-all.xml`
   - Example: `--forcefield amber14-all.xml`
 
+  - Example: `--forcefield amber14-all.xml`
+
+#### **Synthetic NMR Data (Phase 7)**
+
+- `--gen-nef`: Generate synthetic NOE restraints in NEF format.
+  - Scans structure for H-H pairs < cutoff.
+  - Outputs `.nef` file.
+  - Note: Requires hydrogens (use with `--minimize` or internal default).
+
+- `--noe-cutoff <DIST>`: Cutoff distance for NOEs in Angstroms.
+  - Default: `5.0`
+  - Example: `--noe-cutoff 6.0`
+
+- `--nef-output <FILE>`: Custom output filename for NEF.
+
 #### **Output Options**
 
 - `--output <FILENAME>`: Custom output filename
