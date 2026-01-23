@@ -47,6 +47,29 @@ def _build_command_string(args: argparse.Namespace) -> str:
         cmd_parts.append(f"--best-of-N {args.best_of_N}")
     if args.refine_clashes > 0:
         cmd_parts.append(f"--refine-clashes {args.refine_clashes}")
+    if args.optimize:
+        cmd_parts.append("--optimize")
+    if args.minimize:
+        cmd_parts.append("--minimize")
+        cmd_parts.append(f"--forcefield {args.forcefield}")
+    
+    # Phase 7/8/9 flags
+    if args.gen_nef:
+        cmd_parts.append("--gen-nef")
+        cmd_parts.append(f"--noe-cutoff {args.noe_cutoff}")
+        if args.nef_output:
+            cmd_parts.append(f"--nef-output {args.nef_output}")
+            
+    if args.gen_relax:
+        cmd_parts.append("--gen-relax")
+        cmd_parts.append(f"--field {args.field}")
+        cmd_parts.append(f"--tumbling-time {args.tumbling_time}")
+        
+    if args.gen_shifts:
+        cmd_parts.append("--gen-shifts")
+        if args.shift_output:
+            cmd_parts.append(f"--shift-output {args.shift_output}")
+            
     if args.output:
         cmd_parts.append(f"--output {args.output}")
     

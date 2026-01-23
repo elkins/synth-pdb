@@ -229,7 +229,7 @@ This effectively demonstrates:
 
   - Example: `--forcefield amber14-all.xml`
 
-#### **Synthetic NMR Data (Phase 7)**
+#### **Synthetic NMR Data **
 
 - `--gen-nef`: Generate synthetic NOE restraints in NEF format.
   - Scans structure for H-H pairs < cutoff.
@@ -242,7 +242,7 @@ This effectively demonstrates:
 
 - `--nef-output <FILE>`: Custom output filename for NEF.
 
-#### **Synthetic Relaxation Data (Phase 8)**
+#### **Synthetic Relaxation Data **
 
 - `--gen-relax`: Generate synthetic NMR relaxation data ($R_1, R_2, \{^1H\}-^{15}N\ NOE$) in NEF format.
   - Calculates Model-Free parameters ($S^2 \approx 0.85$ for core, $0.5$ for flexible termini).

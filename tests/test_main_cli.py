@@ -496,3 +496,47 @@ class TestMainCLI:
         assert "An unexpected error occurred during file writing" in caplog.text
         assert "Permission denied" in caplog.text
         mock_sys_exit.assert_called_once_with(1)
+
+    def test_header_contains_all_arguments(self, mocker, tmp_path, caplog):
+        """Test that all CLI arguments are recorded in PDB REMARKs."""
+        caplog.set_level(logging.INFO)
+        output_file = tmp_path / "header_test.pdb"
+        
+        # Valid PDB content
+        valid_pdb = (
+            "HEADER    test\n" +
+            create_atom_line(1, "CA", "GLY", "A", 1, 0.0, 0.0, 0.0, "C")
+        )
+        mocker.patch("synth_pdb.main.generate_pdb_content", return_value=valid_pdb)
+        
+        # Run with many flags
+        test_args = [
+            "synth_pdb", 
+            "--length", "5", 
+            "--minimize", "--optimize", 
+            "--gen-shifts", 
+            "--output", str(output_file)
+        ]
+        mocker.patch("sys.argv", test_args)
+        mocker.patch("sys.exit")
+        
+        main.main()
+        
+        # Check output file content
+        with open(output_file, "r") as f:
+            content = f.read()
+            
+        # Verify REMARK 3 contains the flags
+        assert "REMARK 3  Command:" in content
+        assert "--minimize" in content
+        assert "--optimize" in content
+        assert "--gen-shifts" in content
+        # Reconstruct the full command string from REMARK 3 lines to handle wrapping
+        remark_lines = [line for line in content.splitlines() if line.startswith("REMARK 3    ")]
+        # Remove the prefix "REMARK 3    " (12 chars) and join
+        full_command_remark = "".join([line[12:] for line in remark_lines])
+        
+        assert "--minimize" in full_command_remark
+        assert "--optimize" in full_command_remark
+        assert "--gen-shifts" in full_command_remark
+        assert "--forcefield amber14-all.xml" in full_command_remark
