@@ -65,41 +65,41 @@ class TestBfactorCalculation:
     
     def test_terminal_residues_higher_bfactors(self):
         """
-        Test that terminal residues have higher B-factors than middle residues.
+        Test that terminal residues (Low S2) have higher B-factors than middle residues (High S2).
         
         EDUCATIONAL NOTE:
         Terminal residues are more mobile because they have fewer constraints.
-        This is called "terminal fraying" and is observed in real protein structures.
+        This is captured by lower Order Parameters (S2).
         """
         total_residues = 20
         
-        # N-terminus
-        b_n_term = _calculate_bfactor('CA', 1, total_residues, 'ALA')
+        # N-terminus (Low S2)
+        b_n_term = _calculate_bfactor('CA', 1, total_residues, 'ALA', s2=0.45)
         
-        # Middle
-        b_middle = _calculate_bfactor('CA', 10, total_residues, 'ALA')
+        # Middle (High S2)
+        b_middle = _calculate_bfactor('CA', 10, total_residues, 'ALA', s2=0.85)
         
-        # C-terminus
-        b_c_term = _calculate_bfactor('CA', 20, total_residues, 'ALA')
+        # C-terminus (Low S2)
+        b_c_term = _calculate_bfactor('CA', 20, total_residues, 'ALA', s2=0.45)
         
         # Average over multiple calls
         n_term_avg = np.mean([
-            _calculate_bfactor('CA', 1, total_residues, 'ALA')
+            _calculate_bfactor('CA', 1, total_residues, 'ALA', s2=0.45)
             for _ in range(10)
         ])
         middle_avg = np.mean([
-            _calculate_bfactor('CA', 10, total_residues, 'ALA')
+            _calculate_bfactor('CA', 10, total_residues, 'ALA', s2=0.85)
             for _ in range(10)
         ])
         c_term_avg = np.mean([
-            _calculate_bfactor('CA', 20, total_residues, 'ALA')
+            _calculate_bfactor('CA', 20, total_residues, 'ALA', s2=0.45)
             for _ in range(10)
         ])
         
         # Termini should have higher B-factors
         assert n_term_avg > middle_avg
         assert c_term_avg > middle_avg
-    
+
     def test_glycine_higher_bfactor(self):
         """
         Test that glycine has higher B-factors than other residues.
@@ -108,16 +108,13 @@ class TestBfactorCalculation:
         Glycine has no side chain (only H as CB), giving it more conformational
         freedom and higher mobility than other amino acids.
         """
-        residue_num = 10
-        total_residues = 20
-        
         # Average over multiple calls
         gly_avg = np.mean([
-            _calculate_bfactor('CA', residue_num, total_residues, 'GLY')
+            _calculate_bfactor('CA', 10, 20, 'GLY', s2=0.85)
             for _ in range(10)
         ])
         ala_avg = np.mean([
-            _calculate_bfactor('CA', residue_num, total_residues, 'ALA')
+            _calculate_bfactor('CA', 10, 20, 'ALA', s2=0.85)
             for _ in range(10)
         ])
         
@@ -131,32 +128,30 @@ class TestBfactorCalculation:
         Proline's cyclic structure (side chain connects back to backbone N)
         restricts backbone flexibility, making it more rigid.
         """
-        residue_num = 10
-        total_residues = 20
-        
         # Average over multiple calls
         pro_avg = np.mean([
-            _calculate_bfactor('CA', residue_num, total_residues, 'PRO')
+            _calculate_bfactor('CA', 10, 20, 'PRO', s2=0.85)
             for _ in range(10)
         ])
         ala_avg = np.mean([
-            _calculate_bfactor('CA', residue_num, total_residues, 'ALA')
+            _calculate_bfactor('CA', 10, 20, 'ALA', s2=0.85)
             for _ in range(10)
         ])
         
         assert pro_avg < ala_avg
-    
+
     def test_bfactor_realistic_range(self):
         """
-        Test that B-factors are in realistic range (5-60 Ų).
+        Test that B-factors are in realistic range (5-100 Ų).
         
         EDUCATIONAL NOTE:
         Typical B-factors in crystal structures:
-        - Very rigid: 5-15 Ų
+        - Very rigid: 5-15 Ų (Core helices/sheets)
         - Normal: 15-30 Ų
-        - Flexible: 30-50 Ų
-        - Very flexible: 50-60 Ų
-        Values outside this range are unusual.
+        - Flexible: 30-50 Ų (Loops)
+        - Highly Disordered: 50-99 Ų (Termini/Unstructured tails)
+        
+        In our Model-Free simulation, termini with S2 ~ 0.45 can reach 60-80 Ų.
         """
         # Test various scenarios
         test_cases = [
@@ -171,9 +166,9 @@ class TestBfactorCalculation:
         
         for atom_name, res_num, total_res, res_name in test_cases:
             bfactor = _calculate_bfactor(atom_name, res_num, total_res, res_name)
-            assert 5.0 <= bfactor <= 60.0, \
+            assert 5.0 <= bfactor <= 100.0, \
                 f"B-factor {bfactor} out of range for {res_name} {atom_name}"
-    
+
     def test_bfactor_in_generated_pdb(self):
         """
         Test that generated PDB files contain realistic B-factors.
@@ -186,12 +181,18 @@ class TestBfactorCalculation:
         
         # Extract B-factors from ATOM lines
         bfactors = []
+        MIN_BFACTOR = 5.0
+        MAX_BFACTOR = 100.0 # Updated for Model-Free physics (Termini can be highly flexible)
+        
         for line in pdb_content.split('\n'):
             if line.startswith('ATOM'):
                 # B-factor is in columns 61-66 (0-indexed: 60-66)
                 bfactor_str = line[60:66].strip()
                 if bfactor_str:
-                    bfactors.append(float(bfactor_str))
+                    b_factor = float(bfactor_str)
+                    bfactors.append(b_factor)
+                    assert b_factor >= MIN_BFACTOR, f"B-factor {b_factor} too low"
+                    assert b_factor <= MAX_BFACTOR, f"B-factor {b_factor} too high"
         
         # Should have B-factors for all atoms
         assert len(bfactors) > 0, "No B-factors found in PDB"
@@ -201,7 +202,7 @@ class TestBfactorCalculation:
             "All B-factors are 0.00 (not realistic)"
         
         # Should be in realistic range
-        assert all(5.0 <= b <= 60.0 for b in bfactors), \
+        assert all(5.0 <= b <= 100.0 for b in bfactors), \
             f"Some B-factors out of range: {bfactors}"
         
         # Should show variation (not all the same)

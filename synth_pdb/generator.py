@@ -71,14 +71,17 @@ CA_DISTANCE = (
 PDB_ATOM_FORMAT = "ATOM  {atom_number: >5} {atom_name: <4}{alt_loc: <1}{residue_name: >3} {chain_id: <1}{residue_number: >4}{insertion_code: <1}   {x_coord: >8.3f}{y_coord: >8.3f}{z_coord: >8.3f}{occupancy: >6.2f}{temp_factor: >6.2f}          {element: >2}{charge: >2}"
 
 
+from .relaxation import predict_order_parameters
+
 def _calculate_bfactor(
     atom_name: str,
     residue_number: int,
     total_residues: int,
-    residue_name: str
+    residue_name: str,
+    s2: float = 0.85
 ) -> float:
     """
-    Calculate realistic B-factor (temperature factor) for an atom.
+    Calculate realistic B-factor (temperature factor) derived from Order Parameter (S2).
     
     EDUCATIONAL NOTE - B-factors (Temperature Factors):
     ===================================================
@@ -89,39 +92,44 @@ def _calculate_bfactor(
     - B = 8π²<u²> where <u²> is mean square displacement
     - Higher B-factor = more mobile/flexible atom
     - Lower B-factor = more rigid/constrained atom
-    
+
     Typical Patterns in Real Protein Structures:
     1. Backbone vs Side Chains:
        - Backbone atoms (N, CA, C, O): 15-25 Ų (constrained by peptide bonds)
        - Side chain atoms (CB, CG, etc.): 20-35 Ų (more conformational freedom)
     
     2. Position Along Chain:
-       - Core residues: 10-20 Ų (buried, constrained)
-    3. NMR Perspective (Order Parameters):
-       For NMR structures, the "B-factor" column is often repurposed.
-       - It can store the RMSD of the atom across the ensemble of models.
-       - High B-factor = High RMSD = Undefined structure (e.g., flexible tails).
-       - It can also represent the Order Parameter (S^2), indicating flexibility
-         calculated from relaxation data (T1, T2, NOE).
-       
        In this synthetic generator, we simulate B-factors that follow these
        universal patterns of rigidity vs. flexibility.
+       - Core residues: 10-20 Ų (buried, constrained)
        - Terminal residues: 30-50 Ų ("terminal fraying" - fewer constraints)
     
     3. Residue-Specific Effects:
        - Glycine: Higher (no side chain constraints, more flexible)
        - Proline: Lower (cyclic structure, rigid backbone)
-    
+
     For Linear Peptides (our case):
     - No folding/packing, so all residues are "surface-like"
     - Terminal fraying effect is prominent
     - Backbone still more rigid than side chains
+
+    4. NMR Perspective (Order Parameters):
+       For NMR structures, the "B-factor" column is often repurposed.
+       - It can store RMSD across the ensemble.
+       - It can also represent the Order Parameter ($S^2$).
+       - $S^2$ (from Lipari-Szabo) measures rigidity on ps-ns timescales.
+       - $S^2 = 1.0 \rightarrow$ Rigid (Low B-factor).
+       - $S^2 \approx 0.5 \rightarrow$ Flexible (High B-factor).
+    
+    In this generator, we explicitly link the geometric flexibility ($S^2$)
+    to the crystallographic observable ($B$), creating a unified biophysical model.
     
     Args:
         atom_name: Atom name (e.g., 'N', 'CA', 'CB', 'CG')
         residue_number: Residue number (1-indexed)
         total_residues: Total number of residues in chain
         residue_name: Three-letter residue code (e.g., 'ALA', 'GLY')
+        s2: Lipari-Szabo Order Parameter (0.0=Random, 1.0=Rigid). Default 0.85.
         
     Returns:
         B-factor value in Ų, rounded to 2 decimal places
@@ -129,36 +137,38 @@ def _calculate_bfactor(
     # Define backbone atoms (more rigid due to peptide bond constraints)
     BACKBONE_ATOMS = {'N', 'CA', 'C', 'O', 'H', 'HA'}
     
-    # Base B-factors for different atom types
-    if atom_name in BACKBONE_ATOMS:
-        base_bfactor = 18.0  # Backbone is constrained by peptide bonds
-    else:
-        base_bfactor = 25.0  # Side chains have more conformational freedom
+    # Base physics: B-factor inversely related to Order Parameter
+    # Calibration:
+    # S2=1.00 -> B=5.0
+    # S2=0.85 -> B=20.0 (Typical Core)
+    # S2=0.50 -> B=55.0 (Typical Termini/Loop)
     
-    # Calculate distance from nearest terminus (normalized 0-1)
-    # This simulates "terminal fraying" - termini are more mobile
-    dist_from_n_term = (residue_number - 1) / max(total_residues - 1, 1)
-    dist_from_c_term = (total_residues - residue_number) / max(total_residues - 1, 1)
-    dist_from_nearest_term = min(dist_from_n_term, dist_from_c_term)
+    # Simple linear map: B = M * (1 - S2) + C
+    # Delta S2 = 0.35 (0.85->0.50) -> Delta B = 35 (20->55)
+    # Slope M = 35/0.35 = 100
+    # B = 100 * (1 - S2) + Offset
+    # Check: S2=0.85 -> B = 100*0.15 = 15. Need 20. So Offset=5.
     
-    # Terminal mobility factor: increases B-factor near termini
-    # Adds up to 15 Ų at termini
-    terminal_factor = 15.0 * (1.0 - dist_from_nearest_term)
+    base_bfactor = 100.0 * (1.0 - s2) + 5.0
     
+    # Atom type adjustments
+    if atom_name not in BACKBONE_ATOMS:
+        base_bfactor *= 1.5  # Side chains are more mobile than backbone
+        
     # Residue-specific adjustments
     if residue_name == 'GLY':
-        base_bfactor += 5.0  # Glycine is more flexible
+        base_bfactor += 5.0
     elif residue_name == 'PRO':
-        base_bfactor -= 3.0  # Proline is more rigid
+        base_bfactor -= 3.0
     
     # Add small random variation
     random_variation = np.random.uniform(-2.0, 2.0)
     
     # Calculate final B-factor
-    bfactor = base_bfactor + terminal_factor + random_variation
+    bfactor = base_bfactor + random_variation
     
-    # Clamp to realistic range (5-60 Ų)
-    bfactor = max(5.0, min(60.0, bfactor))
+    # Clamp to realistic range (5-99 Ų)
+    bfactor = max(5.0, min(99.0, bfactor))
     
     return round(bfactor, 2)
 
@@ -801,9 +811,6 @@ def generate_pdb_content(
 
             # Add slight variation to omega angle to mimic thermal fluctuations
             # This adds realistic structural diversity (±5° variation)
-            # Use a deterministic seed for the first residue to ensure test reproducibility
-            if i == 1:
-                np.random.seed(42)  # Fixed seed for reproducibility in tests
             
             # EDUCATIONAL NOTE - Cis-Proline Support:
             # Most peptide bonds are Trans (180 deg) to minimize steric clash.
@@ -1024,6 +1031,10 @@ def generate_pdb_content(
     # Get total number of residues for B-factor and occupancy calculation
     total_residues = len(set(peptide.res_id))
     
+    # Calculate Order Parameters (S2) for the generated structure
+    # This ensures consistency between the structure (Helices/Loops) and the Data (B-factors/Relaxation).
+    s2_map = predict_order_parameters(peptide)
+    
     # Process each line and add realistic B-factors and occupancy
     processed_lines = []
     for line in atomic_and_ter_content.splitlines():
@@ -1033,8 +1044,11 @@ def generate_pdb_content(
             res_name = line[17:20].strip()
             res_num = int(line[22:26].strip())
             
-            # Calculate realistic B-factor for this atom
-            bfactor = _calculate_bfactor(atom_name, res_num, total_residues, res_name)
+            # Lookup S2 for this residue (default 0.85 if not found)
+            current_s2 = s2_map.get(res_num, 0.85)
+
+            # Calculate realistic B-factor (temperature factor) for this atom
+            bfactor = _calculate_bfactor(atom_name, res_num, total_residues, res_name, s2=current_s2)
             
             # Calculate realistic occupancy for this atom (correlates with B-factor)
             occupancy = _calculate_occupancy(atom_name, res_num, total_residues, res_name, bfactor)

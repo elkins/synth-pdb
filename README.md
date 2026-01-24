@@ -142,6 +142,28 @@ Generate the best of 10 attempts with clash refinement:
 synth-pdb --length 20 --best-of-N 10 --refine-clashes 5 --output refined_peptide.pdb
 ```
 
+## 🌟 Feature Spotlight: "Spectroscopically Realistic" Dynamics
+
+Most synthetic PDB generators create static bricks. They might create reasonable geometry, but the "B-factor" column (Column 11) is often just zero or random noise.
+
+**Synth-PDB is different.** It simulates the **physics of protein motion** to generate a unified model of structure AND dynamics.
+
+### The "Structure-Dynamics Link"
+We implement the **Lipari-Szabo Model-Free formalism** (Nobel-adjacent physics) directly into the generator:
+1.  **Structure Awareness**: The engine analyzes the generated geometry (`alpha-helix` vs `random-coil`).
+2.  **Order Parameter ($S^2$) Prediction**: It assigns specific rigidity values:
+    *   **Helices**: $S^2 \approx 0.85$ (Rigid H-bond network)
+    *   **Loops**: $S^2 \approx 0.65$ (Flexible nanosecond motions)
+    *   **Termini**: $S^2 \approx 0.45$ (Disordered fraying)
+3.  **Unified Output**:
+    *   **PDB B-Factors**: Calculated via $B \propto (1 - S^2)$. When you visualize the PDB in PyMOL, flexible regions *visually* appear thicker/redder, matching real crystal data distributions.
+    *   **NMR Relaxation**: $R_1, R_2, NOE$ rates are calculated from the *same* parameters.
+
+**Why this matters**:
+> "The correlation between NMR order parameters ($S^2$) and crystallographic B-factors is a bridge between solution-state and solid-state dynamics." — *Fenwick et al., PNAS (2014)*
+
+This feature allows you to test **bioinformatics pipelines** that rely on correlation between sequence, structure, and experimental observables, without needing expensive Molecular Dynamics (MD) simulations.
+
 ### 4. Relax (Simulate Dynamics)
 Generate relaxation rates ($R_1, R_2, NOE$) with **realistic internal dynamics**:
 ```bash
