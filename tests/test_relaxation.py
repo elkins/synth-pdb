@@ -10,6 +10,7 @@ def test_spectral_density_function():
     """Test standard J(w) behavior."""
     # Tests that J(w) decreases with frequency
     tau_m = 10e-9 # 10ns
+    s2 = 0.85 # Define order parameter (rigid)
     
     j_0 = spectral_density(0, tau_m, s2)
     j_high = spectral_density(1e9, tau_m, s2)
