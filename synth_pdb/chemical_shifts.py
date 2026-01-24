@@ -51,11 +51,15 @@ RANDOM_COIL_SHIFTS: Dict[str, Dict[str, float]] = {
 # geometry of the protein backbone (Phi/Psi angles).
 #
 # SPARTA-lite (Simplified prediction):
-# Instead of neural networks or homology databases, we use simple statistical offsets.
-# If an atom is in a Helix, we add a specific offset to its random coil value.
+# "SPARTA" stands for "Shift Prediction from Analogy in Residue-type and Torsion Angle".
+# It predicts chemical shifts by finding homologous structures with similar geometry.
 #
-# This mimics the "Chemical Shift Index" (CSI) method used by spectroscopists to
-# determine secondary structure FROM experimental shifts.
+# Our "Lite" version uses simple statistical offsets instead of database mining,
+# but follows the same principle: Geometry determines Shift.
+#
+# Reference State: DSS (4,4-dimethyl-4-silapentane-1-sulfonic acid)
+# This is the "Zero" for proton/carbon NMR, much like sea level for altitude.
+# Using a standard reference ensures shifts are comparable across different labs.
 #
 # Approximate mean offsets for Helical and Sheet conformations relative to random coil
 # Based on general statistics (e.g. Spera & Bax 1991)

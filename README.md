@@ -695,6 +695,26 @@ synth-pdb/
 └── README.md
 ```
 
+## 📚 Biophysical References & Further Reading
+
+For students and researchers interested in the physics behind the code, here are key seminal papers:
+
+*   **Cis-Proline (~5% Frequency):**
+    *   MacArthur, M. W., & Thornton, J. M. (1991). Influence of proline residues on protein conformation. *J Mol Biol*, 218(2), 397-412.
+    *   Weiss, M. S., et al. (1998). Cis-proline. *Acta Cryst D*, 54, 323-329.
+
+*   **NMR Structure Validation & Chirality:**
+    *   Montelione, G. T., et al. (2013). Recommendations of the wwPDB NMR Validation Task Force. *Structure*, 21(9), 1563-1570. (Defines standards for geometric validation).
+    *   Bhattacharya, A., & Montelione, G. T. (2011). PDBStat: a server for validation of protein NMR structures.
+
+*   **Nuclear Overhauser Effect (NOE) & $r^{-6}$:**
+    *   Wüthrich, K. (1986). *NMR of Proteins and Nucleic Acids*. Wiley-Interscience. (The definitive text).
+    *   Wüthrich, K. (2003). Nobel Lecture: NMR Studies of Protein Structure and Dynamics.
+
+*   **Chemical Shift Prediction (SPARTA) & Referencing (DSS):**
+    *   Shen, Y., & Bax, A. (2010). SPARTA+: a modest improvement in empirical NMR chemical shift prediction... *J Biomol NMR*, 48, 13-22.
+    *   Markley, J. L., et al. (1998). Recommendations for the presentation of NMR structures... (IUPAC). *Pure Appl Chem*, 70(1), 117-142. (Defined DSS as the standard).
+
 ## License
 
 This project is provided as-is for educational and testing purposes.

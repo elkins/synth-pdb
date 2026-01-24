@@ -61,7 +61,6 @@ OMEGA_TRANS = 180.0
 OMEGA_VARIATION = 5.0  # degrees - adds thermal fluctuation to peptide bond
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.CRITICAL)
 
 
 # This constant is used in test_generator.py for coordinate calculations.
@@ -805,8 +804,19 @@ def generate_pdb_content(
             # Use a deterministic seed for the first residue to ensure test reproducibility
             if i == 1:
                 np.random.seed(42)  # Fixed seed for reproducibility in tests
-            current_omega = OMEGA_TRANS + np.random.uniform(-OMEGA_VARIATION, OMEGA_VARIATION)
-
+            
+            # EDUCATIONAL NOTE - Cis-Proline Support:
+            # Most peptide bonds are Trans (180 deg) to minimize steric clash.
+            # However, X-Pro bonds have a ~5% probability of being Cis (0 deg).
+            # This is important for realistic distributions.
+            MEAN_OMEGA = OMEGA_TRANS
+            if res_name == 'PRO':
+                # 5% probability of Cis
+                if random.random() < 0.05:
+                    MEAN_OMEGA = 0.0 # Cis
+            
+            current_omega = MEAN_OMEGA + np.random.uniform(-OMEGA_VARIATION, OMEGA_VARIATION)
+            
             # Correct Atom Placement Logic:
             # 1. Place N using previous Psi (Rotation around CA_prev-C_prev)
             n_coord = position_atom_3d_from_internal_coords(

@@ -31,6 +31,18 @@ class DecoyGenerator:
         """
         Generates N unique decoys for a given sequence within a target RMSD range.
         
+        EDUCATIONAL NOTE - RMSD (Root Mean Square Deviation):
+        -----------------------------------------------------
+        RMSD is the standard metric for comparing two protein structures.
+        It measures the average distance between corresponding atoms (usually C-alpha)
+        after the structures have been optimally superimposed (rotated/translated).
+        
+        Formula: RMSD = sqrt( sum(dist_i^2) / N )
+        
+        - RMSD < 2.0 A: Very similar structures (experimental error range).
+        - RMSD 2-5 A:   Similar fold, but distinct conformation.
+        - RMSD > 5 A:   different folds or very unfolded states.
+        
         RMSD is calculated against the first generated decoy (the 'reference').
         
         Args:

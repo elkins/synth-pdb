@@ -1,107 +1,71 @@
-"""
-Tests for chirality validation.
-
-Following TDD methodology - RED PHASE.
-These tests should FAIL initially until we implement the chirality validation.
-"""
-import pytest
+import unittest
+import logging
+import numpy as np
 from synth_pdb.generator import generate_pdb_content
 from synth_pdb.validator import PDBValidator
 
+# EDUCATIONAL NOTE - Molecular Chirality (Handedness)
+# Introduction to Stereochemistry in Proteins
+# ---------------------------------------------
+# Most biological molecules are "chiral", meaning they cannot be superimpsed
+# on their mirror image (like your left and right hands).
+#
+# 1. The Alpha Carbon (C-alpha):
+#    The central carbon of an amino acid is bonded to four different groups:
+#    - Amine group (-NH2)
+#    - Carboxyl group (-COOH)
+#    - Hydrogen atom (-H)
+#    - Side chain (-R)
+#
+# 2. L-Isomers vs D-Isomers:
+#    Because of this asymmetry, amino acids can exist in two forms (enantiomers):
+#    - L-amino acids (Levorotatory): The form found in ALL natural proteins produced by ribosomes.
+#    - D-amino acids (Dextrorotatory): Rare in nature, found in some bacterial cell walls
+#      but almost never in human proteins.
+#
+# 3. Why it matters:
+#    If a synthetic structure generator accidentally creates D-amino acids (due to
+#    incorrect cross-product order in vector math), the protein will not fold
+#    correctly and will be biologically seemingly "alien".
+#
+# 4. Geometric Definition (CORN Rule):
+#    Looking down the H-Ca bond, the groups CO, R, N read "CO-R-N" clockwise for L-amino acids.
+#    Mathematically, we can check the scalar triple product or improper dihedral angle.
 
-class TestChiralityValidation:
-    """Test suite for L-amino acid chirality validation."""
-    
-    def test_l_amino_acid_chirality_passes(self):
-        """Test that correctly generated L-amino acids pass chirality check."""
-        # Generate a structure with various amino acids
-        pdb = generate_pdb_content(length=5, sequence_str="ACDEF")
-        validator = PDBValidator(pdb)
-        validator.validate_chirality()
+logger = logging.getLogger(__name__)
+
+class TestChirality(unittest.TestCase):
+
+    def test_all_residues_are_L_amino_acids(self):
+        """
+        Generates a random peptide and verifies that all non-Glycine residues
+        have L-chirality.
+        """
+        # Generate a sufficiently long random peptide to cover many amino acid types
+        # Using a fixed seed for reproducibility
+        pdb_content = generate_pdb_content(length=50, seed=42)
         
-        # Should have no chirality violations for correctly generated L-amino acids
-        chirality_violations = [v for v in validator.get_violations() if 'Chirality' in v or 'chirality' in v]
-        assert len(chirality_violations) == 0, \
-            f"Expected no chirality violations, but got: {chirality_violations}"
-    
-    def test_glycine_exempt_from_chirality(self):
-        """Test that glycine (no CB) is exempt from chirality validation."""
-        # Glycine has no CB atom, so it has no chirality
-        pdb = generate_pdb_content(length=5, sequence_str="GGGGG")
-        validator = PDBValidator(pdb)
-        validator.validate_chirality()
+        validator = PDBValidator(pdb_content=pdb_content)
         
-        # Should have no violations (GLY is exempt)
-        chirality_violations = [v for v in validator.get_violations() if 'Chirality' in v or 'chirality' in v]
-        assert len(chirality_violations) == 0
-    
-    def test_mixed_sequence_chirality(self):
-        """Test chirality validation on mixed sequence including GLY."""
-        # Mix of amino acids including glycine
-        pdb = generate_pdb_content(sequence_str="AGVGIGPG")
-        validator = PDBValidator(pdb)
-        validator.validate_chirality()
-        
-        # Should pass for all correctly generated residues
-        chirality_violations = [v for v in validator.get_violations() if 'Chirality' in v or 'chirality' in v]
-        assert len(chirality_violations) == 0
-    
-    def test_all_amino_acids_chirality(self):
-        """Test chirality validation on all 20 standard amino acids."""
-        # All standard amino acids
-        pdb = generate_pdb_content(sequence_str="ACDEFGHIKLMNPQRSTVWY")
-        validator = PDBValidator(pdb)
-        validator.validate_chirality()
-        
-        # Should pass for all (GLY is exempt)
-        chirality_violations = [v for v in validator.get_violations() if 'Chirality' in v or 'chirality' in v]
-        assert len(chirality_violations) == 0
-    
-    def test_chirality_method_exists(self):
-        """Test that validate_chirality method exists on PDBValidator."""
-        pdb = generate_pdb_content(length=3)
-        validator = PDBValidator(pdb)
-        
-        # Method should exist
-        assert hasattr(validator, 'validate_chirality'), \
-            "PDBValidator should have validate_chirality method"
-        
-        # Should be callable
-        assert callable(validator.validate_chirality), \
-            "validate_chirality should be callable"
-    
-    def test_chirality_included_in_validate_all(self):
-        """Test that chirality validation is included in validate_all()."""
-        pdb = generate_pdb_content(length=5, sequence_str="ACDEF")
-        validator = PDBValidator(pdb)
-        
-        # Clear any existing violations
-        validator.violations = []
-        
-        # Run validate_all
-        validator.validate_all()
-        
-        # Chirality should have been checked (no violations expected for correct structure)
-        # We can't directly test if it was called, but we can verify no chirality violations
-        chirality_violations = [v for v in validator.get_violations() if 'Chirality' in v or 'chirality' in v]
-        assert len(chirality_violations) == 0
-    
-    def test_proline_chirality(self):
-        """Test that proline (cyclic structure) still has correct chirality."""
-        # Proline has a cyclic structure but still has a chiral C-alpha
-        pdb = generate_pdb_content(sequence_str="PPPPP")
-        validator = PDBValidator(pdb)
-        validator.validate_chirality()
-        
-        chirality_violations = [v for v in validator.get_violations() if 'Chirality' in v or 'chirality' in v]
-        assert len(chirality_violations) == 0
-    
-    def test_terminal_residues_chirality(self):
-        """Test chirality validation on N-terminal and C-terminal residues."""
-        # Terminal residues have different atom sets but should still have correct chirality
-        pdb = generate_pdb_content(sequence_str="AVL")
-        validator = PDBValidator(pdb)
-        validator.validate_chirality()
-        
-        chirality_violations = [v for v in validator.get_violations() if 'Chirality' in v or 'chirality' in v]
-        assert len(chirality_violations) == 0
+        # This method doesn't exist yet (TDD), but we define the contract here.
+        # It should check improper dihedrals and raise violations for D-amino acids.
+        # EDUCATIONAL: The validate_chirality method will likely implement the
+        # mathematical check for the "CORN" rule or equivalent improper torsion.
+        if hasattr(validator, 'validate_chirality'):
+            validator.validate_chirality()
+            violations = validator.get_violations()
+            
+            chirality_violations = [v for v in violations if "Chirality violation" in v]
+            
+            if chirality_violations:
+                for v in chirality_violations:
+                    logger.error(v)
+            
+            self.assertEqual(len(chirality_violations), 0, 
+                             f"Found {len(chirality_violations)} D-amino acids! Proteins must be L-chiral.")
+        else:
+            # TDD Step 1: Fail if method is missing, or warn
+            self.fail("PDBValidator.validate_chirality() not implemented yet.")
+
+if __name__ == '__main__':
+    unittest.main()

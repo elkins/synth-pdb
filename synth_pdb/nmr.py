@@ -27,8 +27,13 @@ def calculate_synthetic_noes(
 
     # EDUCATIONAL NOTE - The Physics of NOEs
     # The Nuclear Overhauser Effect (NOE) allows us to measure distances between
-    # protons in a molecule. The intensity of the NOE signal is proportional to 
-    # the inverse 6th power of the distance (I ~ 1/r^6).
+    # protons in a molecule. 
+    # NOE stands for Nuclear Overhauser Effect:
+    # - "Nuclear": Involves atomic nuclei (protons).
+    # - "Overhauser": Named after physicist Albert Overhauser who predicted it.
+    # - "Effect": The phenomenon where spinning one nucleus affects the signal of its neighbor.
+    #
+    # The intensity of the NOE signal is proportional to the inverse 6th power of the distance (I ~ 1/r^6).
     #
     # This steep dependence means:
     # 1. Close protons give VERY strong signals.

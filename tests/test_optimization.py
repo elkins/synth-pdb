@@ -5,6 +5,8 @@ from synth_pdb.scoring import calculate_clash_score
 from synth_pdb.packing import optimize_sidechains, SideChainPacker
 from synth_pdb.generator import generate_pdb_content
 from synth_pdb.validator import PDBValidator
+import logging
+logger = logging.getLogger(__name__)
 
 def test_clash_score_calculation():
     # Create two atoms very close together

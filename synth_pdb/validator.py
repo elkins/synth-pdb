@@ -1012,6 +1012,19 @@ class PDBValidator:
                     )
                     continue
                 
+                # Method: Improper dihedral angle or Scalar Triple Product.
+        
+                # The "CORN Rule" for L-Amino Acids:
+                # -----------------------------------
+                # When looking down the H-CA bond (Hydrogen to Alpha-Carbon), the groups read clockwise:
+                # 1. CO (Carbonyl carbon, C)
+                # 2. R  (Side chain, R/CB)
+                # 3. N  (Amide Nitrogen, N)
+                # Hence the mnemonic: CO-R-N -> CORN.
+                
+                # Mathematically, we verify this using the scalar triple product of vectors from CA:
+                # (N - CA) x (C - CA) . (CB - CA)
+                
                 # Calculate improper dihedral N-CA-C-CB
                 # For L-amino acids, this should be negative (~-120° to -60°)
                 # NOTE: Current generator produces positive values (~+60°) due to coordinate system

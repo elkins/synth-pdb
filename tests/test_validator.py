@@ -2,6 +2,9 @@ import logging
 import pytest
 import numpy as np
 from synth_pdb.validator import PDBValidator
+
+logger = logging.getLogger(__name__)
+# logging.getLogger().setLevel(logging.DEBUG) # Optional: Configure externally
 from synth_pdb.data import (
     BOND_LENGTH_N_CA, BOND_LENGTH_CA_C, BOND_LENGTH_C_N, BOND_LENGTH_C_O,
     ANGLE_N_CA_C, ANGLE_C_N_CA, ANGLE_CA_C_O, ANGLE_CA_C_N
