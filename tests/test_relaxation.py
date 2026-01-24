@@ -1,14 +1,15 @@
-
 import pytest
 import numpy as np
 import biotite.structure as struc
 from synth_pdb.relaxation import calculate_relaxation_rates, spectral_density
+import logging
+
+logger = logging.getLogger(__name__)
 
 def test_spectral_density_function():
     """Test standard J(w) behavior."""
     # Tests that J(w) decreases with frequency
     tau_m = 10e-9 # 10ns
-    s2 = 0.85
     
     j_0 = spectral_density(0, tau_m, s2)
     j_high = spectral_density(1e9, tau_m, s2)
@@ -47,8 +48,8 @@ def test_relaxation_trends():
     noe_term = rates[1]['NOE']
     noe_core = rates[3]['NOE']
     
-    print(f"Term S2: {s2_term}, Core S2: {s2_core}")
-    print(f"Term NOE: {noe_term}, Core NOE: {noe_core}")
+    logger.info(f"Term S2: {s2_term}, Core S2: {s2_core}")
+    logger.info(f"Term NOE: {noe_term}, Core NOE: {noe_core}")
     
     # Core should be more rigid (Higher S2)
     assert s2_core > s2_term

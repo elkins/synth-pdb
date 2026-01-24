@@ -746,7 +746,6 @@ def generate_pdb_content(
     
     # Build backbone and add side chains
     for i, res_name in enumerate(sequence):
-        # print(f"DEBUG: Processing residue {i+1} {res_name}")
         res_id = i + 1
         
         # Determine backbone coordinates based on previous residue or initial placement

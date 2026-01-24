@@ -39,12 +39,12 @@ def test_optimization_improves_score():
     peptide = pdb_file.get_structure(model=1)
     
     initial_score = calculate_clash_score(peptide)
-    print(f"Initial Score: {initial_score}")
+    logger.info(f"Initial Score: {initial_score}")
     
     # Run optimizer
     optimized_peptide = optimize_sidechains(peptide, steps=200)
     final_score = calculate_clash_score(optimized_peptide)
-    print(f"Final Score: {final_score}")
+    logger.info(f"Final Score: {final_score}")
     
     # It should not get worse
     assert final_score <= initial_score + 1e-6, "Optimization should not worsen the score significantly"

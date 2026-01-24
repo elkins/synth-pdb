@@ -320,7 +320,7 @@ class TestPDBValidator:
         validator.validate_ramachandran()
         violations = validator.get_violations()
         # Add a debug print to see the calculated Psi
-        print(f"DEBUG: Ramachandran Psi violations: {violations}")
+        logger.debug(f"DEBUG: Ramachandran Psi violations: {violations}")
         assert len(violations) >= 1
         assert "Ramachandran violation (Psi)" in violations[0]
     

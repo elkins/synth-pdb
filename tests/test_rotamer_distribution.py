@@ -6,7 +6,9 @@ from synth_pdb.generator import generate_pdb_content
 from synth_pdb.validator import PDBValidator
 
 # Suppress logging during tests
-logging.getLogger().setLevel(logging.CRITICAL)
+# logging.getLogger().setLevel(logging.CRITICAL)
+
+logger = logging.getLogger(__name__)
 
 class TestRotamerDistribution(unittest.TestCase):
 
@@ -62,7 +64,7 @@ class TestRotamerDistribution(unittest.TestCase):
             else:
                 rotamer_counts['other'] += 1
                 if rotamer_counts['other'] <= 10:  # Print first 10 failures
-                    print(f"Invalid angle: {angle:.2f}")
+                    logger.debug(f"Invalid angle: {angle:.2f}")
                 
         # Verify distribution
         # With 100 samples, we expect roughly:
@@ -70,7 +72,7 @@ class TestRotamerDistribution(unittest.TestCase):
         # t  : ~20
         # g+ : ~10
         
-        print(f"\nObserved Rotamer Counts (N={n_samples}): {rotamer_counts}")
+        logger.info(f"Observed Rotamer Counts (N={n_samples}): {rotamer_counts}")
         
         # Allow some statistical variance (e.g., +/- 15)
         # We just want to ensure the "most common" one is indeed most common
