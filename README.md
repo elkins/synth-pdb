@@ -634,6 +634,20 @@ The `--refine-clashes` option uses an iterative approach:
 - **Residue Numbering**: Sequential from 1
 - **Terminal Modifications**: N-terminal and C-terminal hydrogens/oxygens included
 
+### Atomic Records & B-Factors
+
+Each atom line follows the standard PDB format. The **B-factor** (Temperature Factor) is stored in **columns 61-66**.
+
+```text
+ATOM      1  N   ALA A   1      -2.193   1.858   1.271  0.85 56.71           N
+ATOM      5  CB  ALA A   1       0.241   1.845   1.013  0.85 86.14           C
+                                                        ^^^^ ^^^^^
+                                                       Occpy B-Fact
+```
+
+*   **Occupancy (0.85)**: Reflects the Order Parameter ($S^2$) if calculated, or default.
+*   **B-Factor (56.71 vs 86.14)**: Reflects atomic mobility. Note how the side-chain atom (CB) has a higher B-factor than the backbone (N), indicating greater flexibility.
+
 ### Header Information
 
 Generated PDB files include standard header records:
