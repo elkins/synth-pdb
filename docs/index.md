@@ -21,6 +21,14 @@ In the fields of structural biology and bioinformatics, researchers frequently r
 
 ``synth-pdb`` fills this gap by providing a lightweight, deterministic generator that produces chemically valid, full-atom PDB files with user-defined secondary structures (helices, sheets) in seconds.
 
+## Educational Philosophy: Code as Textbook 🎓
+
+`synth-pdb` is built on the core principle that scientific software should be readable and educational.
+
+*   **Code as Textbook**: We reject "black box" algorithms. Our source code (e.g., `generator.py`, `physics.py`) is heavily annotated with the *biophysical reasons* behind the implementation—explaining concepts like Boltzmann weighting, order parameters ($S^2$), and NOE distance dependence ($r^{-6}$).
+*   **Visual Learning**: With the new `--visualize` flag, students can instantly see how abstract concepts (like steric clashes or helical packing) manifest in 3D, bridging the gap between equations and biology.
+*   **Integrity**: We employ specific tests to ensure these educational notes remain in the codebase, preventing refactoring from stripping away the scientific context.
+
 ## Key Features
 
 ✨ **Structure Generation**

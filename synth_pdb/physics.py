@@ -49,14 +49,31 @@ class EnergyMinimizer:
                              vacuum or crystal lattice assumptions of other methods.
         """
         self.forcefield_name = forcefield_name
-        self.water_model = 'amber14/tip3pfb.xml' # Required if we ever added explicit water
+        self.water_model = 'amber14/tip3pfb.xml' 
         self.solvent_model = solvent_model
+        
+        # Map solvent models to their parameter files in OpenMM
+        # These need to be loaded alongside the main forcefield
+        # Standard OpenMM paths often have 'implicit/' at the root
+        solvent_xml_map = {
+            app.OBC2: 'implicit/obc2.xml',
+            app.OBC1: 'implicit/obc1.xml',
+            app.GBn:  'implicit/gbn.xml',
+            app.GBn2: 'implicit/gbn2.xml',
+            app.HCT:  'implicit/hct.xml',
+        }
+
+        # Build list of XML files to load
+        ff_files = [self.forcefield_name, self.water_model]
+        
+        if self.solvent_model in solvent_xml_map:
+            ff_files.append(solvent_xml_map[self.solvent_model])
         
         try:
             # The ForceField object loads the definitions of atom types and parameters.
-            self.forcefield = app.ForceField(self.forcefield_name, self.water_model)
+            self.forcefield = app.ForceField(*ff_files)
         except Exception as e:
-            logger.error(f"Failed to load forcefield '{forcefield_name}': {e}")
+            logger.error(f"Failed to load forcefield {ff_files}: {e}")
             raise
 
     def minimize(self, pdb_file_path: str, output_path: str, max_iterations: int = 0, tolerance: float = 10.0) -> bool:
@@ -124,7 +141,7 @@ class EnergyMinimizer:
             except ValueError as ve:
                 # Fallback logic for when implicit solvent fails (common with some forcefield combos)
                 if "implicitSolvent" in str(ve):
-                    logger.warning(f"Implicit solvent incompatible ({ve}). Falling back to Vacuum (No Solvent).")
+                    logger.warning(f"Implicit Solvent parameters not found for this forcefield configuration. Using Vacuum electrostatics instead (standard fallback).")
                     system = self.forcefield.createSystem(
                         topology,
                         nonbondedMethod=app.NoCutoff,
@@ -137,7 +154,13 @@ class EnergyMinimizer:
             # 4. Create the Integrator
             # An Integrator is the math engine that moves atoms based on forces (F=ma).
             # 'LangevinIntegrator' simulates a heat bath (friction + random collisions) to maintain temperature.
-            # Even for just minimization (which doesn't use time steps the same way), an Integrator is required by the API.
+            #
+            # Educational Note:
+            # For pure energy minimization (finding the nearest valley), we technically don't need a
+            # thermostat like Langevin because we aren't simulating time-resolved motion yet.
+            # However, OpenMM requires an Integrator to define the Simulation context.
+            # If we were to run "simulation.step(1000)", this integrator would generate
+            # realistic Brownian motion, simulating thermal fluctuations.
             integrator = mm.LangevinIntegrator(
                 300 * unit.kelvin,       # Temperature (Room temp)
                 1.0 / unit.picosecond,   # Friction coefficient
@@ -154,7 +177,7 @@ class EnergyMinimizer:
             logger.info(f"Initial Potential Energy: {e_init:.2f} kJ/mol")
             
             if e_init > 1e6:
-                logger.warning("Extremely high initial energy! The structure likely has severe clashes (overlapping atoms).")
+                logger.info("  -> High initial energy detected due to steric clashes. Minimization will resolve this.")
             
             # 6. Run Energy Minimization (Gradient Descent)
             logger.info("Minimizing energy...")

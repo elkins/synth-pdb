@@ -15,6 +15,7 @@ class TestDocumentationIntegrity(unittest.TestCase):
         self.generator_path = os.path.join(self.base_dir, 'synth_pdb', 'generator.py')
         self.bfactor_test_path = os.path.join(self.base_dir, 'tests', 'test_bfactor.py')
         self.ramachandran_test_path = os.path.join(self.base_dir, 'tests', 'test_ramachandran.py')
+        self.decoys_path = os.path.join(self.base_dir, 'synth_pdb', 'decoys.py')
 
     def _check_file_contains(self, filepath, substrings):
         """Helper to assert file contains list of substrings."""
@@ -28,6 +29,16 @@ class TestDocumentationIntegrity(unittest.TestCase):
                 content, 
                 f"Missing educational note in {os.path.basename(filepath)}: '{substring[:50]}...'"
             )
+
+    def test_decoys_educational_notes(self):
+        """Ensure decoys.py retains key educational blocks."""
+        required_notes = [
+            'EDUCATIONAL NOTE - "Decoys" vs "NMR Ensembles"',
+            "* **NMR Ensemble**: A set of structures that all satisfy experimental restraints",
+            "* **Decoys**: Independent random conformations",
+            "represent the SEARCH SPACE",
+        ]
+        self._check_file_contains(self.decoys_path, required_notes)
 
     def test_generator_educational_notes(self):
         """Ensure generator.py retains key educational blocks."""

@@ -34,10 +34,12 @@ nav:
   - User Guide:
     - Installation: installation.md
     - Usage: usage.md
+    - Visualization: visualization.md
     - 'Biophysics 101': physics.md
   - 'For NMR Spectroscopists': nmr.md
   - API Reference: reference.md
   - Contributing: contributing.md
+  - Technical Notes: technical_notes.md
   - License: license.md
 
 markdown_extensions:

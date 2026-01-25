@@ -79,3 +79,30 @@ class TestMolecularViewer:
         # Check for instructions
         assert "rotate" in html.lower() or "drag" in html.lower()
         assert "zoom" in html.lower()
+
+    def test_feature_toggles_and_restraint_logic(self):
+        """Test that Ghost Mode and Restraints logic are present in HTML."""
+        pdb_data = "ATOM      1  N   ALA A   1       0.000   0.000   0.000  1.00  0.00           N"
+        
+        # Create a dummy restraint to ensure logic is populated
+        dummy_restraints = [{'chain_1': 'A', 'residue_index_1': 1, 'atom_name_1': 'HA',
+                             'chain_2': 'A', 'residue_index_2': 2, 'atom_name_2': 'H', 'dist': 3.5}]
+        
+        html = _create_3dmol_html(pdb_data, "test.pdb", "cartoon", "spectrum", restraints=dummy_restraints)
+        
+        # Check for Ghost Mode UI and Logic
+        assert "Ghost Mode" in html
+        assert "ghostMode = false" in html
+        assert "toggleGhost" in html
+        assert "opacity: opacityVal" in html  # Logic for applying transparency
+        
+        # Check for Restraints UI and Logic
+        assert "Restraints" in html
+        assert "showRestraints = true" in html
+        assert "toggleRestraints" in html
+        assert "drawRestraints" in html
+        assert "viewer.addCylinder" in html
+        
+        # Check that proper keys are generated in the JS array
+        assert "c1:'A'" in html
+        assert "d:3.5" in html

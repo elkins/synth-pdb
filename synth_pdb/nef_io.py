@@ -325,3 +325,112 @@ def write_nef_chemical_shifts(
     with open(filename, "w") as f:
         f.write(nc)
     logger.info(f"Wrote chemical shifts to {filename}")
+
+def read_nef_restraints(filename: str) -> List[Dict]:
+    """
+    Read distance restraints from a NEF file.
+    
+    Parses 'nef_distance_restraint_list' saveframes.
+    
+    Args:
+        filename: Path to NEF file.
+        
+    Returns:
+        List of dictionaries containing parsed restraint data:
+        [{
+            'chain_1': 'A', 'seq_1': 1, 'atom_1': 'H',
+            'chain_2': 'A', 'seq_2': 4, 'atom_2': 'HA',
+            'dist': 5.0, ...
+        }, ...]
+    """
+    restraints = []
+    
+    # State machine for parsing
+    in_restraint_saveframe = False
+    in_loop = False
+    headers = []
+    
+    # Header indices mapped to keys
+    col_map = {}
+    
+    try:
+        with open(filename, 'r') as f:
+            lines = f.readlines()
+            
+        for line in lines:
+            line = line.strip()
+            if not line or line.startswith('#'):
+                continue
+                
+            # Detect saveframe start
+            # We relax the check to enter any saveframe, then validation happens by column headers
+            if line.startswith('save_'):
+                in_restraint_saveframe = True
+                continue
+                
+            # Detect saveframe end
+            if line == 'save_' and in_restraint_saveframe:
+                in_restraint_saveframe = False
+                in_loop = False
+                headers = []
+                col_map = {}
+                continue
+                
+            if not in_restraint_saveframe:
+                continue
+                
+            # Inside restraint saveframe
+            if line == 'loop_':
+                in_loop = True
+                headers = []
+                col_map = {}
+                continue
+            
+            if line == 'stop_':
+                in_loop = False
+                headers = []
+                continue
+                
+            if in_loop:
+                # Reading headers or data
+                if line.startswith('_nef_distance_restraint.'):
+                    # It's a header column definition
+                    col_name = line.split('.')[1]
+                    headers.append(col_name)
+                    # Map simplified name to index
+                    # e.g. chain_code_1 -> index 2
+                    col_map[col_name] = len(headers) - 1
+                else:
+                    # It's a data line
+                    parts = line.split()
+                    if len(parts) != len(headers):
+                        # Skip malformed lines or comment handling
+                        continue
+                        
+                    # Extract data using the map
+                    try:
+                        r = {
+                            'chain_1': parts[col_map['chain_code_1']],
+                            'seq_1': int(parts[col_map['sequence_code_1']]),
+                            'res_1': parts[col_map['residue_name_1']],
+                            'atom_1': parts[col_map['atom_name_1']],
+                            
+                            'chain_2': parts[col_map['chain_code_2']],
+                            'seq_2': int(parts[col_map['sequence_code_2']]),
+                            'res_2': parts[col_map['residue_name_2']],
+                            'atom_2': parts[col_map['atom_name_2']],
+                            
+                            'dist': float(parts[col_map['target_value']])
+                        }
+                        restraints.append(r)
+                    except (KeyError, ValueError) as e:
+                        # Log parsing error but continue
+                        # logger.warning(f"Skipping malformed restraint line: {line} - Error: {e}")
+                        pass
+                        
+    except FileNotFoundError:
+        logger.error(f"NEF file not found: {filename}")
+        return []
+        
+    logger.info(f"Read {len(restraints)} restraints from {filename}")
+    return restraints

@@ -38,12 +38,23 @@ class DecoyGenerator:
         after the structures have been optimally superimposed (rotated/translated).
         
         Formula: RMSD = sqrt( sum(dist_i^2) / N )
-        
-        - RMSD < 2.0 A: Very similar structures (experimental error range).
-        - RMSD 2-5 A:   Similar fold, but distinct conformation.
-        - RMSD > 5 A:   different folds or very unfolded states.
+
+        Interpretation:
+        *   RMSD < 2.0 A: Very similar structures (within experimental error).
+        *   RMSD 2-5 A:   Similar fold, but distinct local conformation.
+        *   RMSD > 5 A:   Different folds or very unfolded states.
         
         RMSD is calculated against the first generated decoy (the 'reference').
+        
+        EDUCATIONAL NOTE - "Decoys" vs "NMR Ensembles":
+        -----------------------------------------------
+        *   **NMR Ensemble**: A set of structures that all satisfy experimental restraints (NOEs)
+            and converge to a similar fold (low RMSD). They represent PRECISION.
+        *   **Decoys**: Independent random conformations generated to sample the conformational space.
+            They often have high RMSD (diversity) and represent the SEARCH SPACE.
+            
+        This generator produces *Decoys* (independent samples). To mimic an NMR ensemble,
+        one would need to filter these by RMSD or use simulated annealing refinement.
         
         Args:
             sequence: Amino acid sequence.
