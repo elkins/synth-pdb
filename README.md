@@ -565,6 +565,10 @@ synth-pdb --sequence "LKELEKELEKELEKELEKELEKEL" \
           --visualize
 ```
 
+> **👀 Viewer Tip**: Since you used `--gen-nef`, the **synthetic NOE restraints** will automatically appear as **red cylinders** connecting the protons. Use the **"🔴 Restraints"** button in the viewer to toggle them on/off!
+
+![Ghost Mode with Restraints](docs/images/viewer_restraints.png)
+
 #### 🌿 Amphipathic Helix Visualization
 A classic biophysical motif where one face of the helix is hydrophobic (L, V, I) and the other is hydrophilic (K, E, R).
 
