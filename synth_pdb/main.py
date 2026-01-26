@@ -333,6 +333,19 @@ def main() -> None:
         help="Format for distogram export (default: json).",
     )
     
+    # Phase 14: Biophysical Realism (Capping & pH)
+    parser.add_argument(
+        "--cap-termini",
+        action="store_true",
+        help="Add N-terminal Acetyl (ACE) and C-terminal N-methylamide (NME) caps."
+    )
+    parser.add_argument(
+        "--ph",
+        type=float,
+        default=7.4,
+        help="pH for determining protonation states (default: 7.4). Affects Histidine (HIS/HIP/HIE)."
+    )
+    
     parser.add_argument(
         "--seed",
         type=int,
@@ -514,6 +527,8 @@ def main() -> None:
 
                 forcefield=args.forcefield,
                 seed=args.seed,
+                ph=args.ph,
+                cap_termini=args.cap_termini,
             )
 
             if not current_pdb_content:

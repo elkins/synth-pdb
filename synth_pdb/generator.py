@@ -40,6 +40,7 @@ _position_atom_3d_from_internal_coords = position_atom_3d_from_internal_coords
 
 from .packing import optimize_sidechains as run_optimization
 from .physics import EnergyMinimizer
+from . import biophysics # New Module
 import os
 import shutil
 import tempfile
@@ -648,6 +649,8 @@ def generate_pdb_content(
     minimize_energy: bool = False,
     forcefield: str = 'amber14-all.xml',
     seed: Optional[int] = None,
+    ph: float = 7.4,
+    cap_termini: bool = False,
 ) -> str:
     """
     Generates PDB content for a linear peptide chain.
@@ -959,6 +962,20 @@ def generate_pdb_content(
     if optimize_sidechains:
         logger.info("Running side-chain optimization...")
         peptide = run_optimization(peptide)
+
+    # EDUCATIONAL NOTE - Biophysical Realism (Phase 2):
+    # We apply chemical modifications after geometric construction/packing but BEFORE 
+    # energy minimization. Correct protonation states (pH) are critical for 
+    # correct electrostatics in the forcefield.
+    
+    # 1. Terminal Capping (ACE/NME) - If requested
+    if cap_termini:
+         peptide = biophysics.cap_termini(peptide)
+         
+    # 2. pH Titration (Protonation States)
+    # Adjusts HIS -> HIP/HIE/HID based on pH.
+    peptide = biophysics.apply_ph_titration(peptide, ph=ph)
+
 
     # EDUCATIONAL NOTE - Energy Minimization (Phase 2):
     # OpenMM requires a file-based interaction usually for easy topology handling from PDB.

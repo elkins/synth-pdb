@@ -289,7 +289,8 @@ class TestGenerator(unittest.TestCase):
                 atom_array = atom_array[0]
 
             for res_name in atom_array.res_name:
-                self.assertIn(res_name, STANDARD_AMINO_ACIDS)
+                valid_residues = STANDARD_AMINO_ACIDS + ["HIE", "HID", "HIP"]
+                self.assertIn(res_name, valid_residues)
         finally:
             os.remove(temp_file_path)
 

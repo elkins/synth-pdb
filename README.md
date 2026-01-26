@@ -348,6 +348,17 @@ This effectively demonstrates:
 - `--distogram-format {json,csv,npz}`: Output format.
   - Default: `json`
 
+#### **Biophysical Realism (Physics) **
+- `--ph <VAL>`: Set pH for titration (default 7.4).
+  - Automatically adjusts Histidine protonation (`HIS` $\rightarrow$ `HIP` if pH < 6.0).
+  - Critical for realistic electrostatics and NMR chemical shifts.
+
+- `--cap-termini`: Add terminal blocking groups.
+  - N-terminus: Acetyl (`ACE`)
+  - C-terminus: N-methylamide (`NME`)
+  - Removes charged termini ($\text{NH}_3^+$/$\text{COO}^-$) for realistic peptide modeling.
+
+
 
 
 #### **Output Options**
