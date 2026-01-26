@@ -998,26 +998,38 @@ def generate_pdb_content(
                     logger.info("Minimization successful.")
                     # Read back the optimized structure
                     # We return the CONTENT of this file
+                    # Read back the optimized structure
+                    # We return the CONTENT of this file
                     with open(output_pdb_path, 'r') as f:
-                        return f.read()
+                        atomic_and_ter_content = f.read()
+                        
+                    # CRITICAL FIX: Do NOT return early.
+                    # We must continue execution so that B-factors and Occupancies 
+                    # are calculated and injected below.
+                    # We skip the biotite PDB generation block since we have content.
+                    pass
                 else:
                     logger.error("Minimization failed. Returning un-minimized structure.")
+                    # If failed, we fall through to standard generation below
+                    atomic_and_ter_content = None
         except Exception as e:
             logger.error(f"Error during minimization workflow: {e}")
             # Fallthrough to return original peptide content
-    
-    # Assign sequential atom_id to all atoms in the peptide AtomArray
-    peptide.atom_id = np.arange(1, peptide.array_length() + 1)
+            atomic_and_ter_content = None
 
-    pdb_file = pdb.PDBFile()
-    pdb_file.set_structure(peptide)
+    if atomic_and_ter_content is None:
+        # Assign sequential atom_id to all atoms in the peptide AtomArray
+        peptide.atom_id = np.arange(1, peptide.array_length() + 1)
     
-    string_io = io.StringIO()
-    pdb_file.write(string_io)
-    
-    # Biotite's PDBFile.write() will write ATOM records, which can be 78 or 80 chars.
-    # It also handles TER records between chains, but not necessarily at the end of a single chain.
-    atomic_and_ter_content = string_io.getvalue()
+        pdb_file = pdb.PDBFile()
+        pdb_file.set_structure(peptide)
+        
+        string_io = io.StringIO()
+        pdb_file.write(string_io)
+        
+        # Biotite's PDBFile.write() will write ATOM records, which can be 78 or 80 chars.
+        # It also handles TER records between chains, but not necessarily at the end of a single chain.
+        atomic_and_ter_content = string_io.getvalue()
     
     # EDUCATIONAL NOTE - Adding Realistic B-factors:
     # Biotite sets all B-factors to 0.00 by default. We post-process the PDB string
