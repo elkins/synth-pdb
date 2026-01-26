@@ -181,8 +181,8 @@ def main() -> None:
         "--mode",
         type=str,
         default="generate",
-        choices=["generate", "decoys", "docking", "pymol"],
-        help="Operation mode: 'generate' (default) single structure, 'decoys' ensemble, 'docking' preparation (PQR), 'pymol' visualization script.",
+        choices=["generate", "decoys", "docking", "pymol", "dataset"],
+        help="Operation mode: 'generate' (default) single structure, 'decoys' ensemble, 'docking' preparation (PQR), 'pymol' visualization script, 'dataset' bulk generation.",
     )
     parser.add_argument(
         "--n-decoys",
@@ -351,6 +351,32 @@ def main() -> None:
         "--equilibrate",
         action="store_true",
         help="Run Molecular Dynamics equilibration (at 300K) after minimization. Requires OpenMM."
+    )
+    
+    # Phase 15: Bulk Dataset Generation (AI)
+    parser.add_argument(
+        "--num-samples",
+        type=int,
+        default=100,
+        help="Number of samples to generate for the dataset (for --mode dataset). Default: 100."
+    )
+    parser.add_argument(
+        "--min-length",
+        type=int,
+        default=10,
+        help="Minimum sequence length for dataset samples (for --mode dataset). Default: 10."
+    )
+    parser.add_argument(
+        "--max-length",
+        type=int,
+        default=50,
+        help="Maximum sequence length for dataset samples (for --mode dataset). Default: 50."
+    )
+    parser.add_argument(
+        "--train-ratio",
+        type=float,
+        default=0.8,
+        help="Ratio of samples to split into training set (for --mode dataset). Default: 0.8."
     )
     parser.add_argument(
         "--md-steps",
