@@ -2,7 +2,7 @@
 import pytest
 import numpy as np
 import biotite.structure as struc
-from synth_pdb.chemical_shifts import predict_chemical_shifts, RANDOM_COIL_SHIFTS, SECONDARY_SHIFTS
+from synth_pdb.chemical_shifts import predict_chemical_shifts, calculate_csi, RANDOM_COIL_SHIFTS, SECONDARY_SHIFTS
 from synth_pdb.generator import generate_pdb_content
 from synth_pdb.pdb_utils import extract_atomic_content, assemble_pdb_content
 import biotite.structure.io.pdb as pdb_io
@@ -131,3 +131,31 @@ def test_proline_shifts():
     assert "N" not in res2_pro
     assert "H" not in res2_pro
     assert "CA" in res2_pro
+
+def test_csi_calculation():
+    """Test that CSI correctly subtracts Random Coil values."""
+    # 1. Setup Mock Structure (needed for ResName lookup)
+    structure = struc.AtomArray(1)
+    structure.res_id = np.array([10])
+    structure.res_name = np.array(["ALA"])
+    structure.atom_name = np.array(["CA"])
+    structure.chain_id = np.array(["A"])
+    
+    # 2. Setup Shifts (Simulate a Helix)
+    # ALA Random Coil CA = 52.5
+    # Helix Offset = +3.1 -> Predicted = 55.6
+    shifts = {
+        "A": {
+            10: {"CA": 56.5} # +4.0 deviation
+        }
+    }
+    
+    # 3. Calculate
+    csi = calculate_csi(shifts, structure)
+    
+    # 4. Verify
+    # Delta = 56.5 - 52.5 = 4.0
+    assert "A" in csi
+    assert 10 in csi["A"]
+    delta = csi["A"][10]
+    assert pytest.approx(delta, 0.1) == 4.0

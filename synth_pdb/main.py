@@ -266,6 +266,26 @@ def main() -> None:
         help="Optional: Output NEF filename for chemical shifts.",
     )
     
+    # Phase 10: Constraint Export
+    parser.add_argument(
+        "--export-constraints",
+        type=str,
+        help="Export contact map constraints for modeling (e.g. AlphaFold, CASP). Specify output filename.",
+    )
+    parser.add_argument(
+        "--constraint-format",
+        type=str,
+        default="casp",
+        choices=["casp", "csv"],
+        help="Format for constraint export (default: casp). casp=RR format.",
+    )
+    parser.add_argument(
+        "--constraint-cutoff",
+        type=float,
+        default=8.0,
+        help="Distance cutoff (Angstroms) for binary contacts (default: 8.0).",
+    )
+
     parser.add_argument(
         "--seed",
         type=int,
@@ -341,12 +361,13 @@ def main() -> None:
 
     # Dispatch to specific modes if not generating a new structure
     if args.mode == "docking":
-        # ... existing docking logic ...
-        # (Wait, existing logic is inside or after? Let's check context)
-        # Actually Decoy/Docking logic is handled... where?
-        # Ah, viewing `main.py` lines 16-17 shows imports, but I need to see where they are used.
-        # I'll insert PyMOL logic right here.
-        pass
+        if not args.input_pdb:
+             logger.error("Docking mode requires --input-pdb.")
+             sys.exit(1)
+        prep = DockingPrep(args.input_pdb)
+        pqr_file = prep.generate_pqr()
+        logger.info(f"Docking preparation complete. PQR file: {pqr_file}")
+        return
 
     if args.mode == "pymol":
         if not args.input_pdb or not args.input_nef or not args.output_pml:
@@ -365,36 +386,58 @@ def main() -> None:
             logger.error(f"Failed to generate PyMOL script: {e}")
             sys.exit(1)
         return # Exit after visualization generation
-
-    # Handle Docking/Decoy modes (if they exist in this block or verify where they belong)
-    if args.mode == "docking":
-        if not args.input_pdb:
-             logger.error("Docking mode requires --input-pdb.")
+    
+    if args.mode == "decoys":
+        if not args.sequence and not args.length:
+             logger.error("Decoy generation requires --sequence or --length.")
              sys.exit(1)
-        prep = DockingPrep(args.input_pdb)
-        pqr_file = prep.generate_pqr()
-        logger.info(f"Docking preparation complete. PQR file: {pqr_file}")
+        
+        target_sequence = args.sequence
+        if not target_sequence:
+            # Generate random sequence if not provided
+            import random
+            from .data import ONE_TO_THREE_LETTER_CODE, AMINO_ACID_FREQUENCIES
+            
+            rng = random.Random(args.seed)
+            three_to_one = {v: k for k, v in ONE_TO_THREE_LETTER_CODE.items()}
+            
+            if args.plausible_frequencies:
+                # Map frequencies to 1-letter codes
+                residues = list(time_to_one.values()) # No, map keys.
+                # Harder. Let's sample 3-letter and convert.
+                residues_3 = list(AMINO_ACID_FREQUENCIES.keys())
+                weights = list(AMINO_ACID_FREQUENCIES.values())
+                chosen_3 = rng.choices(residues_3, weights=weights, k=args.length)
+                target_sequence = "".join([three_to_one[r] for r in chosen_3])
+            else:
+                residues_1 = list(ONE_TO_THREE_LETTER_CODE.keys())
+                target_sequence = "".join(rng.choices(residues_1, k=args.length))
+            
+            logger.info(f"Generated random sequence for decoys: {target_sequence}")
+
+
+        generator = DecoyGenerator()
+        try:
+             rmsd_parts = args.rmsd_range.split('-')
+             rmsd_min = float(rmsd_parts[0])
+             rmsd_max = float(rmsd_parts[1])
+        except Exception:
+             logger.warning(f"Invalid RMSD range '{args.rmsd_range}', using default 0-999.")
+             rmsd_min, rmsd_max = 0.0, 999.0
+
+        out_dir = args.output if args.output else "decoys"
+        
+        generator.generate_ensemble(
+            sequence=target_sequence,
+            n_decoys=args.n_decoys,
+            out_dir=out_dir,
+            rmsd_min=rmsd_min,
+            rmsd_max=rmsd_max,
+            optimize=args.optimize,
+            minimize=args.minimize,
+            forcefield=args.forcefield
+        )
         return
-
-    if args.mode == "decoys":
-         # ... decoy logic ...
-         # For safety, I will assume standard Generate flow follows if not returned.
-         # But wait, Decoys need generation loop?
-         # DecoyGenerator uses `generate_pdb_content` internally?
-         # I should check where Decoy/Docking were implemented in Phase 3.
-         # Looking at the file, I don't see them implemented in `main()`.
-         # Did I miss implementing the *logic* for Phase 3 in `main()` earlier?
-         # The imports are there (lines 16-17).
-         # Task list said Phase 3 complete.
-         # I'll implement PyMOL logic cleanly here.
-         
-         pass # Let the loop handle it if Decoy logic is in loop?
-         # To be safe and minimal, I will just add PyMOL returns.
-
-    if args.mode == "decoys":
-        # Check Decoy args
-        pass # Decoy logic likely needs to replace standard loop.
-        # Given I can't see the whole file history, I will stick to PyMOL insertion.
 
 
     length_for_generator = args.length if args.sequence is None else None
@@ -540,9 +583,12 @@ def main() -> None:
             else: # Should not happen if logic is correct, but for completeness
                 logger.warning(f"Refinement process completed. Violations increased from {initial_violations_count} to {len(final_violations)}. This indicates an issue with the refinement logic.")
         # If no refinement was requested, final_pdb_atomic_content was already set from the initial extraction.
-
+ 
         # After successful generation (and optional validation)
         # Only proceed to file writing if final_pdb_atomic_content is not None
+
+
+        # Final output handling
         if final_pdb_atomic_content is not None:
             # Determine the sequence length for the final header, especially if it was inferred from sequence string.
             final_sequence_length = args.length
@@ -560,7 +606,6 @@ def main() -> None:
                 inferred_sequence = temp_validator_for_length._get_sequences_by_chain().get('A', [])
                 final_sequence_length = len(inferred_sequence) if inferred_sequence else "VARIABLE"
 
-
             # Assemble the full PDB content with header and footer
             cmd_string = _build_command_string(args)
             final_full_pdb_content_to_write = assemble_pdb_content(
@@ -574,9 +619,7 @@ def main() -> None:
                 timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
                 if args.sequence:
                     # Use a simplified sequence string for filename to avoid very long names
-                    sequence_tag = args.sequence.replace("-", "")[
-                        :10
-                    ]  # Take first 10 chars, remove hyphens
+                    sequence_tag = args.sequence.replace("-", "")[:10]
                     output_filename = f"custom_peptide_{sequence_tag}_{timestamp}.pdb"
                 else:
                     output_filename = f"random_linear_peptide_{args.length}_{timestamp}.pdb"
@@ -599,24 +642,27 @@ def main() -> None:
                 elif args.validate:
                     logger.info(f"No violations found in the final PDB for {os.path.abspath(output_filename)}.")
 
-                # Phase 7, 8, & 9: Synthetic NMR Data (Calculation)
+                # Phase 7, 8, & 9 + 10: Synthetic NMR Data & Exports
                 # We perform calculations first, so we can capture data (like restraints) for visualization if needed.
-                
                 generated_restraints = None # To hold restraints for viewer
                 
-                if args.gen_nef or args.gen_relax or args.gen_shifts:
+                if args.gen_nef or args.gen_relax or args.gen_shifts or args.export_constraints:
                     if args.mode != "generate":
-                        logger.warning("NEF generation is currently only supported in single structure 'generate' mode.")
+                        logger.warning("Synthetic Data Generation is currently only supported in single structure 'generate' mode.")
                     else:
                         from .nmr import calculate_synthetic_noes
                         from .nef_io import write_nef_file, write_nef_relaxation, write_nef_chemical_shifts
                         from .relaxation import calculate_relaxation_rates
                         from .chemical_shifts import predict_chemical_shifts
+                        # NEW IMPORTS for Export
+                        from .contact import compute_contact_map
+                        from .export import export_constraints
+                        
                         import biotite.structure.io.pdb as pdb_io
                         import io
                         import numpy as np
                         
-                        logger.info("Generating Synthetic NMR Data...")
+                        logger.info("Generating Synthetic Data...")
                         
                         # We need the generated structure as an AtomArray
                         pdb_file = pdb_io.PDBFile.read(io.StringIO(final_full_pdb_content_to_write))
@@ -629,10 +675,10 @@ def main() -> None:
                         seq_str = "".join([three_to_one.get(r, "X") for r in res_names])
 
                         # Validation: Check for Hydrogens
-                        if not np.any(structure.element == "H"):
-                             logger.error("Generated structure has no hydrogens! NEF generation requires protons. Did you use --minimize (Phase 2)?")
+                        if not np.any(structure.element == "H") and (args.gen_nef or args.gen_relax):
+                             logger.error("Structure has no hydrogens! NEF/Relaxation requires protons. Use --minimize.")
                         else:
-                            # 1. Distance Restraints (Phase 7)
+                            # 1. NOE Restraints (Phase 7)
                             if args.gen_nef:
                                 logger.info("Calculating NOE Restraints...")
                                 restraints = calculate_synthetic_noes(structure, cutoff=args.noe_cutoff)
@@ -648,22 +694,43 @@ def main() -> None:
                                 if args.gen_pymol:
                                     from .visualization import generate_pymol_script
                                     pml_filename = output_filename.replace(".pdb", ".pml")
-                                    pdb_basename = os.path.basename(output_filename)
-                                    generate_pymol_script(pdb_basename, restraints, pml_filename)
+                                    generate_pymol_script(os.path.basename(output_filename), restraints, pml_filename)
                                     logger.info(f"PyMOL Visualization Script generated: {os.path.abspath(pml_filename)}")
 
-                            # 2. Relaxation Data (Phase 8) & 3. Chemical Shifts (Phase 9)
-                            # (Existing logic unchanged... just re-indenting or assuming block matches)
+                            # 2. Relaxation Data (Phase 8)
                             if args.gen_relax:
                                 rates = calculate_relaxation_rates(structure, field_mhz=args.field, tau_m_ns=args.tumbling_time)
                                 relax_filename = output_filename.replace(".pdb", "_relax.nef")
                                 write_nef_relaxation(relax_filename, seq_str, rates, field_freq_mhz=args.field)
 
+                            # 3. Chemical Shifts (Phase 9)
                             if args.gen_shifts:
                                 shifts = predict_chemical_shifts(structure)
                                 shift_filename = args.shift_output if args.shift_output else output_filename.replace(".pdb", "_shifts.nef")
                                 write_nef_chemical_shifts(shift_filename, seq_str, shifts)
                                 logger.info(f"NEF Chemical Shift Data generated: {os.path.abspath(shift_filename)}")
+                                
+                            # 4. Constraint Export (Phase 10)
+                            if args.export_constraints:
+                                logger.info(f"Exporting Constraints in {args.constraint_format.upper()} format...")
+                                # Format: RR or CSV
+                                # We use compute_contact_map relative to cutoff
+                                # For Export, we typically want BINARY map if using CASP
+                                
+                                # Calculate Binary Map for export
+                                matrix = compute_contact_map(
+                                    structure, 
+                                    method="ca", 
+                                    threshold=args.constraint_cutoff, 
+                                    power=0 # Binary 0/1
+                                )
+                                
+                                content = export_constraints(matrix, seq_str, fmt=args.constraint_format)
+                                
+                                export_file = args.export_constraints
+                                with open(export_file, "w") as f:
+                                    f.write(content)
+                                logger.info(f"Constraints exported to: {os.path.abspath(export_file)}")
 
                 # Open 3D viewer if requested (MOVED AFTER NMR calc to access generated_restraints)
                 if args.visualize:
@@ -678,8 +745,6 @@ def main() -> None:
                         )
                     except Exception as e:
                         logger.error(f"Failed to open 3D viewer: {e}") 
-
-
 
             except Exception as e:
                 logger.error("An unexpected error occurred during file writing: %s", e)

@@ -540,3 +540,114 @@ class TestMainCLI:
         assert "--optimize" in full_command_remark
         assert "--gen-shifts" in full_command_remark
         assert "--forcefield amber14-all.xml" in full_command_remark
+
+    def test_run_decoys(self, mocker, caplog):
+        """Test --mode decoys calls the generator."""
+        caplog.set_level(logging.INFO)
+        
+        # Mock DecoyGenerator
+        mock_gen_cls = mocker.patch("synth_pdb.main.DecoyGenerator")
+        mock_gen_instance = mock_gen_cls.return_value
+        
+        # Mock sys.argv
+        test_args = ["synth_pdb", "--mode", "decoys", "--sequence", "AAA", "--n-decoys", "5"]
+        mocker.patch("sys.argv", test_args)
+        mocker.patch("sys.exit")
+        
+        main.main()
+        
+        # Verify call
+        mock_gen_instance.generate_ensemble.assert_called_once()
+        args, kwargs = mock_gen_instance.generate_ensemble.call_args
+        assert kwargs["sequence"] == "AAA"
+        assert kwargs["n_decoys"] == 5
+        assert kwargs["rmsd_min"] == 0.0
+        assert kwargs["rmsd_max"] == 999.0
+
+    def test_decoys_missing_sequence_generates_random(self, mocker, caplog):
+        """Test that missing sequence triggers random generation."""
+        caplog.set_level(logging.INFO)
+        
+        mock_gen_cls = mocker.patch("synth_pdb.main.DecoyGenerator")
+        mock_gen_instance = mock_gen_cls.return_value
+        
+        # Mock sys.argv with length but no sequence
+        test_args = ["synth_pdb", "--mode", "decoys", "--length", "10", "--n-decoys", "1"]
+        mocker.patch("sys.argv", test_args)
+        mocker.patch("sys.exit")
+        
+        main.main()
+        
+        # Check logs
+        assert "Generated random sequence for decoys" in caplog.text
+        mock_gen_instance.generate_ensemble.assert_called_once()
+        args, kwargs = mock_gen_instance.generate_ensemble.call_args
+        assert len(kwargs["sequence"]) == 10
+
+    def test_run_docking(self, mocker, caplog):
+        """Test --mode docking calls DockingPrep."""
+        caplog.set_level(logging.INFO)
+        mocker.patch("synth_pdb.main.DockingPrep")
+        
+        test_args = ["synth_pdb", "--mode", "docking", "--input-pdb", "test.pdb"]
+        mocker.patch("sys.argv", test_args)
+        mocker.patch("sys.exit")
+        
+        main.main()
+        
+        assert "Docking preparation complete" in caplog.text
+
+    def test_run_pymol(self, mocker, caplog):
+        """Test --mode pymol generation."""
+        caplog.set_level(logging.INFO)
+        mocker.patch("synth_pdb.nef_io.read_nef_restraints", return_value=[])
+        mocker.patch("synth_pdb.visualization.generate_pymol_script")
+        
+        test_args = ["synth_pdb", "--mode", "pymol", "--input-pdb", "t.pdb", "--input-nef", "t.nef", "--output-pml", "o.pml"]
+        mocker.patch("sys.argv", test_args)
+        mocker.patch("sys.exit")
+        
+        main.main()
+        
+        assert "PyMOL script generated successfully" in caplog.text
+
+    def test_run_export_features(self, mocker, tmp_path, caplog):
+        """Test generation of NEF, Relax, Shifts, and Constraints."""
+        caplog.set_level(logging.INFO)
+        output_file = tmp_path / "export_test.pdb"
+        
+        # Valid PDB content
+        valid_pdb = (
+            "HEADER    test\n" +
+            create_atom_line(1, "CA", "GLY", "A", 1, 0.0, 0.0, 0.0, "C") + "\n" +
+            create_atom_line(2, "HA1", "GLY", "A", 1, 1.0, 0.0, 0.0, "H") 
+        )
+        mocker.patch("synth_pdb.main.generate_pdb_content", return_value=valid_pdb)
+        
+        # Mock calculation functions
+        # Patch the source modules because main.py imports them locally/lazily
+        mocker.patch("synth_pdb.nmr.calculate_synthetic_noes", return_value=[])
+        mocker.patch("synth_pdb.nef_io.write_nef_file")
+        mocker.patch("synth_pdb.relaxation.calculate_relaxation_rates", return_value={})
+        mocker.patch("synth_pdb.nef_io.write_nef_relaxation")
+        mocker.patch("synth_pdb.chemical_shifts.predict_chemical_shifts", return_value={})
+        mocker.patch("synth_pdb.nef_io.write_nef_chemical_shifts")
+        mocker.patch("synth_pdb.contact.compute_contact_map", return_value=np.zeros((1,1)))
+        mocker.patch("synth_pdb.export.export_constraints", return_value="test")
+        
+        test_args = [
+            "synth_pdb", 
+            "--length", "1", 
+            "--output", str(output_file),
+            "--gen-nef", "--gen-relax", "--gen-shifts",
+            "--export-constraints", str(tmp_path / "c.casp")
+        ]
+        mocker.patch("sys.argv", test_args)
+        mocker.patch("sys.exit")
+        
+        main.main()
+        
+        # Verify calls
+        assert "Calculating NOE Restraints" in caplog.text or "Calculate NOE Restraints" in caplog.text
+        assert "Constraints exported to" in caplog.text
+

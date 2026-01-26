@@ -302,6 +302,22 @@ This effectively demonstrates:
   - Default: `10.0`
   - Controls the overall magnitude of relaxation rates. Larger proteins have larger $\tau_m$.
 
+#### **Constraints Export **
+
+- `--export-constraints <FILE>`: Export contact map constraints for modeling/folding.
+  - Useful for checking agreement with AlphaFold/CASP predictions.
+  - Outputs a file containing residue-residue contacts.
+  - Example: `--export-constraints constraints.casp`
+
+- `--constraint-format {casp,csv}`: Format for the exported constraints.
+  - `casp`: Critical Assessment of Structure Prediction (RR) format.
+  - `csv`: Comma-separated values (i, j, distance).
+  - Default: `casp`
+
+- `--constraint-cutoff <DIST>`: Distance cutoff for defining binary contacts (Angstroms).
+  - Default: `8.0`
+
+
 #### **Output Options**
 
 - `--output <FILENAME>`: Custom output filename
