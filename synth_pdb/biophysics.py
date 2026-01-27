@@ -242,6 +242,17 @@ def cap_termini(structure: struc.AtomArray) -> struc.AtomArray:
         final_structure = ace_structure + final_structure
         
     if nme_structure:
+        # Critical Fix for OpenMM: Remove OXT from the C-terminal residue.
+        # OpenMM sees OXT and thinks it's a terminal residue (e.g., CLYS).
+        # But since we attach NME, it should be an internal residue (LYS).
+        # The presence of OXT (+ bond to NME) causes "1 C atom too many" error.
+        
+        # Identify OXT at c_term_id
+        oxt_mask = (final_structure.res_id == c_term_id) & (final_structure.atom_name == "OXT")
+        if oxt_mask.any():
+            final_structure = final_structure[~oxt_mask]
+            logger.debug(f"Removed OXT from residue {c_term_id} to accommodate NME cap.")
+            
         # Append
         final_structure = final_structure + nme_structure
         
