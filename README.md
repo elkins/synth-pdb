@@ -22,6 +22,7 @@ A command-line tool to generate Protein Data Bank (PDB) files with full atomic r
 - [Scientific Context](#scientific-context)
 - [Limitations](#limitations)
 - [Development](#development)
+- [Glossary of Scientific Terms & Acronyms](#glossary-of-scientific-terms--acronyms)
 - [License](#license)
 
 ## Features
@@ -929,6 +930,22 @@ For students and researchers interested in the physics behind the code, here are
 *   **Internal Dynamics & Model-Free Formalism:**
     *   Lipari, G., & Szabo, A. (1982). Model-free approach to the interpretation of nuclear magnetic resonance relaxation in macromolecules. 1. Theory and range of validity. *J. Am. Chem. Soc.*, 104(17), 4546–4559. (The foundational theory).
     *   Kay, L. E., Torchia, D. A., & Bax, A. (1989). Backbone dynamics of proteins as studied by 15N inverse detected heteronuclear NMR spectroscopy... *Biochemistry*, 28(23), 8972-8979. (The seminal application to proteins).
+
+## Glossary of Scientific Terms & Acronyms
+
+This section provides definitions and seminal references for the biophysical and computational terms used throughout `synth-pdb`.
+
+| Term | Definition | Reference |
+| :--- | :--- | :--- |
+| **PDB** | **Protein Data Bank**. The global repository for 3D structural data of proteins, nucleic acids, and complex assemblies. | Berman, H. M., et al. (2000). *Nucleic Acids Res.* |
+| **CASP** | **Critical Assessment of Structure Prediction**. A community-wide experiment held every two years to establish the state-of-the-art in protein structure modeling. | Kryshtafovych, A., et al. (2021). *Proteins.* |
+| **NOE** | **Nuclear Overhauser Effect**. A phenomenon where magnetization is transferred between spins through space, allowing for the measure of inter-atomic distances (r⁻⁶ dependency). | Wüthrich, K. (1986). *NMR of Proteins and Nucleic Acids.* |
+| **CSI** | **Chemical Shift Index**. A standard method used to deduce protein secondary structure (alpha helix vs. beta sheet) from detected NMR chemical shift deviations. | Wishart, D. S., et al. (1992). *Biochemistry.* |
+| **NEF** | **NMR Exchange Format**. A unified, open standard for the exchange of NMR restraint data among various software packages. | Gutmanas, A., et al. (2015). *Nat. Struct. Mol. Biol.* |
+| **NeRF** | **Natural Extension Reference Frame**. An algorithm for rapidly constructing 3D Cartesian coordinates from internal coordinates (bond lengths, angles, and dihedrals). | Parsons, J., et al. (2005). *J. Comput. Chem.* |
+| **S²** | **Model-Free Order Parameter**. A value between 0 (random) and 1 (rigid) that describes the degree of spatial restriction of local backbone motion. | Lipari, G., & Szabo, A. (1982). *J. Am. Chem. Soc.* |
+| **OBC2** | **Onufriev-Bashford-Case**. A computationally efficient implicit solvent model (Generalized Born) used to simulate the screening effect of water. | Onufriev, A., et al. (2004). *Proteins.* |
+| **AMBER** | **Assisted Model Building with Energy Refinement**. A widely-used suite of molecular simulation programs and force fields for biomolecules. | Case, D. A., et al. (2005). *J. Comput. Chem.* |
 
 ## License
 
