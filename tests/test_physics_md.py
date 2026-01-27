@@ -19,10 +19,9 @@ class TestMDEquilibration:
         app_mock.Simulation.return_value = mock_simulation
         
         mock_pdb_file = MagicMock()
+        mock_pdb_file.topology.atoms.return_value = [MagicMock()]
+        mock_pdb_file.topology.residues.return_value = [MagicMock()]
         app_mock.PDBFile.return_value = mock_pdb_file
-        
-        mock_modeller = MagicMock()
-        app_mock.Modeller.return_value = mock_modeller
         
         # Configure Fake objects for Energy return (avoid MagicMock format issues)
         class FakeQuantity:
@@ -32,8 +31,18 @@ class TestMDEquilibration:
             def getPotentialEnergy(self):
                 return FakeQuantity()
             def getPositions(self):
-                return MagicMock()
+                # Provide a list-like object for length checks
+                return [FakeQuantity()] * 10
+        
+        mock_modeller = MagicMock()
+        mock_modeller.positions = [FakeQuantity()] * 10
+        mock_modeller.topology.atoms.return_value = [MagicMock()]
+        mock_modeller.topology.residues.return_value = [MagicMock()]
+        app_mock.Modeller.return_value = mock_modeller
+        
+        mock_simulation = MagicMock()
         mock_simulation.context.getState.return_value = FakeState()
+        app_mock.Simulation.return_value = mock_simulation
 
         # Link openmm.app to app_mock explicitly
         openmm_mock.app = app_mock
@@ -67,8 +76,7 @@ class TestMDEquilibration:
             with open(input_pdb, "w") as f:
                 f.write("ATOM")
             
-            # Mock logger to be safe
-            physics.logger = MagicMock()
+            # success = minimizer.equilibrate(input_pdb, output_pdb, steps=1000)
             
             success = minimizer.equilibrate(input_pdb, output_pdb, steps=1000)
             

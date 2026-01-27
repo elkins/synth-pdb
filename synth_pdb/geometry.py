@@ -89,6 +89,43 @@ def calculate_angle(
     angle_rad = np.arccos(cosine_angle)
     return np.degrees(angle_rad)
 
+
+def calculate_dihedral_angle(
+    p1: np.ndarray, p2: np.ndarray, p3: np.ndarray, p4: np.ndarray
+) -> float:
+    """
+    Calculates the dihedral angle (in degrees) defined by four points (p1, p2, p3, p4).
+    Uses the robust vector-based normal approach (IUPAC convention).
+    """
+    v1 = p2 - p1
+    v2 = p3 - p2
+    v3 = p4 - p3
+    
+    # Normals to the two planes
+    n1 = np.cross(v1, v2).astype(float)
+    n2 = np.cross(v2, v3).astype(float)
+    
+    # Normalize normals
+    n1_norm = np.linalg.norm(n1)
+    n2_norm = np.linalg.norm(n2)
+    
+    if n1_norm == 0 or n2_norm == 0:
+        return 0.0
+        
+    n1 /= n1_norm
+    n2 /= n2_norm
+    
+    # Unit vector along the second bond
+    u2 = v2.astype(float) / np.linalg.norm(v2)
+    
+    # Orthonormal basis in the plane perpendicular to b2
+    m1 = np.cross(n1, u2)
+    
+    x = np.dot(n1, n2)
+    y = np.dot(m1, n2)
+    
+    return np.degrees(np.arctan2(y, x))
+
 def reconstruct_sidechain(
     peptide: struc.AtomArray,
     res_id: int,

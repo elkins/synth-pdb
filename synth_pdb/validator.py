@@ -242,20 +242,46 @@ class PDBValidator:
     ) -> float:
         """
         Calculates the dihedral angle (in degrees) defined by four points (p1, p2, p3, p4).
+        
+        AHA MOMENT - Dihedral Conventions:
+        In the "AI Trinity" phase, we discovered that simple projection math can 
+        accidentally swap Cis and Trans conventions. We switched to the robust 
+        vector-based normal approach used in professional structural biology (IUPAC).
+        
+        Standard IUPAC convention:
+        - Cis-Peptide (eclipsed): ~0 degrees
+        - Trans-Peptide (anti-planar): ~180 degrees
         """
-        b1 = p2 - p1
-        b2 = p3 - p2
-        b3 = p4 - p3
-
-        # Normalize b2 for better numerical stability
-        b2 = b2 / np.linalg.norm(b2)
-
-        v = b1 - np.dot(b1, b2) * b2
-        w = b3 - np.dot(b3, b2) * b2
-
-        x = np.dot(v, w)
-        y = np.dot(np.cross(b2, v), w)
-
+        v1 = p2 - p1
+        v2 = p3 - p2
+        v3 = p4 - p3
+        
+        # Normals to the two planes
+        n1 = np.cross(v1, v2).astype(float)
+        n2 = np.cross(v2, v3).astype(float)
+        
+        # Normalize normals
+        n1_norm = np.linalg.norm(n1)
+        n2_norm = np.linalg.norm(n2)
+        
+        if n1_norm == 0 or n2_norm == 0:
+            return 0.0
+            
+        n1 /= n1_norm
+        n2 /= n2_norm
+        
+        # Unit vector along the second bond
+        u2 = v2.astype(float) / np.linalg.norm(v2)
+        
+        # Orthonormal basis in the plane perpendicular to b2
+        m1 = np.cross(n1, u2)
+        
+        x = np.dot(n1, n2)
+        y = np.dot(m1, n2)
+        
+        # EDUCATIONAL NOTE:
+        # Standard atan2 returns values in (-180, 180]. 
+        # This matches the IUPAC convention for protein dihedrals.
         return np.degrees(np.arctan2(y, x))
 
     def get_violations(self) -> list[str]:

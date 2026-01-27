@@ -6,6 +6,7 @@ Enhances synthetic structures with realistic physical chemistry properties.
 Includes:
 - pH Titration (Histidine protonation states)
 - Terminal Capping (N-acetyl/C-amide)
+- Salt Bridge Stabilization (Automatic detection of ionic interactions)
 - Charge assignment
 
 Educational Note - pH and Protonation:
@@ -245,3 +246,89 @@ def cap_termini(structure: struc.AtomArray) -> struc.AtomArray:
         final_structure = final_structure + nme_structure
         
     return final_structure
+
+# EDUCATIONAL NOTE: Salt Bridges
+# ------------------------------
+# A salt bridge is a combination of two non-covalent interactions: 
+# 1. Hydrogen Bonding
+# 2. Electrostatic (Ionic) Attraction
+#
+# It occurs between a positively charged basic residue and a negatively 
+# charged acidic residue. In proteins, these are critical for:
+# - Stabilizing tertiary and quaternary structure.
+# - Specific ligand binding.
+# - pH-dependent conformational changes (as pKa shifts can break the bridge).
+#
+# Reference:
+# Bosshard, H. R., et al. (2004). "The salt bridge in proteins." 
+# Journal of Molecular Recognition, 17(1), 1-16.
+
+ACIDIC_RESIDUES = ["ASP", "GLU"]
+BASIC_RESIDUES = ["LYS", "ARG", "HIS"]
+
+# Specific atoms that carry the formal charges
+ACIDIC_ATOMS = ["OD1", "OD2", "OE1", "OE2"]
+BASIC_ATOMS = ["NZ", "NH1", "NH2", "ND1", "NE2"]
+
+def find_salt_bridges(structure: struc.AtomArray, cutoff: float = 5.0):
+    """
+    Automatically detects potential salt bridges in a protein structure.
+    
+    A salt bridge is defined here as a pair of acidic and basic residues 
+    where any of their side-chain charged atoms are within the specified cutoff.
+    
+    Args:
+        structure: Biotite AtomArray (should include side chains).
+        cutoff: Distance threshold in Angstroms (default 4.0).
+        
+    Returns:
+        list of dict: Each dict contains:
+            - res_ia: Residue ID of the first residue
+            - res_ib: Residue ID of the second residue
+            - atom_a: Name of the coordinating atom in res_ia
+            - atom_b: Name of the coordinating atom in res_ib
+            - distance: The measured distance
+    """
+    # Filter for Acidic and Basic atoms only to speed up search
+    acid_mask = np.isin(structure.res_name, ACIDIC_RESIDUES) & np.isin(structure.atom_name, ACIDIC_ATOMS)
+    base_mask = np.isin(structure.res_name, BASIC_RESIDUES) & np.isin(structure.atom_name, BASIC_ATOMS)
+    
+    acids = structure[acid_mask]
+    bases = structure[base_mask]
+    
+    if len(acids) == 0 or len(bases) == 0:
+        return []
+        
+    # Compute Distance Matrix between all Acid atoms and Base atoms
+    # acids.coord: (N, 3), bases.coord: (M, 3)
+    # diffs: (N, M, 3)
+    diffs = acids.coord[:, np.newaxis, :] - bases.coord[np.newaxis, :, :]
+    dists = np.sqrt(np.sum(diffs**2, axis=-1))
+    
+    # Find pairs within cutoff
+    indices = np.where(dists < cutoff)
+    
+    found_pairs = {} # (res_ia, res_ib) -> bridge_dict
+    
+    for acid_idx, base_idx in zip(*indices):
+        a_atom = acids[acid_idx]
+        b_atom = bases[base_idx]
+        
+        # Ensure we don't bridge within the same residue
+        if a_atom.res_id == b_atom.res_id:
+            continue
+            
+        pair_key = tuple(sorted([a_atom.res_id, b_atom.res_id]))
+        dist = dists[acid_idx, base_idx]
+        
+        # We pick the closest atom pair for each residue-residue interaction
+        if pair_key not in found_pairs or dist < found_pairs[pair_key]["distance"]:
+            found_pairs[pair_key] = {
+                "res_ia": int(a_atom.res_id),
+                "res_ib": int(b_atom.res_id),
+                "atom_a": a_atom.atom_name,
+                "atom_b": b_atom.atom_name,
+                "distance": float(dist)
+            }
+            
+    return list(found_pairs.values())

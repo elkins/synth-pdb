@@ -36,6 +36,7 @@ A command-line tool to generate Protein Data Bank (PDB) files with full atomic r
 - **Bulk Dataset Generation**: Generate thousands of (Structure, Sequence, Contact Map) triplets for AI training via `--mode dataset`.
 - **Metal Ion Coordination**: Automatic detection and structural injection of cofactors like **Zinc (Zn2+)** with physics-aware harmonic constraints. ✅
 - **Disulfide Bonds**: Automatic detection and annotation of **SSBOND** records for Cysteine pairs. ✅
+- **Salt Bridge Stabilization**: Automatic detection of ionic interactions with harmonic restraints in OpenMM. ✅
 
 🔬 **Validation Suite**
 - Bond length validation
@@ -96,10 +97,16 @@ A command-line tool to generate Protein Data Bank (PDB) files with full atomic r
 **Educational Value**: Teaches how math converts 1D sequences + 2D angles into 3D shapes.
 
 #### ⛓️ Metal Coordination (Cofactors)
-**What**: Structural integration of inorganic ions (e.g. Zinc)
-**Motifs**: Detected via ligand clustering (Cys/His sites)
-**Physics**: Applied via Harmonic Constraints in Energy Minimization
-**Importance**: models structural stability of Zinc Fingers and enzymatic sites
+**What**: Structural integration of inorganic ions (e.g. Zinc).
+**Motifs**: Detected via ligand clustering (Cys/His sites).
+**Physics**: Applied via Harmonic Constraints in Energy Minimization.
+**Importance**: Models structural stability of Zinc Fingers and enzymatic sites.
+
+#### 🧲 Salt Bridge Stabilization
+**What**: Automatic detection of ionic interactions (e.g., LYS+ and ASP-).
+**Criteria**: Distance-based detection between charged side-chain atoms (cutoff 5.0 Å).
+**Physics**: Stabilized via harmonic restraints during energy minimization.
+**Importance**: Maintains tertiary structure integrity in synthetic protein models.
 
 #### 🔗 Disulfide Bonds (SSBOND)
 **What**: Covalent bonds between Cysteine residues

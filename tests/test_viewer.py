@@ -106,3 +106,30 @@ class TestMolecularViewer:
         # Check that proper keys are generated in the JS array
         assert "c1:'A'" in html
         assert "d:3.5" in html
+
+    def test_view_structure_in_browser(self, mocker):
+        """Test the main entry point for the browser-based viewer."""
+        # Mock dependencies to avoid side effects
+        mock_webbrowser = mocker.patch("webbrowser.open")
+        
+        # For tempfile, we need to mock it carefully because of the context manager
+        mock_temp = mocker.patch("tempfile.NamedTemporaryFile")
+        mock_instance = mock_temp.return_value.__enter__.return_value
+        mock_instance.name = "/tmp/fake_viewer.html"
+        
+        pdb_data = "ATOM      1  N   ALA A   1       0.000   0.000   0.000  1.00  0.00           N"
+        
+        # Call function
+        view_structure_in_browser(pdb_data, "test.pdb")
+        
+        # Verify interactions
+        assert mock_temp.called
+        assert mock_instance.write.called
+        mock_webbrowser.assert_called_once_with("file:///tmp/fake_viewer.html")
+
+    def test_view_structure_in_browser_error(self, mocker):
+        """Test error handling in view_structure_in_browser."""
+        mocker.patch("synth_pdb.viewer._create_3dmol_html", side_effect=ValueError("Test Error"))
+        
+        with pytest.raises(ValueError, match="Test Error"):
+            view_structure_in_browser("pdb", "test.pdb")

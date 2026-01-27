@@ -34,6 +34,7 @@ from .pdb_utils import create_pdb_header, create_pdb_footer
 from .geometry import (
     position_atom_3d_from_internal_coords,
     calculate_angle,
+    calculate_dihedral_angle,
 )
 # Re-export for backward compatibility with tests
 _position_atom_3d_from_internal_coords = position_atom_3d_from_internal_coords
@@ -767,7 +768,11 @@ def generate_pdb_content(
         if i == 0:
             n_coord = np.array([0.0, 0.0, 0.0])
             ca_coord = np.array([BOND_LENGTH_N_CA, 0.0, 0.0])
-            c_coord = ca_coord + np.array([BOND_LENGTH_CA_C * np.cos(np.deg2rad(180-ANGLE_N_CA_C)), BOND_LENGTH_CA_C * np.sin(np.deg2rad(180-ANGLE_N_CA_C)), 0.0])
+            c_coord = ca_coord + np.array([
+                BOND_LENGTH_CA_C * np.cos(np.deg2rad(180 - ANGLE_N_CA_C)),
+                BOND_LENGTH_CA_C * np.sin(np.deg2rad(180 - ANGLE_N_CA_C)),
+                0.0
+            ])
             
             # Determine initial PSI for the first residue to propagate to next
             # We need to sample it based on conformation
@@ -779,12 +784,6 @@ def generate_pdb_content(
                  current_psi = RAMACHANDRAN_PRESETS[res0_conf]['psi'] + np.random.normal(0, 5)
 
         else:
-            # Extract previous C from the already built peptide
-            # Use unpadded atom names as biotite normalizes them
-            prev_c_atom = peptide[(peptide.res_id == res_id - 1) & (peptide.atom_name == "C")][-1]
-            prev_ca_atom = peptide[(peptide.res_id == res_id - 1) & (peptide.atom_name == "CA")][-1]
-            prev_n_atom = peptide[(peptide.res_id == res_id - 1) & (peptide.atom_name == "N")][-1]
-
             # EDUCATIONAL NOTE - Per-Residue Conformation Selection:
             # For each residue, we now look up its specific conformation from
             # the residue_conformations dictionary. This allows different residues
@@ -838,19 +837,19 @@ def generate_pdb_content(
             #
             # 1. Place N using previous Psi (Rotation around CA_prev-C_prev)
             n_coord = position_atom_3d_from_internal_coords(
-                prev_n_atom.coord, prev_ca_atom.coord, prev_c_atom.coord,
+                prev_n_coord, prev_ca_coord, prev_c_coord,
                 BOND_LENGTH_C_N, ANGLE_CA_C_N, prev_psi
             )
             
             # 2. Place CA using Omega (Rotation around C_prev-N_curr)
             ca_coord = position_atom_3d_from_internal_coords(
-                prev_ca_atom.coord, prev_c_atom.coord, n_coord,
+                prev_ca_coord, prev_c_coord, n_coord,
                 BOND_LENGTH_N_CA, ANGLE_C_N_CA, current_omega
             )
             
             # 3. Place C using Phi (Rotation around N_curr-CA_curr)
             c_coord = position_atom_3d_from_internal_coords(
-                prev_c_atom.coord, n_coord, ca_coord,
+                prev_c_coord, n_coord, ca_coord,
                 BOND_LENGTH_CA_C, ANGLE_N_CA_C, current_phi
             )
 
@@ -858,23 +857,38 @@ def generate_pdb_content(
         prev_psi = current_psi
         
         # Get reference residue from biotite
-        # Use appropriate terminal definitions
+        # CRITICAL FIX: Always use .copy() because struc.info.residue returns cached templates.
+        # Modifying the template in-place causes subsequent residues of the same type to be broken.
         if i == 0: # N-terminal residue
-            ref_res_template = struc.info.residue(res_name, 'N_TERM')
+            #ref_res_template = struc.info.residue(res_name, 'N_TERM').copy() # Not supported in all biotite versions - Roberto Tejero
+            ref_res_template = struc.info.residue(res_name).copy()
         elif i == len(sequence) - 1: # C-terminal residue
-            ref_res_template = struc.info.residue(res_name, 'C_TERM')
+            #ref_res_template = struc.info.residue(res_name, 'C_TERM').copy() # Not supported in all biotite versions - Roberto Tejero
+            ref_res_template = struc.info.residue(res_name).copy()
         else: # Internal residue
-            ref_res_template = struc.info.residue(res_name, 'INTERNAL')
+            #ref_res_template = struc.info.residue(res_name, 'INTERNAL').copy() # Not supported in all biotite versions - Roberto Tejero
+            ref_res_template = struc.info.residue(res_name).copy()
 
         # EDUCATIONAL NOTE - Peptide Bond Chemistry:
         # A peptide bond forms via dehydration synthesis (loss of H2O).
         # The Carboxyl group (COOH) of one amino acid joins the Amine group (NH2) of the next.
-        # This means internal residues lose their terminal Oxygen (OXT).
-        # We must explicitly remove OXT atoms from all residues except the C-terminus
-        # to represent a continuous polypeptide chain correctly.
+        # This means internal residues lose their terminal Oxygen (OXT) and associated Hydrogens.
+        # We must explicitly remove terminal-only atoms from all residues to represent 
+        # a continuous polypeptide chain correctly and avoid OpenMM template errors.
+        
+        # 1. Remove OXT for all except absolute C-terminus
         if i < len(sequence) - 1:
             ref_res_template = ref_res_template[ref_res_template.atom_name != "OXT"]
+            # Also remove HXT (Hydroxyl Hydrogen) if present in template
+            ref_res_template = ref_res_template[ref_res_template.atom_name != "HXT"]
+            
+        # 2. Remove extra N-terminal Hydrogens (H2, H3) for all except absolute N-terminus
+        # Standard internal residues only have 'H'.
+        if i > 0:
+            ref_res_template = ref_res_template[ref_res_template.atom_name != "H2"]
+            ref_res_template = ref_res_template[ref_res_template.atom_name != "H3"]
 
+        # 3. Apply rotamers if available
         if res_name in ROTAMER_LIBRARY:
             rotamers = ROTAMER_LIBRARY[res_name]
             
@@ -899,45 +913,62 @@ def generate_pdb_content(
                             break
                     
                     if gamma_atom_name:
-                        n_template = ref_res_template[ref_res_template.atom_name == "N"][0]
-                        ca_template = ref_res_template[ref_res_template.atom_name == "CA"][0]
-                        cb_template = ref_res_template[ref_res_template.atom_name == "CB"][0]
-                        gamma_template = ref_res_template[ref_res_template.atom_name == gamma_atom_name][0]
+                        # EDUCATIONAL NOTE - Sidechain Rotation:
+                        # Instead of placing a single atom (which breaks branched residues like VAL),
+                        # we rotate the ENTIRE sidechain about the CA-CB axis to reach target chi1.
+                        # We removed the +180.0 offset because NeRF and IUPAC both use 0 for Cis.
+                        ca_atom = ref_res_template[ref_res_template.atom_name == "CA"][0]
+                        cb_atom = ref_res_template[ref_res_template.atom_name == "CB"][0]
+                        n_atom = ref_res_template[ref_res_template.atom_name == "N"][0]
+                        g_atom = ref_res_template[ref_res_template.atom_name == gamma_atom_name][0]
                         
-                        bond_length_cb_gamma = np.linalg.norm(gamma_template.coord - cb_template.coord)
-                        angle_ca_cb_gamma = calculate_angle(ca_template.coord, cb_template.coord, gamma_template.coord)
-
-                        # EDUCATIONAL NOTE - NeRF Phase Shift:
-                        # The standard NeRF construction defines 0 degrees as trans (180 offset from cis).
-                        # The IUPAC definition for Chi angles (and Dunbrack library) defines 0 degrees as cis.
-                        # Therefore, we must add 180 degrees to correct the phase shift.
-                        new_gamma_coord = position_atom_3d_from_internal_coords(
-                            n_template.coord, ca_template.coord, cb_template.coord,
-                            bond_length_cb_gamma, angle_ca_cb_gamma, chi1_target + 180.0
+                        current_chi1 = calculate_dihedral_angle(
+                            n_atom.coord, ca_atom.coord, cb_atom.coord, g_atom.coord
                         )
-                        # Fix: use direct index assignment to modify array in-place
-                        gamma_idx = np.where(ref_res_template.atom_name == gamma_atom_name)[0][0]
-                        ref_res_template.coord[gamma_idx] = new_gamma_coord
+                        # Rodrigues rotation formula CCW looking down CA->CB 
+                        # results in a NEGATIVE change in dihedral angle in our convention.
+                        # So rotation_angle = current - target
+                        diff_deg = current_chi1 - chi1_target
+                        
+                        # Rotate all atoms downstream of CB
+                        # We identify sidechain atoms as everything except N, CA, C, O, H, HA
+                        backbone_names = {"N", "CA", "C", "O", "H", "HA", "CB"}
+                        for atom_idx in range(len(ref_res_template)):
+                            if ref_res_template.atom_name[atom_idx] not in backbone_names:
+                                # Rotate point about CA-CB axis
+                                p = ref_res_template.coord[atom_idx]
+                                v = cb_atom.coord - ca_atom.coord
+                                v /= np.linalg.norm(v)
+                                
+                                # Rodrigues' rotation formula
+                                alpha = np.deg2rad(diff_deg)
+                                cos_a = np.cos(alpha)
+                                sin_a = np.sin(alpha)
+                                
+                                rel_p = p - ca_atom.coord
+                                rotated_p = (
+                                    rel_p * cos_a + 
+                                    np.cross(v, rel_p) * sin_a + 
+                                    v * np.dot(v, rel_p) * (1 - cos_a)
+                                )
+                                ref_res_template.coord[atom_idx] = rotated_p + ca_atom.coord
             
         # Extract N, CA, C from ref_res_template
-        # Ensure these atoms are present in the template. Some templates might not have N or C (e.g., non-standard)
+        # Ensure these atoms are present in the template for superimposition
         template_backbone_n = ref_res_template[ref_res_template.atom_name == "N"]
         template_backbone_ca = ref_res_template[ref_res_template.atom_name == "CA"]
         template_backbone_c = ref_res_template[ref_res_template.atom_name == "C"]
 
-        # Filter out empty AtomArrays for robustness
-        mobile_atoms = []
-        if template_backbone_n.array_length() > 0:
-            mobile_atoms.append(template_backbone_n)
-        if template_backbone_ca.array_length() > 0:
-            mobile_atoms.append(template_backbone_ca)
-        if template_backbone_c.array_length() > 0:
-            mobile_atoms.append(template_backbone_c)
+        # Concatenate backbone atoms into a single AtomArray
+        # We must have exactly 3 atoms (N, CA, C) to match the target array
+        mobile_backbone_from_template = template_backbone_n + template_backbone_ca + template_backbone_c
         
-        if not mobile_atoms:
-            raise ValueError(f"Reference residue template for {res_name} is missing N, CA, or C atoms needed for superimposition.")
-
-        mobile_backbone_from_template = struc.array(mobile_atoms)
+        if len(mobile_backbone_from_template) != 3:
+            raise ValueError(
+                f"Reference residue template for {res_name} is missing required "
+                f"backbone atoms (N, CA, C) for superimposition. "
+                f"Found atoms: {list(mobile_backbone_from_template.atom_name)}"
+            )
 
         # Create the 'target' structure for superimposition from the *constructed* coordinates
         target_backbone_constructed = struc.array([
@@ -946,8 +977,12 @@ def generate_pdb_content(
             struc.Atom(c_coord, atom_name="C", res_id=res_id, res_name=res_name, element="C", hetero=False)
         ])
         
-        # Perform superimposition
-        _, transformation = struc.superimpose(mobile_backbone_from_template, target_backbone_constructed)
+        # AHA MOMENT - Superimposition Direction:
+        # In the "AI Trinity" debugging phase, we found that residues were disconnected 
+        # (6A-13A gaps). This was due to superimposing the backbone onto the template 
+        # instead of moving the template into our newly constructed global frame.
+        # Fixed: target=constructed_frame, mobile=residue_template.
+        _, transformation = struc.superimpose(target_backbone_constructed, mobile_backbone_from_template)
         
         # Apply transformation to the entire reference residue template
         transformed_res = ref_res_template
@@ -959,7 +994,19 @@ def generate_pdb_content(
         transformed_res.chain_id[:] = "A" # Ensure chain ID is set
         
         # Append the transformed residue to the peptide
-        peptide += transformed_res
+        if i == 0:
+            peptide = transformed_res.copy()
+        else:
+            peptide += transformed_res
+            
+        # Store these for next iteration
+        # Use BOTH the construction coordinates AND the transformed ones if needed?
+        # Actually, NeRF needs the PREVIOUS frame. 
+        # To perfectly connect residues, we MUST use the coordinates where we placed 
+        # C of the previous residue.
+        prev_n_coord = n_coord
+        prev_ca_coord = ca_coord
+        prev_c_coord = c_coord
     
     # After all residues are added, ensure global chain_id is 'A' (redundant if already set above, but good safeguard)
     peptide.chain_id = np.array(["A"] * peptide.array_length(), dtype="U1")
@@ -1122,7 +1169,12 @@ def generate_pdb_content(
 
     # Manually add TER record if biotite doesn't add one at the end of the last chain.
     # Check if the last record written by biotite is an ATOM/HETATM, if so, add TER manually.
-    last_line = atomic_and_ter_content.strip().splitlines()[-1]
+    lines = atomic_and_ter_content.strip().splitlines()
+    if not lines:
+        logger.error("Generated PDB content is empty! Falling back to raw sequence string.")
+        return atomic_and_ter_content
+    
+    last_line = lines[-1]
     if last_line.startswith("ATOM") or last_line.startswith("HETATM"):
         # Get last atom details from the peptide AtomArray
         last_atom = peptide[-1]

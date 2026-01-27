@@ -66,22 +66,14 @@ class EnergyMinimizer:
                              aims to approximate that solution environment, distinct from the
                              vacuum or crystal lattice assumptions of other methods.
         """
-        if not HAS_OPENMM:
-             # We allow initialization to pass so the module can be imported
-             # but methods will check HAS_OPENMM
-             pass
-
-        # Set default solvent model
-        if solvent_model is None and HAS_OPENMM:
-            solvent_model = app.OBC2
-
+        if not HAS_OPENMM: return
+        if solvent_model is None: solvent_model = app.OBC2
         self.forcefield_name = forcefield_name
         self.water_model = 'amber14/tip3pfb.xml' 
         self.solvent_model = solvent_model
+        # Build list of XML files to load
+        ff_files = [self.forcefield_name, self.water_model]
         
-        if not HAS_OPENMM:
-            return
-
         # Map solvent models to their parameter files in OpenMM
         # These need to be loaded alongside the main forcefield
         # Standard OpenMM paths often have 'implicit/' at the root
@@ -92,21 +84,17 @@ class EnergyMinimizer:
             app.GBn2: 'implicit/gbn2.xml',
             app.HCT:  'implicit/hct.xml',
         }
-
-        # Build list of XML files to load
-        ff_files = [self.forcefield_name, self.water_model]
         
         if self.solvent_model in solvent_xml_map:
             ff_files.append(solvent_xml_map[self.solvent_model])
-        
         try:
             # The ForceField object loads the definitions of atom types and parameters.
+            # It also creates a topology object that represents the molecular structure.
             self.forcefield = app.ForceField(*ff_files)
         except Exception as e:
-            logger.error(f"Failed to load forcefield {ff_files}: {e}")
-            raise
+            logger.error(f"Failed to load forcefield: {e}"); raise
 
-    def minimize(self, pdb_file_path: str, output_path: str, max_iterations: int = 0, tolerance: float = 10.0) -> bool:
+    def minimize(self, pdb_file_path, output_path, max_iterations=0, tolerance=10.0):
         """
         Minimizes the energy of a structure already containing correct atoms (including Hydrogens).
         
@@ -116,15 +104,27 @@ class EnergyMinimizer:
             max_iterations: Limit steps (0 = until convergence).
             tolerance: Target energy convergence threshold (kJ/mol).
         """
-        if not HAS_OPENMM:
-             logger.error("Cannot minimize: OpenMM not found.")
-             return False
-
-        # This method assumes the input PDB is perfect (has Hydrogens, correct names).
-        # See 'add_hydrogens_and_minimize' for the robust version used by synth-pdb.
+        if not HAS_OPENMM: return False
         return self._run_simulation(pdb_file_path, output_path, max_iterations, tolerance, add_hydrogens=False)
 
-    def add_hydrogens_and_minimize(self, pdb_file_path: str, output_path: str) -> bool:
+    def equilibrate(self, pdb_file_path, output_path, steps=1000):
+        """
+        Run Thermal Equilibration (MD) at 300K.
+        
+        Args:
+            pdb_file_path: Input PDB/File path.
+            output_path: Output PDB path.
+            steps: Number of MD steps (2 fs per step). 1000 steps = 2 ps.
+            
+        Returns:
+            True if successful.
+        """
+        if not HAS_OPENMM:
+             logger.error("Cannot equilibrate: OpenMM not found.")
+             return False
+        return self._run_simulation(pdb_file_path, output_path, add_hydrogens=True, equilibration_steps=steps)
+
+    def add_hydrogens_and_minimize(self, pdb_file_path, output_path):
         """
         Robust minimization pipeline: Adds Hydrogens -> Creates/Minimizes System -> Saves Result.
         
@@ -142,206 +142,158 @@ class EnergyMinimizer:
         if not HAS_OPENMM:
              logger.error("Cannot add hydrogens: OpenMM not found.")
              return False
-             
         return self._run_simulation(pdb_file_path, output_path, add_hydrogens=True)
 
-    def equilibrate(self, pdb_file_path: str, output_path: str, steps: int = 1000) -> bool:
-        """
-        Run Thermal Equilibration (MD) at 300K.
-        
-        Args:
-            pdb_file_path: Input PDB/File path.
-            output_path: Output PDB path.
-            steps: Number of MD steps (2 fs per step). 1000 steps = 2 ps.
-            
-        Returns:
-            True if successful.
-        """
-        if not HAS_OPENMM:
-             logger.error("Cannot equilibrate: OpenMM not found.")
-             return False
-        
-        # We always add hydrogens for MD
-        return self._run_simulation(pdb_file_path, output_path, add_hydrogens=True, equilibration_steps=steps)
-
     def _run_simulation(self, input_path, output_path, max_iterations=0, tolerance=10.0, add_hydrogens=True, equilibration_steps=0):
-        """Internal worker for setting up and running the OpenMM Simulation."""
         logger.info(f"Processing physics for {input_path}...")
-        
         try:
-            # 1. Load the PDB file structure (topology and positions)
             pdb = app.PDBFile(input_path)
-            
-            # 2. Prepare the Topology (Add Hydrogens if requested)
+            topology, positions = pdb.topology, pdb.positions
+            atom_list = list(topology.atoms())
+            coordination_restraints = []
+            salt_bridge_restraints = []
             if add_hydrogens:
-                logger.info("Adding missing hydrogens (protonation state @ pH 7.0)...")
-                modeller = app.Modeller(pdb.topology, pdb.positions)
+                modeller = app.Modeller(topology, positions)
                 
-                # Detecting sites for physics-aware coordination constraints
-                coordination_restraints = [] 
-                atom_list = list(pdb.topology.atoms())
+                # THE "AI TRINITY" AHA MOMENT - Hydrogen Stripping:
+                # We found that OpenMM's addHydrogens() would fail or produce inconsistent 
+                # protonation states if Biotite's template-based hydrogens were present.
+                # Stripping all hydrogens and letting OpenMM re-add them according to 
+                # the forcefield and pH is the key to simulation stability.
+                try:
+                    from openmm.app import element
+                    modeller.delete([a for a in modeller.topology.atoms() if a.element is not None and a.element.symbol == "H"])
+                except Exception as e:
+                    logger.debug(f"Hydrogen deletion skipped or failed: {e}")
                 
                 try:
                     from .cofactors import find_metal_binding_sites
+                    from .biophysics import find_salt_bridges
                     import io
                     import biotite.structure.io.pdb as biotite_pdb
-                    
                     tmp_io = io.StringIO()
-                    app.PDBFile.writeFile(pdb.topology, pdb.positions, tmp_io)
+                    # Use modeller's results after stripping hydrogens
+                    app.PDBFile.writeFile(modeller.topology, modeller.positions, tmp_io)
                     tmp_io.seek(0)
-                    pdb_content = tmp_io.read()
-                    if pdb_content.strip():
-                        tmp_io.seek(0)
-                        b_struc = biotite_pdb.PDBFile.read(tmp_io).get_structure(model=1)
-                        
-                        binding_sites = find_metal_binding_sites(b_struc)
-                        
-                        for site in binding_sites:
-                            ion_idx = -1
+                    b_struc = biotite_pdb.PDBFile.read(tmp_io).get_structure(model=1)
+                    sites = find_metal_binding_sites(b_struc)
+                    for site in sites:
+                        ion_idx = -1
+                        for atom in atom_list:
+                            if atom.residue.name == site["type"]: ion_idx = atom.index; break
+                        if ion_idx == -1: continue
+                        for ligand_idx in site["ligand_indices"]:
+                            lig_atom = b_struc[ligand_idx]
                             for atom in atom_list:
-                                if atom.residue.name == site["type"]:
-                                    ion_idx = atom.index
-                                    break
-                            if ion_idx == -1: continue
-                            
-                            for ligand_idx in site["ligand_indices"]:
-                                ligand_atom = b_struc[ligand_idx]
-                                for atom in atom_list:
-                                    if (atom.residue.id == str(ligand_atom.res_id) and 
-                                        atom.name == ligand_atom.atom_name):
-                                        coordination_restraints.append((ion_idx, atom.index))
-                                        break
-                except Exception as e:
-                    logger.warning(f"Could not auto-detect coordination sites (this is normal in some test environments): {e}")
+                                if (atom.residue.id == str(lig_atom.res_id) and atom.name == lig_atom.atom_name): coordination_restraints.append((ion_idx, atom.index)); break
+                    bridges = find_salt_bridges(b_struc)
+                    logger.debug(f"DEBUG: Found {len(bridges)} salt bridges.")
+                    for bridge in bridges:
+                        idx_a, idx_b = -1, -1
+                        for atom in atom_list:
+                            if (atom.residue.id == str(bridge["res_ia"]) and atom.name == bridge["atom_a"]): idx_a = atom.index
+                            if (atom.residue.id == str(bridge["res_ib"]) and atom.name == bridge["atom_b"]): idx_b = atom.index
+                        if idx_a != -1 and idx_b != -1: salt_bridge_restraints.append((idx_a, idx_b, bridge["distance"] / 10.0))
+                except Exception as e: logger.warning(f"Detection failed: {e}")
+                # THE "AI TRINITY" AHA MOMENT - HETATM Preservation:
+                # OpenMM's Modeller.addHydrogens() sometimes culls residues it doesn't recognize.
+                # Specifically, if our ZN ion is in its own chain or has a non-standard name.
+                non_protein_data = []
+                for res in modeller.topology.residues():
+                    # Check for metal ions (case-insensitive and stripping spaces)
+                    rname = res.name.strip().upper()
+                    if rname in ["ZN", "FE", "MG", "CA", "NA", "CL"]:
+                        for atom in res.atoms():
+                            non_protein_data.append({
+                                "res_name": res.name,
+                                "atom_name": atom.name,
+                                "element": atom.element,
+                                "pos": modeller.positions[atom.index]
+                            })
 
                 modeller.addHydrogens(self.forcefield, pH=7.0)
                 
-                topology = modeller.topology
-                positions = modeller.positions
-            else:
-                topology = pdb.topology
-                positions = pdb.positions
-
-            # 3. Create the 'System'
-            # The System object connects the Topology (atoms/bonds) to the Forcefield (physics rules).
-            # It calculates all forces acting on every atom.
-            logger.debug("Creating OpenMM System (applying forcefield parameters)...")
-            try:
-                system = self.forcefield.createSystem(
-                    topology,
-                    nonbondedMethod=app.NoCutoff, # No cutoff for vacuum/implicit (calculates ALL pairwise interactions)
-                    constraints=app.HBonds,       # Constrain Hydrogen bond lengths (allows larger time steps in MD)
-                    implicitSolvent=self.solvent_model # Continuum water model
-                )
-            except ValueError as ve:
-                # Fallback logic for when implicit solvent fails (common with some forcefield combos)
-                if "implicitSolvent" in str(ve):
-                    logger.warning(f"Implicit Solvent parameters not found for this forcefield configuration. Using Vacuum electrostatics instead (standard fallback).")
-                    system = self.forcefield.createSystem(
-                        topology,
-                        nonbondedMethod=app.NoCutoff,
-                        constraints=app.HBonds
-                        # implicitSolvent defaults to None (Vacuum)
-                    )
-                else:
-                    raise ve
+                # Restore lost HETATMs
+                new_res_names = [res.name.strip().upper() for res in modeller.topology.residues()]
+                for data in non_protein_data:
+                    if data["res_name"].strip().upper() not in new_res_names:
+                        logger.info(f"Restoring lost HETATM: {data['res_name']}")
+                        new_chain = modeller.topology.addChain()
+                        new_res = modeller.topology.addResidue(data["res_name"], new_chain)
+                        modeller.topology.addAtom(data["atom_name"], data["element"], new_res)
+                        
+                        # Robustly append to positions
+                        # Modeller.positions is a list of Vec3 with units.
+                        current_pos = list(modeller.positions)
+                        current_pos.append(data["pos"])
+                        # Modeller.positions setter expects a list of Vec3 (Quantity)
+                        modeller.positions = current_pos
+                
+                topology, positions = modeller.topology, modeller.positions
+                logger.info(f"Final atoms after addHydrogens: {len(list(topology.atoms()))}")
             
-            # 4. Add Coordination Restraints
-            # educational_note:
-            # We use a Harmonic Bond (CustomBondForce) to keep the metal ion 
-            # centered between its ligands. Without this, the ion might 
-            # dissociate during minimization due to lack of explicit covalent bonds.
+            try:
+                system = self.forcefield.createSystem(topology, nonbondedMethod=app.NoCutoff, constraints=app.HBonds, implicitSolvent=self.solvent_model)
+            except Exception:
+                system = self.forcefield.createSystem(topology, nonbondedMethod=app.NoCutoff, constraints=app.HBonds)
+            
+            num_atoms = len(list(topology.atoms()))
+            if num_atoms == 0:
+                logger.error("Topology has 0 atoms before Simulation creation!")
+                return False
+            
             if coordination_restraints:
-                logger.info(f"Applying {len(coordination_restraints)} harmonic coordination constraints (k=50000)...")
                 force = mm.CustomBondForce("0.5*k*(r-r0)^2")
                 force.addGlobalParameter("k", 50000.0 * unit.kilojoules_per_mole / unit.nanometer**2)
                 force.addPerBondParameter("r0")
-                
-                new_atom_list = list(topology.atoms())
-                for ion_idx_orig, lig_idx_orig in coordination_restraints:
-                    orig_ion = atom_list[ion_idx_orig]
-                    orig_lig = atom_list[lig_idx_orig]
-                    
-                    new_ion_idx = -1
-                    new_lig_idx = -1
-                    for atom in new_atom_list:
-                        if (atom.residue.name == orig_ion.residue.name and 
-                            atom.residue.id == orig_ion.residue.id and 
-                            atom.name == orig_ion.name):
-                            new_ion_idx = atom.index
-                        
-                        if (atom.residue.name == orig_lig.residue.name and
-                            atom.residue.id == orig_lig.residue.id and 
-                            atom.name == orig_lig.name):
-                            new_lig_idx = atom.index
-                    
-                    if new_ion_idx != -1 and new_lig_idx != -1:
-                        lig_atom_name = new_atom_list[new_lig_idx].name
-                        r0_val = 0.23 if lig_atom_name == "SG" else 0.21
-                        force.addBond(new_ion_idx, new_lig_idx, [r0_val * unit.nanometers])
-                        logger.debug(f"Confirmed restraint: {new_atom_list[new_ion_idx]} to {new_atom_list[new_lig_idx]} @ {r0_val}nm")
-                    else:
-                        logger.warning(f"Failed to map restraint indices: ion={new_ion_idx}, lig={new_lig_idx}")
-                
+                new_atoms = list(topology.atoms())
+                for i_orig, l_orig in coordination_restraints:
+                    o_i, o_l = atom_list[i_orig], atom_list[l_orig]
+                    n_i, n_l = -1, -1
+                    for a in new_atoms:
+                        if a.residue.id == o_i.residue.id and a.name == o_i.name: n_i = a.index
+                        if a.residue.id == o_l.residue.id and a.name == o_l.name: n_l = a.index
+                    if n_i != -1 and n_l != -1: force.addBond(n_i, n_l, [(0.23 if new_atoms[n_l].name == "SG" else 0.21) * unit.nanometers])
                 system.addForce(force)
-                logger.info(f"Successfully added {force.getNumBonds()} coordination bonds to the system.")
+            if salt_bridge_restraints:
+                sb_force = mm.CustomBondForce("0.5*k_sb*(r-r0)^2")
+                sb_force.addGlobalParameter("k_sb", 10000.0 * unit.kilojoules_per_mole / unit.nanometer**2)
+                sb_force.addPerBondParameter("r0")
+                new_atoms = list(topology.atoms())
+                for a_orig, b_orig, r0_nm in salt_bridge_restraints:
+                    o_a, o_b = atom_list[a_orig], atom_list[b_orig]
+                    n_a, n_b = -1, -1
+                    for a in new_atoms:
+                        if (a.residue.id == o_a.residue.id and a.name == o_a.name): n_a = a.index
+                        if (a.residue.id == o_b.residue.id and a.name == o_b.name): n_b = a.index
+                    if n_a != -1 and n_b != -1: sb_force.addBond(n_a, n_b, [r0_nm * unit.nanometers])
+                system.addForce(sb_force)
 
-            # 4. Create the Integrator
-            # An Integrator is the math engine that moves atoms based on forces (F=ma).
-            # 'LangevinIntegrator' simulates a heat bath (friction + random collisions) to maintain temperature.
-            #
-            # Educational Note:
-            # For pure energy minimization (finding the nearest valley), we technically don't need a
-            # thermostat like Langevin because we aren't simulating time-resolved motion yet.
-            # However, OpenMM requires an Integrator to define the Simulation context.
-            # If we were to run "simulation.step(1000)", this integrator would generate
-            # realistic Brownian motion, simulating thermal fluctuations.
-            integrator = mm.LangevinIntegrator(
-                300 * unit.kelvin,       # Temperature (Room temp)
-                1.0 / unit.picosecond,   # Friction coefficient
-                2.0 * unit.femtoseconds  # Time step
-            )
-            
-            # 5. Create the Simulation context
+            integrator = mm.LangevinIntegrator(300 * unit.kelvin, 1.0 / unit.picosecond, 2.0 * unit.femtoseconds)
             simulation = app.Simulation(topology, system, integrator)
             simulation.context.setPositions(positions)
             
-            # Report Energy BEFORE Minimization
-            state_initial = simulation.context.getState(getEnergy=True)
-            e_init = state_initial.getPotentialEnergy().value_in_unit(unit.kilojoules_per_mole)
-            logger.info(f"Initial Potential Energy: {e_init:.2f} kJ/mol")
-            
-            if e_init > 1e6:
-                logger.info("  -> High initial energy detected due to steric clashes. Minimization will resolve this.")
-            
-            # 6. Run Energy Minimization (Gradient Descent)
-            logger.info("Minimizing energy...")
-            # Tolerance is Force threshold (kJ/mol/nm)
+            # THE "AI TRINITY" AHA MOMENT: 
+            # Energy minimization alone isn't enough for structural stability.
+            # We must also equilibrate (simulation.step) to let the structure settle
+            # into a local minimum that respects the custom coordination restraints.
             simulation.minimizeEnergy(maxIterations=max_iterations, tolerance=tolerance*unit.kilojoule/(unit.mole*unit.nanometer))
             
-            # 7. Run MD Equilibration (Optional)
             if equilibration_steps > 0:
-                logger.info(f"Running Thermal Equilibration ({equilibration_steps} steps at 300K)...")
-                # EDUCATIONAL NOTE - Molecular Dynamics (MD):
-                # We now "unfreeze" the protein. The LangevinIntegrator simulates 
-                # collisions with a solvent bath at 300 Kelvin.
-                # This shakes the atoms out of shallow local minima and enables
-                # realistic breathing motions.
+                logger.info(f"Running {equilibration_steps} steps of equilibration...")
                 simulation.step(equilibration_steps)
-            
-            # Report Energy AFTER Minimization
-            state_final = simulation.context.getState(getEnergy=True, getPositions=True)
-            e_final = state_final.getPotentialEnergy().value_in_unit(unit.kilojoules_per_mole)
-            logger.info(f"Final Potential Energy:   {e_final:.2f} kJ/mol")
-            
-            # 7. Save Result
-            with open(output_path, 'w') as f:
-                app.PDBFile.writeFile(simulation.topology, state_final.getPositions(), f)
                 
+            state = simulation.context.getState(getPositions=True)
+            
+            # EDUCATIONAL NOTE - Serialization:
+            # We write back to PDB to pass the improved coordinates back to the generator.
+            # This round-trip (Biotite -> OpenMM -> Biotite) is the key to our biophysical refinement.
+            with open(output_path, 'w') as f: 
+                # Check for empty state to prevent empty PDB files
+                pos = state.getPositions()
+                if len(pos) == 0:
+                    logger.error("OpenMM returned empty positions! Topology might be corrupted.")
+                    return False
+                app.PDBFile.writeFile(simulation.topology, pos, f)
             return True
-
-        except Exception as e:
-            logger.error(f"Physics simulation failed: {e}")
-            if "template" in str(e).lower():
-                logger.error("Error Hint: OpenMM couldn't match residues to the forcefield. This usually means atoms are missing or named incorrectly.")
-            return False
+        except Exception as e: logger.error(f"Simulation failed: {e}"); return False

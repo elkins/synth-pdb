@@ -75,8 +75,8 @@ class TestPDBValidator:
         p3 = np.array([1.0, 1.0, 0.0])
         p4 = np.array([2.0, 1.0, 0.0])
         # A simple planar configuration should yield an angle close to 0 or 180.
-        # Given the setup, 0.0 is expected.
-        assert PDBValidator._calculate_dihedral_angle(p1, p2, p3, p4) == pytest.approx(0.0)
+        # Given the setup (a "Z" shape), 180.0 is expected for Trans.
+        assert PDBValidator._calculate_dihedral_angle(p1, p2, p3, p4) == pytest.approx(180.0)
 
         # A non-planar example designed to be 90 degrees
         p1 = np.array([0.0, 0.0, 0.0])
@@ -311,7 +311,12 @@ class TestPDBValidator:
         
         # From the perspective of C1, N2 needs to be in a position that results in a large angle.
         # Let's set N2 to be far along Y-axis, relative to C1.
-        n2_res2 = c1_res1 + np.array([BOND_LENGTH_C_N * np.cos(np.deg2rad(180)), BOND_LENGTH_C_N * np.sin(np.deg2rad(180)), 2.0]) # High Z component, or large angle
+        # force a 180-degree omega (Trans), which is outside (-100, 100)
+        n2_res2 = _position_atom_3d_from_internal_coords(
+            p1=n1_res1, p2=ca1_res1, p3=c1_res1,
+            bond_length=BOND_LENGTH_C_N, bond_angle_deg=ANGLE_CA_C_N,
+            dihedral_angle_deg=180.0
+        )
 
         pdb_content = (
             create_atom_line(1, "N", "ALA", "A", 1, *n1_res1, "N", alt_loc="", insertion_code="") + "\n" +
@@ -598,3 +603,69 @@ class TestPDBValidator:
         violations = validator.get_violations()
         assert len(violations) == 1
         assert "Proline-Glycine motif (PG)" in violations[0]
+
+    def test_validate_sequence_improbabilities_asn_gly_turn(self):
+        # NG
+        pdb_content = (
+            create_atom_line(1, "CA", "ASN", "A", 1, 0.0, 0.0, 0.0, "C", alt_loc="", insertion_code="") + "\n" +
+            create_atom_line(2, "CA", "GLY", "A", 2, CA_DISTANCE, 0.0, 0.0, "C", alt_loc="", insertion_code="")
+        )
+        validator = PDBValidator(pdb_content)
+        validator.validate_sequence_improbabilities()
+        violations = validator.get_violations()
+        assert len(violations) == 1
+        assert "Asparagine-Glycine motif (NG)" in violations[0]
+
+    def test_validate_sequence_improbabilities_end_of_seq_clusters(self):
+        # Test cluster at the very end of sequence
+        # KKKKK
+        pdb_content = ""
+        for i in range(5):
+            pdb_content += create_atom_line(i+1, "CA", "LYS", "A", i+1, i*CA_DISTANCE, 0.0, 0.0, "C", alt_loc="", insertion_code="") + "\n"
+        validator = PDBValidator(pdb_content)
+        validator.validate_sequence_improbabilities(max_consecutive_charged=4)
+        violations = validator.get_violations()
+        assert any("Charge Cluster" in v for v in violations)
+        
+        # VVVVVVVVVVV at end
+        pdb_content = ""
+        for i in range(11):
+            pdb_content += create_atom_line(i+1, "CA", "VAL", "A", i+1, i*CA_DISTANCE, 0.0, 0.0, "C", alt_loc="", insertion_code="") + "\n"
+        validator = PDBValidator(pdb_content)
+        validator.validate_sequence_improbabilities(max_hydrophobic_stretch=10)
+        violations = validator.get_violations()
+        assert any("Hydrophobic Stretch" in v for v in violations)
+
+    def test_pdb_parsing_errors(self, caplog):
+        # Malformed line
+        pdb_content = "ATOM   abc  N   ALA A   1       0.000   0.000   0.000  1.00  0.00           N\n"
+        validator = PDBValidator(pdb_content)
+        assert len(validator.atoms) == 0
+        assert "Could not parse PDB ATOM/HETATM line" in caplog.text
+
+    def test_validator_from_parsed_atoms(self):
+        # Test initialization from parsed_atoms list
+        atoms = [
+            {
+                "atom_number": 1,
+                "atom_name": "N",
+                "alt_loc": "",
+                "residue_name": "ALA",
+                "chain_id": "A",
+                "residue_number": 1,
+                "insertion_code": "",
+                "coords": [0.0, 0.0, 0.0], # Testing list conversion to numpy
+                "occupancy": 1.0,
+                "temp_factor": 0.0,
+                "element": "N",
+                "charge": "",
+                "record_name": "ATOM",
+            }
+        ]
+        validator = PDBValidator(parsed_atoms=atoms)
+        assert len(validator.atoms) == 1
+        assert isinstance(validator.atoms[0]['coords'], np.ndarray)
+
+    def test_validator_no_input_error(self):
+        with pytest.raises(ValueError, match="Either pdb_content or parsed_atoms must be provided"):
+            PDBValidator()

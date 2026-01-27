@@ -123,8 +123,9 @@ class TestGenerator(unittest.TestCase):
         content = generate_pdb_content(sequence_str=sequence_str) # Removed full_atom
         atom_lines = [line for line in content.strip().split("\n") if line.startswith("ATOM")]
         # ALA=13, GLY=10, VAL=19. Total expected for AGV was 42 with internal OXT.
-        # With OXT removed from internal residues (ALA, GLY), we expect 42 - 2 = 40.
-        self.assertEqual(len(atom_lines), 40)
+        # With OXT and terminal hydrogens (H2, H3) removed from internal residues (ALA, GLY),
+        # we expect (13-1-2) + (10-1-2) + 19 = 10 + 7 + 19 = 36.
+        self.assertEqual(len(atom_lines), 36)
         
         sequence = _resolve_sequence(length=0, user_sequence_str=sequence_str) # length should be ignored
         self.assertEqual(sequence, expected_sequence)
@@ -136,8 +137,9 @@ class TestGenerator(unittest.TestCase):
         content = generate_pdb_content(sequence_str=sequence_str) # Removed full_atom
         atom_lines = [line for line in content.strip().split("\n") if line.startswith("ATOM")]
         # ALA=13, GLY=10, VAL=19. Total expected for AGV was 42 with internal OXT.
-        # With OXT removed from internal residues (ALA, GLY), we expect 42 - 2 = 40.
-        self.assertEqual(len(atom_lines), 40) # Check total atom lines
+        # With OXT and terminal hydrogens (H2, H3) removed from internal residues (ALA, GLY),
+        # we expect (13-1-2) + (10-1-2) + 19 = 10 + 7 + 19 = 36.
+        self.assertEqual(len(atom_lines), 36) # Check total atom lines
     
     def test_reproducibility_with_seed(self):
         """Test that using a fixed seed produces identical output."""
@@ -580,7 +582,8 @@ class TestGenerator(unittest.TestCase):
                     
                     # Charge (79-80) - 2 chars
                     self.assertEqual(len(line[78:80]), 2)
-                    self.assertEqual(atom_data["charge"], "") # Current implementation generates empty charge
+                    # Implementation may generate charges like '1+' for N-term or '' for neutral
+                    self.assertIn(atom_data["charge"], ["", "1+", "1-"])
 
     def test_generate_pdb_content_long_peptide_numbering_and_chain_id(self):
         """

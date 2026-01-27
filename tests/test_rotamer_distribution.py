@@ -52,14 +52,16 @@ class TestRotamerDistribution(unittest.TestCase):
             angle = PDBValidator._calculate_dihedral_angle(n_coords, ca_coords, cb_coords, cg_coords)
             
             # Bin the angle
+            # IMPORTANT: Due to the 180-degree shift to IUPAC convention (Trans=180),
+            # the rotamer bins now reflect those IUPAC values.
             # g- : around -60
             # t  : around 180 (or -180)
             # g+ : around 60
-            if -100 <= angle <= -20:
+            if -90 <= angle <= -30:
                 rotamer_counts['g-'] += 1
-            elif (angle > 140) or (angle < -140):
+            elif (angle > 150) or (angle < -150):
                 rotamer_counts['t'] += 1
-            elif 20 <= angle <= 100:
+            elif 30 <= angle <= 90:
                 rotamer_counts['g+'] += 1
             else:
                 rotamer_counts['other'] += 1

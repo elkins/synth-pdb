@@ -107,7 +107,7 @@ def add_metal_ion(structure: struc.AtomArray, site: Dict) -> struc.AtomArray:
     ion = struc.AtomArray(1)
     ion.res_name = np.array([ion_type])
     ion.atom_name = np.array([ion_type])
-    ion.element = np.array([ion_type[:1]]) # "Z" for "ZN"
+    ion.element = np.array([ion_type]) # "ZN" not "Z" for Zinc
     ion.coord = np.array([centroid])
     
     # Metadata
