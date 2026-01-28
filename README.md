@@ -646,6 +646,34 @@ synth-pdb --sequence MQIFVKTLTGKTITLEVEPSDTIENVKAKIQDKEGIPPDQQRLIFAGKQLEDGRTLSDY
 ```
 *Educational Concept*: Generating complex, multi-domain topologies. Physics-based minimization (`--minimize`) resolves steric clashes better than geometric heuristics alone.
 
+#### 🏗️ "Architectural" Protein Examples (The Giants)
+
+These larger structures demonstrate domain organization and fibrous protein architectures.
+
+**1. "Synthetic Spectrin" (Multi-Domain Repeat)**
+*~150 Residues*
+Spectrin is a cytoskeletal protein made of repeating triple-helical bundles. We can simulate a simplified version: three distinct alpha-helical domains connected by flexible linkers.
+```bash
+synth-pdb --length 150 --structure "1-40:alpha,41-50:random,51-90:alpha,91-100:random,101-140:alpha,141-150:random" --minimize --visualize --output synthetic_spectrin.pdb
+```
+*Educational Concept*: Demonstrates "beads on a string" domain organization and stable inter-domain flexibility.
+
+**2. "Titin Segment" (Poly-Beta Repeat)**
+*~120 Residues*
+Titin acts as a molecular spring in muscle, made of distinct Ig-like (beta sheet) domains.
+```bash
+synth-pdb --length 120 --structure "1-30:beta,31-40:random,41-70:beta,71-80:random,81-110:beta,111-120:random" --minimize --visualize --output titin_segment.pdb
+```
+*Educational Concept*: Shows distinct rigid beta-regions separated by disordered "hinges", mimicking force-bearing structural proteins.
+
+**3. "Giant Coiled-Coil" (The Molecular Rod)**
+*~100 Residues*
+A super-long continuous alpha helix, modeled after Myosin tails or Tropomyosin.
+```bash
+synth-pdb --sequence "LKELEKELEKELEKELEKELEKELEKELEKELEKELEKELEKELEKELEKE" --conformation alpha --minimize --visualize --output long_coil.pdb
+```
+*Educational Concept*: A massive, rigid rod where the helical groove is clearly visible. Excellent for demonstrating persistence length.
+
 #### For Structural Biologists
 
 ```bash
