@@ -605,12 +605,7 @@ def main() -> None:
                 logger.info("Performing PDB validation checks for current generation...")
                 logger.debug(f"PDB content passed to validator (attempt {attempt_num}):\n{current_pdb_content}")
                 validator = PDBValidator(current_pdb_content)
-                validator.validate_bond_lengths()
-                validator.validate_bond_angles()
-                validator.validate_ramachandran()
-                validator.validate_steric_clashes()
-                validator.validate_peptide_plane()
-                validator.validate_sequence_improbabilities()
+                validator.validate_all()
                 current_violations = validator.get_violations()
                 logger.debug(f"PDBValidator returned {len(current_violations)} violations for attempt {attempt_num}. Content: {current_violations}")
             
@@ -686,12 +681,7 @@ def main() -> None:
                     new_atomic_content_after_tweak, 1, command_args=cmd_string
                 )
                 temp_validator = PDBValidator(pdb_content=temp_full_pdb)
-                temp_validator.validate_bond_lengths()
-                temp_validator.validate_bond_angles()
-                temp_validator.validate_ramachandran()
-                temp_validator.validate_steric_clashes()
-                temp_validator.validate_peptide_plane()
-                temp_validator.validate_sequence_improbabilities()
+                temp_validator.validate_all()
                 new_violations = temp_validator.get_violations()
 
                 if len(new_violations) < len(current_refined_violations):

@@ -771,3 +771,76 @@ BACKBONE_DEPENDENT_ROTAMER_LIBRARY: Dict[str, Dict[str, List[Dict[str, List[floa
          'beta':  [{'chi1': [-60.0], 'prob': 0.30}, {'chi1': [60.0], 'prob': 0.40}, {'chi1': [180.0], 'prob': 0.30}],
     }
 }
+
+# --- Chi Angle Definitions ---
+# Defines the atoms required to calculate each Chi angle.
+# N-CA-CB-G  (Chi1)
+# CA-CB-G-D  (Chi2)
+# CB-G-D-E   (Chi3)
+# G-D-E-Z    (Chi4)
+AMINO_ACID_CHI_DEFINITIONS: Dict[str, List[Dict[str, List[str]]]] = {
+    'VAL': [{'name': 'chi1', 'atoms': ['N', 'CA', 'CB', 'CG1']}],
+    'THR': [{'name': 'chi1', 'atoms': ['N', 'CA', 'CB', 'OG1']}],
+    'ILE': [
+        {'name': 'chi1', 'atoms': ['N', 'CA', 'CB', 'CG1']},
+        {'name': 'chi2', 'atoms': ['CA', 'CB', 'CG1', 'CD1']}
+    ],
+    'LEU': [
+        {'name': 'chi1', 'atoms': ['N', 'CA', 'CB', 'CG']},
+        {'name': 'chi2', 'atoms': ['CA', 'CB', 'CG', 'CD1']}
+    ],
+    'MET': [
+        {'name': 'chi1', 'atoms': ['N', 'CA', 'CB', 'CG']},
+        {'name': 'chi2', 'atoms': ['CA', 'CB', 'CG', 'SD']},
+        {'name': 'chi3', 'atoms': ['CB', 'CG', 'SD', 'CE']}
+    ],
+    'ARG': [
+        {'name': 'chi1', 'atoms': ['N', 'CA', 'CB', 'CG']},
+        {'name': 'chi2', 'atoms': ['CA', 'CB', 'CG', 'CD']},
+        {'name': 'chi3', 'atoms': ['CB', 'CG', 'CD', 'NE']},
+        {'name': 'chi4', 'atoms': ['CG', 'CD', 'NE', 'CZ']}
+    ],
+    'LYS': [
+        {'name': 'chi1', 'atoms': ['N', 'CA', 'CB', 'CG']},
+        {'name': 'chi2', 'atoms': ['CA', 'CB', 'CG', 'CD']},
+        {'name': 'chi3', 'atoms': ['CB', 'CG', 'CD', 'CE']},
+        {'name': 'chi4', 'atoms': ['CG', 'CD', 'CE', 'NZ']}
+    ],
+    'ASP': [
+        {'name': 'chi1', 'atoms': ['N', 'CA', 'CB', 'CG']},
+        {'name': 'chi2', 'atoms': ['CA', 'CB', 'CG', 'OD1']}
+    ],
+    'ASN': [
+        {'name': 'chi1', 'atoms': ['N', 'CA', 'CB', 'CG']},
+        {'name': 'chi2', 'atoms': ['CA', 'CB', 'CG', 'OD1']}
+    ],
+    'GLU': [
+        {'name': 'chi1', 'atoms': ['N', 'CA', 'CB', 'CG']},
+        {'name': 'chi2', 'atoms': ['CA', 'CB', 'CG', 'CD']},
+        {'name': 'chi3', 'atoms': ['CB', 'CG', 'CD', 'OE1']}
+    ],
+    'GLN': [
+        {'name': 'chi1', 'atoms': ['N', 'CA', 'CB', 'CG']},
+        {'name': 'chi2', 'atoms': ['CA', 'CB', 'CG', 'CD']},
+        {'name': 'chi3', 'atoms': ['CB', 'CG', 'CD', 'OE1']}
+    ],
+    'HIS': [
+        {'name': 'chi1', 'atoms': ['N', 'CA', 'CB', 'CG']},
+        {'name': 'chi2', 'atoms': ['CA', 'CB', 'CG', 'ND1']}
+    ],
+    'PHE': [
+        {'name': 'chi1', 'atoms': ['N', 'CA', 'CB', 'CG']},
+        {'name': 'chi2', 'atoms': ['CA', 'CB', 'CG', 'CD1']}
+    ],
+    'TYR': [
+        {'name': 'chi1', 'atoms': ['N', 'CA', 'CB', 'CG']},
+        {'name': 'chi2', 'atoms': ['CA', 'CB', 'CG', 'CD1']}
+    ],
+    'TRP': [
+        {'name': 'chi1', 'atoms': ['N', 'CA', 'CB', 'CG']},
+        {'name': 'chi2', 'atoms': ['CA', 'CB', 'CG', 'CD1']}
+    ],
+    'CYS': [{'name': 'chi1', 'atoms': ['N', 'CA', 'CB', 'SG']}],
+    'SER': [{'name': 'chi1', 'atoms': ['N', 'CA', 'CB', 'OG']}],
+    # PRO, GLY, ALA have no standard Chi1 or special definitions handled specially
+}

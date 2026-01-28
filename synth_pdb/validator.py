@@ -17,6 +17,8 @@ from .data import (
     HYDROPHOBIC_AMINO_ACIDS,
     POLAR_UNCHARGED_AMINO_ACIDS,
     RAMACHANDRAN_POLYGONS,
+    BACKBONE_DEPENDENT_ROTAMER_LIBRARY,
+    AMINO_ACID_CHI_DEFINITIONS,
 )
 
 logger = logging.getLogger(__name__)
@@ -1030,6 +1032,138 @@ class PDBValidator:
 
         return modified_atoms
 
+    def validate_side_chain_rotamers(self, tolerance: float = 40.0):
+        """
+        Validates side-chain rotamers against the Backbone-Dependent Library.
+        
+        Educational Note - Side Chain Packing:
+        --------------------------------------
+        Side chains are not free to rotate continuously. They prefer specific discrete
+        conformations (Rotamers) to avoid steric clashes with the backbone and other atoms.
+        These are typically staggered conformations (gauche+, gauche-, trans).
+        A "Rotamer Outlier" usually indicates a high-energy, eclipsed state that is physically unlikely.
+        
+        The library provides valid (chi1, chi2...) clusters for Alpha and Beta backbones.
+        We check if the side-chain dihedral angles match any of the allowed low-energy 
+        conformations defined in `BACKBONE_DEPENDENT_ROTAMER_LIBRARY`.
+        """
+        logger.info("Performing side-chain rotamer validation.")
+        
+        for chain_id, residues_in_chain in self.grouped_atoms.items():
+            sorted_res_numbers = sorted(residues_in_chain.keys())
+            for i, res_num in enumerate(sorted_res_numbers):
+                current_res = residues_in_chain[res_num]
+                # Default safety: Get CA to find residue name
+                if "CA" not in current_res:
+                    continue
+                res_name = current_res["CA"]["residue_name"]
+                
+                # Skip if no definition (GLY, ALA, PRO - PRO has special ring, GLY/ALA have no Chi)
+                if res_name not in AMINO_ACID_CHI_DEFINITIONS:
+                    continue
+                
+                # 1. Determine local backbone conformation (Phi)
+                # Needed to select Alpha vs Beta library
+                phi = None
+                if i > 0:
+                    prev_res = residues_in_chain[sorted_res_numbers[i-1]]
+                    if "C" in prev_res and "N" in current_res and "CA" in current_res and "C" in current_res:
+                        phi = self._calculate_dihedral_angle(
+                            prev_res["C"]["coords"],
+                            current_res["N"]["coords"],
+                            current_res["CA"]["coords"],
+                            current_res["C"]["coords"]
+                        )
+                
+                # Classify Backbone:
+                # -30 to -90 implies Alpha Helix. Everything else treated as Beta/Other for now.
+                backbone_type = 'beta'
+                if phi is not None and -90.0 <= phi <= -30.0:
+                    backbone_type = 'alpha'
+                
+                # 2. Calculate Measure Chi Angles
+                measured_chis = {}
+                missing_atoms = False
+                
+                chi_defs = AMINO_ACID_CHI_DEFINITIONS[res_name]
+                for chi_def in chi_defs:
+                    chi_name = chi_def['name']
+                    atom_names = chi_def['atoms'] # [N, CA, CB, CG]
+                    
+                    coords = []
+                    for name in atom_names:
+                        if name in current_res:
+                            coords.append(current_res[name]["coords"])
+                        else:
+                            missing_atoms = True
+                            break
+                    
+                    if missing_atoms:
+                        logger.debug(f"Skipping Rotamer check for {res_name} {res_num}: missing atoms for {chi_name}.")
+                        break
+                        
+                    # Calculate Dihedral
+                    angle = self._calculate_dihedral_angle(*coords)
+                    measured_chis[chi_name] = angle
+                
+                if missing_atoms:
+                    continue
+                    
+                # 3. Check against Library
+                # library_entry is a list of valid rotamers: [{'chi1': [-60], ...}, ...]
+                library_entry = BACKBONE_DEPENDENT_ROTAMER_LIBRARY.get(res_name, {}).get(backbone_type)
+                
+                if not library_entry:
+                    # Fallback or skip if not found
+                    continue
+                    
+                match_found = False
+                
+                # We check if the measured configuration matches ANY of the allowed rotamers
+                for allowed_rotamer in library_entry:
+                    # Check if ALL defined chi angles in this rotamer match the measured ones
+                    # allowed_rotamer = {'chi1': [-60], 'chi2': [180], 'prob': 0.1}
+                    
+                    this_rotamer_matches = True
+                    for key, val_list in allowed_rotamer.items():
+                        if not key.startswith('chi'):
+                            continue
+                        
+                        if key not in measured_chis:
+                            # If library has a chi we didn't measure (e.g. we missed atoms), we can't strict match
+                            # But if we calculated everything in CHI_DEFINITIONS, we should be good.
+                            continue
+                            
+                        measured = measured_chis[key]
+                        
+                        # Check against allowed values (usually just one, e.g. [-60])
+                        # Distance on circle (periodicity)
+                        # diff = min(|a-b|, 360-|a-b|)
+                        min_diff = 360.0
+                        for v in val_list:
+                            diff = abs(measured - v)
+                            diff = min(diff, 360.0 - diff)
+                            if diff < min_diff:
+                                min_diff = diff
+                        
+                        if min_diff > tolerance:
+                            this_rotamer_matches = False
+                            break
+                    
+                    if this_rotamer_matches:
+                        match_found = True
+                        break
+                
+                if not match_found:
+                    # Construct nice error message with measured vs closest allowed?
+                    # For brevity, just listing measured.
+                    chi_str = ", ".join([f"{k}={v:.1f}°" for k, v in measured_chis.items()])
+                    self.violations.append(
+                        f"Rotamer violation: Chain {chain_id}, Residue {res_num} {res_name} "
+                        f"({backbone_type}-backbone). Side-chain conformation ({chi_str}) "
+                        f"is an Outlier (does not match any allowed {res_name} rotamers within {tolerance}° tolerance)."
+                    )
+
     def validate_chirality(self) -> None:
         """
         Validate L-amino acid chirality at C-alpha.
@@ -1118,4 +1252,5 @@ class PDBValidator:
         self.validate_peptide_plane()
         self.validate_sequence_improbabilities()
         self.validate_chirality()
+        self.validate_side_chain_rotamers()
 

@@ -43,6 +43,7 @@ A command-line tool to generate Protein Data Bank (PDB) files with full atomic r
 - Bond length validation
 - Bond angle validation
 - Ramachandran angle checking (phi/psi dihedral angles)
+- Side-Chain Rotamer validation (Chi1/Chi2 angles checked against backbone-dependent library)
 - Steric clash detection (minimum distance + van der Waals overlap)
 - Peptide plane planarity (omega angle)
 - Sequence improbability detection (charge clusters, hydrophobic stretches, etc.)
@@ -932,7 +933,7 @@ pytest tests/test_generator.py -v
 ```
 
 **Test Coverage**: 95% overall
-- 282 tests covering generation, validation, CLI, and edge cases
+- 283 tests covering generation, validation, CLI, and edge cases
 
 ### Project Structure
 

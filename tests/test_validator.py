@@ -745,3 +745,68 @@ class TestPDBValidator:
     def test_validator_no_input_error(self):
         with pytest.raises(ValueError, match="Either pdb_content or parsed_atoms must be provided"):
             PDBValidator()
+
+    # --- Rotamer Validation Tests ---
+    def test_validate_rotamers_violation(self):
+        """
+        Test that a side-chain rotamer violation is detected.
+        
+        Scenario: Valine (VAL) with Chi1 = 0.0 degrees (completely eclipsed).
+        Allowed Chi1 for VAL: {-60, 180, 60}.
+        0.0 is a high-energy eclipsed state and should be flagged.
+        """
+        # Construct atoms for VAL: N, CA, CB, CG1
+        # N at origin
+        n = np.array([0.0, 0.0, 0.0])
+        # CA on X-axis (N-CA bond)
+        ca = np.array([1.46, 0.0, 0.0])
+        
+        # CB in XY plane (N-CA-CB angle ~ 110)
+        # Place CB such that N-CA-CB is defined.
+        # Let's use internal coords helper to be robust.
+        cb = _position_atom_3d_from_internal_coords(
+            p1=n + np.array([0., 1., 0.]), # Dummy start
+            p2=n, 
+            p3=ca,
+            bond_length=1.53, # CA-CB
+            bond_angle_deg=110.0, # N-CA-CB
+            dihedral_angle_deg=0.0
+        )
+        
+        # CG1: This defines Chi1 (N-CA-CB-CG1).
+        # We want Chi1 = 0.0 degrees.
+        cg1 = _position_atom_3d_from_internal_coords(
+            p1=n,
+            p2=ca,
+            p3=cb,
+            bond_length=1.5, # CB-CG
+            bond_angle_deg=110.0, # CA-CB-CG
+            dihedral_angle_deg=0.0 # Chi1 = 0.0
+        )
+        
+        # We also need C atom to form a complete residue for grouping, though not strictly for Chi1
+        c = np.array([ca[0] + 1.5, ca[1], ca[2]]) 
+
+        pdb_content = (
+            create_atom_line(1, "N", "VAL", "A", 1, *n, "N") + "\n" +
+            create_atom_line(2, "CA", "VAL", "A", 1, *ca, "C") + "\n" +
+            create_atom_line(3, "C", "VAL", "A", 1, *c, "C") + "\n" +
+            create_atom_line(4, "CB", "VAL", "A", 1, *cb, "C") + "\n" +
+            create_atom_line(5, "CG1", "VAL", "A", 1, *cg1, "C")
+        )
+        
+        validator = PDBValidator(pdb_content)
+        # Attempt minimal validation (skip backbone which might fail)
+        try:
+            validator.validate_side_chain_rotamers(tolerance=20.0)
+        except AttributeError:
+             # If method doesn't exist yet (TDD), this confirms we need to add it.
+             # We can fail the test here or let it error out.
+             pytest.fail("validate_side_chain_rotamers method not found on PDBValidator")
+             
+        violations = validator.get_violations()
+        assert len(violations) >= 1
+        assert "Rotamer violation" in violations[0]
+        assert "chi1" in violations[0]
+        assert "0.0" in violations[0] # Should mention the measured angle
+
