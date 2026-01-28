@@ -259,78 +259,154 @@ class TestPDBValidator:
         assert not validator.get_violations()
 
     def test_validate_ramachandran_violation_phi(self):
-        # Manually craft atoms to create a Phi violation
-        # C(i-1) - N(i) - CA(i) - C(i)
-        # Let's make Phi ~ -10 (very positive, usually not allowed for most AAs)
-        # N1-CA1-C1 (res 1) ; C1-N2-CA2-C2 (res 2) ; C2-N3-CA3-C3 (res 3)
-        # We need N2, CA2, C2, and C1 for Phi at res 2.
+        """
+        Test that a General residue (Alanine) is FLAGGED as a violation when placed
+        in the "Left-Handed Alpha Helix" region (Phi approx +60).
         
-        # PDB lines for 3 residues with specific geometry
-        # This geometry is hard to calculate to get exact phi, but we can exaggerate
-        # a bad angle. The validator calculates, so we just need coordinates.
+        Biological Context:
+        -------------------
+        Most L-amino acids cannot adopt positive Phi angles due to steric clashes
+        between the side chain and the backbone carbonyl oxygen. This region is
+        essentially "forbidden" for all residues except Glycine.
+        """
+        # Test violation for General residue (ALA) with Phi=+60, Psi=+60
+        # This is Left-handed Alpha region, forbidden for ALA (General)
+        # Should be an Outlier because Phi > -30.
         
-        # Minimal setup to get a Phi angle
-        # C1 from res1, N2, CA2, C2 from res2
-        c1_res1 = np.array([0.0, 0.0, 0.0]) # C from previous residue
-        n2_res2 = np.array([BOND_LENGTH_C_N, 0.0, 0.0]) # N for current residue
-        # Create a "bent" N2-CA2 bond to force a very positive phi
-        ca2_res2 = n2_res2 + np.array([0.5, 0.5, 0.0]) # Ca for current residue (phi will be positive)
-        c2_res2 = ca2_res2 + np.array([BOND_LENGTH_CA_C, 0.0, 0.0]) # C for current residue
-
+        # Initial atoms
+        c1_res1 = np.array([0.0, 1.0, 0.0])
+        n2_res2 = np.array([0.0, 0.0, 0.0])
+        ca2_res2 = np.array([1.458, 0.0, 0.0])
+        
+        # Calculate P4 (Res2 C) for Phi=+60
+        # NOTE: The helper apparently flips sign (or coordinate system implies it).
+        # We observed that input 60.0 yields -60.0.
+        # So we input -60.0 to get +60.0.
+        target_phi = 60.0
+        c2_res2 = _position_atom_3d_from_internal_coords(
+            p1=c1_res1, p2=n2_res2, p3=ca2_res2,
+            bond_length=BOND_LENGTH_CA_C,
+            bond_angle_deg=ANGLE_N_CA_C,
+            dihedral_angle_deg=-target_phi
+        )
+        
+        # Calculate P5 (Res3 N) for Psi=+60
+        # We want Psi=+60.
+        target_psi = 60.0
+        n3_res3 = _position_atom_3d_from_internal_coords(
+            p1=n2_res2, p2=ca2_res2, p3=c2_res2,
+            bond_length=BOND_LENGTH_C_N,
+            bond_angle_deg=ANGLE_CA_C_N,
+            dihedral_angle_deg=-target_psi
+        )
+        
         pdb_content = (
-            create_atom_line(1, "C", "ALA", "A", 1, *c1_res1, "C", alt_loc="", insertion_code="") + "\n" + # C of Res 1
-            create_atom_line(2, "N", "ALA", "A", 2, *n2_res2, "N", alt_loc="", insertion_code="") + "\n" + # N of Res 2
-            create_atom_line(3, "CA", "ALA", "A", 2, *ca2_res2, "C", alt_loc="", insertion_code="") + "\n" + # CA of Res 2
-            create_atom_line(4, "C", "ALA", "A", 2, *c2_res2, "C", alt_loc="", insertion_code="") # C of Res 2
+            create_atom_line(1, "C", "ALA", "A", 1, *c1_res1, "C", alt_loc="", insertion_code="") + "\n" +
+            create_atom_line(2, "N", "ALA", "A", 2, *n2_res2, "N", alt_loc="", insertion_code="") + "\n" +
+            create_atom_line(3, "CA", "ALA", "A", 2, *ca2_res2, "C", alt_loc="", insertion_code="") + "\n" +
+            create_atom_line(4, "C", "ALA", "A", 2, *c2_res2, "C", alt_loc="", insertion_code="") + "\n" +
+            create_atom_line(5, "N", "ALA", "A", 3, *n3_res3, "N", alt_loc="", insertion_code="")
         )
         validator = PDBValidator(pdb_content)
         validator.validate_ramachandran()
         violations = validator.get_violations()
         assert len(violations) >= 1
-        assert "Ramachandran violation (Phi)" in violations[0]
+        assert "Ramachandran violation" in violations[0]
+        assert "Outlier" in violations[0]
 
-    def test_validate_ramachandran_violation_psi(self):
-        # Manually craft atoms to create a Psi violation
-        # N(i) - CA(i) - C(i) - N(i+1)
+    def test_validate_ramachandran_glycine_allowed(self):
+        """
+        Test that Glycine is ALLOWED in the "Left-Handed Alpha Helix" region.
+
+        Biological Context:
+        -------------------
+        Glycine has no side chain (just a Hydrogen atom). This lack of steric bulk
+        allows it to access a much wider range of Phi/Psi angles, including the
+        positive-Phi region forbidden to other residues. This unique flexibility
+        makes Glycine essential for tight turns in protein structures.
+        """
+        # Same geometry (Phi=+60, Psi=+60) for GLYCINE.
+        # Glycine allows positive Phi (Favored region).
         
-        n1_res1 = np.array([0.0, 0.0, 0.0])
-        ca1_res1 = np.array([BOND_LENGTH_N_CA, 0.0, 0.0])
-        c1_res1 = ca1_res1 + np.array([BOND_LENGTH_CA_C * np.cos(np.deg2rad(180 - ANGLE_N_CA_C)), BOND_LENGTH_CA_C * np.sin(np.deg2rad(180 - ANGLE_N_CA_C)), 0.0])
+        c1_res1 = np.array([0.0, 1.0, 0.0])
+        n2_res2 = np.array([0.0, 0.0, 0.0])
+        ca2_res2 = np.array([1.458, 0.0, 0.0])
         
-        # To create a Psi violation (e.g., ~120 degrees, outside -100 to 100)
-        # We need N2 to be positioned such that the N1-CA1-C1-N2 dihedral is large.
-        # Let's place N2 with a z-component to force it out of plane.
+        c2_res2 = _position_atom_3d_from_internal_coords(
+            p1=c1_res1, p2=n2_res2, p3=ca2_res2,
+            bond_length=BOND_LENGTH_CA_C,
+            bond_angle_deg=ANGLE_N_CA_C,
+            dihedral_angle_deg=60.0
+        )
         
-        # Calculate N2 position based on desired Psi.
-        # This involves inverse kinematics, which is complex.
-        # Simpler for testing: place N2 far away in a direction that should trigger violation.
-        # The key is to make the N1-CA1-C1-N2 dihedral significant.
-        # Let's try to set N2 such that the dihedral is ~120 degrees.
-        # For simplicity, let's just make n2_res2 such that the angle is very clearly outside.
-        # Current n2_res2 might not have been far enough to force the dihedral into a high value.
-        
-        # From the perspective of C1, N2 needs to be in a position that results in a large angle.
-        # Let's set N2 to be far along Y-axis, relative to C1.
-        # force a 180-degree omega (Trans), which is outside (-100, 100)
-        n2_res2 = _position_atom_3d_from_internal_coords(
-            p1=n1_res1, p2=ca1_res1, p3=c1_res1,
-            bond_length=BOND_LENGTH_C_N, bond_angle_deg=ANGLE_CA_C_N,
-            dihedral_angle_deg=180.0
+        n3_res3 = _position_atom_3d_from_internal_coords(
+            p1=n2_res2, p2=ca2_res2, p3=c2_res2,
+            bond_length=BOND_LENGTH_C_N,
+            bond_angle_deg=ANGLE_CA_C_N,
+            dihedral_angle_deg=60.0
         )
 
         pdb_content = (
-            create_atom_line(1, "N", "ALA", "A", 1, *n1_res1, "N", alt_loc="", insertion_code="") + "\n" +
-            create_atom_line(2, "CA", "ALA", "A", 1, *ca1_res1, "C", alt_loc="", insertion_code="") + "\n" +
-            create_atom_line(3, "C", "ALA", "A", 1, *c1_res1, "C", alt_loc="", insertion_code="") + "\n" +
-            create_atom_line(4, "N", "ALA", "A", 2, *n2_res2, "N", alt_loc="", insertion_code="") # N of Res 2
+            create_atom_line(1, "C", "ALA", "A", 1, *c1_res1, "C") + "\n" +
+            create_atom_line(2, "N", "GLY", "A", 2, *n2_res2, "N") + "\n" +
+            create_atom_line(3, "CA", "GLY", "A", 2, *ca2_res2, "C") + "\n" +
+            create_atom_line(4, "C", "GLY", "A", 2, *c2_res2, "C") + "\n" +
+            create_atom_line(5, "N", "ALA", "A", 3, *n3_res3, "N")
         )
         validator = PDBValidator(pdb_content)
         validator.validate_ramachandran()
         violations = validator.get_violations()
-        # Add a debug print to see the calculated Psi
-        logger.debug(f"DEBUG: Ramachandran Psi violations: {violations}")
+        # Should be NO violations for Glycine
+        assert len(violations) == 0
+
+    def test_validate_ramachandran_violation_proline(self):
+        """
+        Test that Proline is FLAGGED as a violation in the standard Beta region.
+        
+        Biological Context:
+        -------------------
+        Proline's side chain forms a cyclic ring connecting back to the nitrogen.
+        This forces the Phi angle to be locked around -60 (+/- 20) degrees.
+        It PHYSICALLY CANNOT adopt the extended conformation (Phi approx -120)
+        typical of beta-sheets, making it a "helix breaker" and "sheet breaker".
+        """
+        # Proline with Phi = -120 (Beta region)
+        # Proline is restricted to Phi ~ -60. Beta region is an outlier.
+        
+        c1_res1 = np.array([0.0, 1.0, 0.0])
+        n2_res2 = np.array([0.0, 0.0, 0.0])
+        ca2_res2 = np.array([1.458, 0.0, 0.0])
+        
+        # Phi = -120
+        c2_res2 = _position_atom_3d_from_internal_coords(
+            p1=c1_res1, p2=n2_res2, p3=ca2_res2,
+            bond_length=BOND_LENGTH_CA_C,
+            bond_angle_deg=ANGLE_N_CA_C,
+            dihedral_angle_deg=-120.0
+        )
+        
+        # Psi = 120 (Beta)
+        n3_res3 = _position_atom_3d_from_internal_coords(
+            p1=n2_res2, p2=ca2_res2, p3=c2_res2,
+            bond_length=BOND_LENGTH_C_N,
+            bond_angle_deg=ANGLE_CA_C_N,
+            dihedral_angle_deg=120.0
+        )
+
+        pdb_content = (
+            create_atom_line(1, "C", "ALA", "A", 1, *c1_res1, "C") + "\n" +
+            create_atom_line(2, "N", "PRO", "A", 2, *n2_res2, "N") + "\n" +
+            create_atom_line(3, "CA", "PRO", "A", 2, *ca2_res2, "C") + "\n" +
+            create_atom_line(4, "C", "PRO", "A", 2, *c2_res2, "C") + "\n" +
+            create_atom_line(5, "N", "ALA", "A", 3, *n3_res3, "N")
+        )
+        validator = PDBValidator(pdb_content)
+        validator.validate_ramachandran()
+        violations = validator.get_violations()
+        # Should be a violation for Proline
         assert len(violations) >= 1
-        assert "Ramachandran violation (Psi)" in violations[0]
+        assert "PRO" in violations[0]
+        assert "Outlier" in violations[0]
     
     def test_parse_clashing_pdb_content(self):
         clashing_pdb_content = (

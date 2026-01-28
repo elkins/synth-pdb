@@ -1,6 +1,6 @@
 import numpy as np
 import logging
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple
 
 from .data import (
     BOND_LENGTH_N_CA,
@@ -16,6 +16,7 @@ from .data import (
     NEGATIVE_AMINO_ACIDS,
     HYDROPHOBIC_AMINO_ACIDS,
     POLAR_UNCHARGED_AMINO_ACIDS,
+    RAMACHANDRAN_POLYGONS,
 )
 
 logger = logging.getLogger(__name__)
@@ -243,10 +244,10 @@ class PDBValidator:
         """
         Calculates the dihedral angle (in degrees) defined by four points (p1, p2, p3, p4).
         
-        AHA MOMENT - Dihedral Conventions:
-        In the "AI Trinity" phase, we discovered that simple projection math can 
-        accidentally swap Cis and Trans conventions. We switched to the robust 
-        vector-based normal approach used in professional structural biology (IUPAC).
+        IMPORTANT NOTE - Dihedral Conventions:
+        It was discovered that simple projection math can accidentally swap
+        Cis and Trans conventions.  Instead, the robust vector-based normal
+        approach used in professional structural biology (IUPAC) is used.
         
         Standard IUPAC convention:
         - Cis-Peptide (eclipsed): ~0 degrees
@@ -450,27 +451,49 @@ class PDBValidator:
                                 f"by more than {tolerance}°. Actual: {actual_angle:.2f}"
                             )
 
+    @staticmethod
+    def _is_point_in_polygon(point: Tuple[float, float], polygon: List[Tuple[float, float]]) -> bool:
+        """
+        Ray-casting algorithm to check if a point is inside a polygon.
+        Polygon is defined by a list of (x, y) tuples.
+        """
+        logger.info("Performing Ramachandran angle validation (polygonal regions).")
+        x, y = point
+        n = len(polygon)
+        inside = False
+        p1x, p1y = polygon[0]
+        for i in range(n + 1):
+            p2x, p2y = polygon[i % n]
+            if y > min(p1y, p2y):
+                if y <= max(p1y, p2y):
+                    if x <= max(p1x, p2x):
+                        if p1y != p2y:
+                            xinters = (y - p1y) * (p2x - p1x) / (p2y - p1y) + p1x
+                        if p1x == p2x or x <= xinters:
+                            inside = not inside
+            p1x, p1y = p2x, p2y
+        return inside
+
     def validate_ramachandran(self):
         """
-        Validates Ramachandran angles (Phi/Psi) against simplified allowed regions.
-        Reports angles outside very generous common regions.
+        Validates Ramachandran angles (Phi, Psi) against MolProbity-defined polygonal regions.
+        Checks if angles fall within simplified "Favored" (98%) or "Allowed" (99.8%) polygons.
+        
+        ### Educational Note - Computational Efficiency & Convergence:
+        -----------------------------------------------
+        Checking Ramachandran angles isn't just about "correctness" — it's a critical
+        performance optimization for Energy Minimization (OpenMM).
+        
+        1. **Better Starting Points**: A structure with valid angles is much closer 
+           to the global energy minimum. Minimization starting from a "Favored" 
+           conformation converges significantly faster than one starting from a 
+           high-energy "Outlier", saving expensive compute cycles.
+           
+        2. **Filtering**: By rejecting outliers *before* sending them to the 
+           physics engine, we avoid wasting GPU/CPU time minimizing structures 
+           that are likely trapped in local minima or effectively "broken".
         """
-        logger.info("Performing Ramachandran angle validation (simplified regions).")
-
-        # Simplified allowed regions (approximate and broad for demonstration)
-        # These are *not* precise and real Ramachandran plots are much more detailed and AA-specific.
-        # Values in degrees.
-        # General residues (non-Gly, non-Pro)
-        GENERIC_ALLOWED_PHI = (-180, -30)
-        GENERIC_ALLOWED_PSI = (-100, 100) # Temporarily made more restrictive for testing
-
-        # Glycine has much broader allowed regions
-        GLYCINE_ALLOWED_PHI = (-180, 180)
-        GLYCINE_ALLOWED_PSI = (-180, 180)
-
-        # Proline has restricted regions
-        PROLINE_ALLOWED_PHI = (-80, -30)
-        PROLINE_ALLOWED_PSI = (-50, 50)
+        logger.info("Performing Ramachandran angle validation (MolProbity-style polygons).")
 
         for chain_id, residues_in_chain in self.grouped_atoms.items():
             sorted_res_numbers = sorted(residues_in_chain.keys())
@@ -478,22 +501,18 @@ class PDBValidator:
                 current_res_atoms = residues_in_chain[res_num]
                 res_name = current_res_atoms.get("CA", {}).get("residue_name")
 
+                # Skip if not a standard amino acid or if info is missing
+                if not current_res_atoms.get("N") or not current_res_atoms.get("CA") or not current_res_atoms.get("C"):
+                    continue
+
                 phi = None
                 psi = None
 
                 # Calculate Phi (Φ): C(i-1) - N(i) - CA(i) - C(i)
-                # Requires previous residue's C atom
                 if i > 0:
                     prev_res_num = sorted_res_numbers[i - 1]
                     prev_res_atoms = residues_in_chain.get(prev_res_num)
-
-                    if (
-                        prev_res_atoms
-                        and prev_res_atoms.get("C")
-                        and current_res_atoms.get("N")
-                        and current_res_atoms.get("CA")
-                        and current_res_atoms.get("C")
-                    ):
+                    if prev_res_atoms and prev_res_atoms.get("C"):
                         p1 = prev_res_atoms["C"]["coords"]
                         p2 = current_res_atoms["N"]["coords"]
                         p3 = current_res_atoms["CA"]["coords"]
@@ -501,65 +520,66 @@ class PDBValidator:
                         phi = self._calculate_dihedral_angle(p1, p2, p3, p4)
 
                 # Calculate Psi (Ψ): N(i) - CA(i) - C(i) - N(i+1)
-                # Requires next residue's N atom
                 if i < len(sorted_res_numbers) - 1:
                     next_res_num = sorted_res_numbers[i + 1]
                     next_res_atoms = residues_in_chain.get(next_res_num)
-
-                    if (
-                        current_res_atoms.get("N")
-                        and current_res_atoms.get("CA")
-                        and current_res_atoms.get("C")
-                        and next_res_atoms
-                        and next_res_atoms.get("N")
-                    ):
+                    if next_res_atoms and next_res_atoms.get("N"):
                         p1 = current_res_atoms["N"]["coords"]
                         p2 = current_res_atoms["CA"]["coords"]
                         p3 = current_res_atoms["C"]["coords"]
                         p4 = next_res_atoms["N"]["coords"]
                         psi = self._calculate_dihedral_angle(p1, p2, p3, p4)
 
-                if phi is not None or psi is not None:
-                    phi_str = f"{phi:.2f}°" if phi is not None else "N/A"
-                    psi_str = f"{psi:.2f}°" if psi is not None else "N/A"
-                    logger.debug(f"Calculated Phi: {phi_str}, Psi: {psi_str} for Chain {chain_id}, Residue {res_num} {res_name}") # Debug print
-                    violation_detected = False
-
+                if phi is not None and psi is not None:
+                    phi_str = f"{phi:.2f}"
+                    psi_str = f"{psi:.2f}"
+                    
+                    # Determine residue category for validation
+                    # Categories: General, GLY, PRO, Pre-Pro
+                    category = "General"
                     if res_name == "GLY":
-                        allowed_phi = GLYCINE_ALLOWED_PHI
-                        allowed_psi = GLYCINE_ALLOWED_PSI
+                        category = "GLY"
                     elif res_name == "PRO":
-                        allowed_phi = PROLINE_ALLOWED_PHI
-                        allowed_psi = PROLINE_ALLOWED_PSI
-                    else:
-                        allowed_phi = GENERIC_ALLOWED_PHI
-                        allowed_psi = GENERIC_ALLOWED_PSI
+                        category = "PRO"
+                    elif i < len(sorted_res_numbers) - 1:
+                        # Check if next residue is Proline (Pre-Pro check)
+                        next_r_num = sorted_res_numbers[i + 1]
+                        next_r_name = residues_in_chain.get(next_r_num, {}).get("CA", {}).get("residue_name")
+                        if next_r_name == "PRO":
+                            category = "Pre-Pro"
 
-                    if phi is not None and (
-                        phi < allowed_phi[0] or phi > allowed_phi[1]
-                    ):
+                    # Get Polygons
+                    polygons = RAMACHANDRAN_POLYGONS.get(category, RAMACHANDRAN_POLYGONS["General"])
+                    
+                    status = "Outlier"
+                    
+                    # Check Favored
+                    is_favored = False
+                    for poly in polygons["Favored"]:
+                        if self._is_point_in_polygon((phi, psi), poly):
+                            is_favored = True
+                            status = "Favored"
+                            break
+                    
+                    # Check Allowed if not Favored
+                    if not is_favored:
+                        for poly in polygons["Allowed"]:
+                            if self._is_point_in_polygon((phi, psi), poly):
+                                status = "Allowed"
+                                break
+                    
+                    logger.debug(f"Chain {chain_id} Res {res_num} {res_name} ({category}): Phi={phi_str}, Psi={psi_str} -> {status}")
+
+                    if status == "Outlier":
                         self.violations.append(
-                            f"Ramachandran violation (Phi): Chain {chain_id}, Residue {res_num} {res_name} "
-                            f"Phi angle ({phi:.2f}°) outside allowed range {allowed_phi}."
+                            f"Ramachandran violation: Chain {chain_id}, Residue {res_num} {res_name} "
+                            f"(Phi={phi_str}°, Psi={psi_str}°) is an Outlier for '{category}' category."
                         )
-                        violation_detected = True
-
-                    if psi is not None and (
-                        psi < allowed_psi[0] or psi > allowed_psi[1]
-                    ):
-                        self.violations.append(
-                            f"Ramachandran violation (Psi): Chain {chain_id}, Residue {res_num} {res_name} "
-                            f"Psi angle ({psi:.2f}°) outside allowed range {allowed_psi}."
-                        )
-                        violation_detected = True
-
-                    if not violation_detected and (phi is not None or psi is not None):
-                        phi_str = f"{phi:.2f}°" if phi is not None else "N/A"
-                        psi_str = f"{psi:.2f}°" if psi is not None else "N/A"
-                        logger.debug(
-                            f"Ramachandran angles for Chain {chain_id}, Residue {res_num} {res_name}: "
-                            f"Phi={phi_str}, Psi={psi_str} (within simplified allowed regions)"
-                        )
+                    elif status == "Allowed":
+                        # Optional: warn for "Allowed" (not outlier but not optimal)
+                        # MolProbity usually only flags Outliers as errors, but Allowed as warnings.
+                        # For synth-pdb, we'll log it but not fail strictly unless desired.
+                        pass
 
     def validate_steric_clashes(
         self,

@@ -1099,7 +1099,16 @@ def generate_pdb_content(
                     # CRITICAL FIX: Do NOT return early.
                     # We must continue execution so that B-factors and Occupancies 
                     # are calculated and injected below.
-                    # We skip the biotite PDB generation block since we have content.
+                    
+                    # EDUCATIONAL NOTE - Re-parsing Minimized Structure:
+                    # We must read the minimized structure back into our internal 'peptide' object.
+                    # Why? Because downstream steps (like disulfide detection and B-factor calculation)
+                    # depend on the exact atomic coordinates. If we used the old 'peptide' object,
+                    # we would be analyzing the un-minimized geometry!
+                    pdb_file = pdb.PDBFile.read(output_pdb_path)
+                    peptide = pdb_file.get_structure(model=1)
+                    
+                    # We skip the biotite PDB generation block below since we have content.
                     pass
                 else:
                     logger.error("Minimization failed. Returning un-minimized structure.")

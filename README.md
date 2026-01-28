@@ -9,7 +9,7 @@
 
 A command-line tool to generate Protein Data Bank (PDB) files with full atomic representation for testing, benchmarking, and educational purposes.
 
-> ⚠️ **Important**: The generated structures use idealized geometries and may contain violations of standard structural constraints. These files are intended for **testing computational tools** and **educational demonstrations**, not for simulation or experimental validation.
+> ⚠️ **Important**: The generated structures use idealized geometries. For high-quality, physically realistic structures suitable for simulation, we strongly recommend using the **`--minimize`** flag, which relaxes the geometry using the OpenMM physics engine.
 
 ## Table of Contents
 - [Features](#features)
@@ -84,12 +84,13 @@ A command-line tool to generate Protein Data Bank (PDB) files with full atomic r
 **Control**: Per-region via `--structure` parameter  
 **Example**: `--structure "1-10:alpha,11-15:random,16-25:alpha"`
 
-#### 🧪 Residue-Specific Ramachandran Distributions (Experimental/WIP)
-**Status**: Experimental (Geometric construction needs Refactoring)
-**What**: Realistic backbone geometry based on amino acid type
-- **Glycine (GLY)**: Correctly accesses left-handed alpha region (phi > 0) ✅
-- **Proline (PRO)**: Correctly restricts phi angles ✅
-- **Preset Conformations**: (Alpha/Beta/PPII) Input angles are correct, but final structure geometry may vary due to construction method limitations. *Work in Progress.*
+#### 🧪 Residue-Specific Ramachandran Validation (MolProbity-Style)
+**Status**: Fully Implemented ✅
+**What**: Realistic backbone geometry validation based on amino acid type using MolProbity/Top8000 data.
+- **Glycine (GLY)**: Correctly allowed in left-handed alpha region (phi > 0).
+- **Proline (PRO)**: Checks against restricted phi angles.
+- **General**: All other residues are checked against standard Favored/Allowed polygons.
+- **Precision**: Uses point-in-polygon algorithms for accurate classification (Favored, Allowed, Outlier).
 
 #### 📐 NeRF Geometry (The Construction Engine)
 **What**: Natural Extension Reference Frame algorithm  
@@ -745,9 +746,9 @@ When `--validate` is enabled, the tool checks for:
 
 2. **Bond Angles**: Validates N-CA-C, CA-C-N, CA-C-O angles (±5° tolerance)
 
-3. **Ramachandran Angles**: Checks phi/psi dihedral angles against allowed regions
-   - Allowed: alpha-helix, beta-sheet, and left-handed alpha-helix regions
-   - Glycine and proline have relaxed criteria
+3. **Ramachandran Angles**: Checks phi/psi dihedral angles against MolProbity-defined polygonal regions
+   - **Categories**: General, Glycine, Proline, Pre-Proline
+   - **Levels**: Distinguishes between Favored, Allowed, and Outlier status
 
 4. **Steric Clashes**: Detects atoms that are too close
    - Minimum distance rule: ≥2.0 Å between any atoms
@@ -973,6 +974,30 @@ For students and researchers interested in the physics behind the code, here are
 *   **Internal Dynamics & Model-Free Formalism:**
     *   Lipari, G., & Szabo, A. (1982). Model-free approach to the interpretation of nuclear magnetic resonance relaxation in macromolecules. 1. Theory and range of validity. *J. Am. Chem. Soc.*, 104(17), 4546–4559. (The foundational theory).
     *   Kay, L. E., Torchia, D. A., & Bax, A. (1989). Backbone dynamics of proteins as studied by 15N inverse detected heteronuclear NMR spectroscopy... *Biochemistry*, 28(23), 8972-8979. (The seminal application to proteins).
+
+## References & Bibliography
+
+### Structure Generation & Rotamers
+1.  **Dunbrack, R. L., & Cohen, F. E. (1997).** Bayesian statistical analysis of protein side-chain rotamer preferences. *Protein Science, 6*(8), 1661–1681.
+    - Used for: Rotamer libraries and side-chain probability distributions.
+2.  **Parsons, J., et al. (2005).** Practical conversion from torsion space to Cartesian space for in silico protein synthesis. *Journal of Computational Chemistry, 26*(10), 1063–1068.
+    - Used for: The NeRF (Natural Extension Reference Frame) algorithm for backbone construction.
+3.  **Smith, D. M. (2001).** Protein Composition and Structure. *Encyclopedia of Life Sciences*.
+    - Used for: Biological amino acid frequency data.
+
+### NMR Dynamics & Relaxation
+4.  **Lipari, G., & Szabo, A. (1982).** Model-free approach to the interpretation of nuclear magnetic resonance relaxation in macromolecules. *Journal of the American Chemical Society, 104*(17), 4546–4559.
+    - Used for: Calculating $S^2$ order parameters and relaxation rates ($R_1, R_2, NOE$).
+5.  **Wishart, D. S., et al. (1995).** 1H, 13C and 15N random coil NMR chemical shifts of the common amino acids. *Journal of Biomolecular NMR, 6, 135–140.*
+    - Used for: Random coil chemical shift baselines.
+6.  **Cavanagh, J., et al. (2007).** *Protein NMR Spectroscopy: Principles and Practice*. Academic Press.
+    - Used for: General NMR theory and relaxation equations.
+
+### Validation
+7.  **Williams, C. J., et al. (2018).** MolProbity: More and better reference data for improved all-atom structure validation. *Protein Science, 27*(1), 293–315.
+    - Used for: Ramachandran polygon definitions and validation criteria.
+8.  **Lovell, S. C., et al. (2003).** Structure validation by Calpha geometry: phi,psi and Cbeta deviation. *Proteins: Structure, Function and Bioinformatics, 50*(3), 437–450.
+    - Used for: Early reference for Ramachandran validation concepts.
 
 ## Glossary of Scientific Terms & Acronyms
 

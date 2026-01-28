@@ -1,4 +1,4 @@
-from typing import List, Dict, Set, Any
+from typing import List, Dict, Set, Any, Tuple
 
 """
 This module contains data definitions for the synth_pdb package, starting
@@ -127,7 +127,7 @@ RAMACHANDRAN_PRESETS: Dict[str, Dict[str, float]] = {
 }
 
 # --- Ramachandran Probability Regions for Random Sampling ---
-# Based on Lovell et al. (2003) Proteins: Structure, Function, and Bioinformatics
+# Based on Lovell et al. (2003) Proteins: Structure, Function and Bioinformatics
 # Used for realistic random conformation sampling
 
 RAMACHANDRAN_REGIONS: Dict[str, Dict[str, Any]] = {
@@ -155,12 +155,77 @@ RAMACHANDRAN_REGIONS: Dict[str, Dict[str, Any]] = {
     },
 }
 
+# --- MolProbity-style Ramachandran Polygons ---
+# Polygonal definitions for "Favored" (98%) and "Allowed" (99.8%) regions.
+# Coordinates are (phi, psi) pairs in degrees.
+# These are approximate polygons based on standard plots (e.g. MolProbity/Top8000).
+
+RAMACHANDRAN_POLYGONS: Dict[str, Dict[str, List[List[Tuple[float, float]]]]] = {
+    "General": {
+        "Favored": [
+            # Alpha-Helical Region (Centered ~ -60, -45)
+            [(-70, -30), (-60, -20), (-40, -40), (-40, -60), (-60, -70), (-80, -60), (-90, -40)],
+            # Beta-Sheet Region (Centered ~ -120, 120 and -120, -150ish ?) -> Actually top-left quadrant
+            # Beta bounds: Phi [-180, -40], Psi [90, 180] and [-180, -180] wrapping?
+            # Main Beta Cluster
+            [(-180, 180), (-180, 80), (-120, 80), (-60, 120), (-60, 180)],
+            # Polyproline II / Extended (part of Beta usually, but separate cluster sometimes)
+            # Connecting bridge?
+            [(-180, -180), (-180, -150), (-150, -150), (-150, -180)],
+        ],
+        "Allowed": [
+            # Broader regions surrounding the favored ones
+            [(-180, 180), (-180, -180), (-30, -180), (-30, 180)], # Covers entire left side mostly
+        ]
+    },
+    "GLY": {
+        "Favored": [
+            # Symmetric regions (Alpha Left/Right, Beta Left/Right)
+            # Right Alpha (Standard L-AA alpha is left, but Gly has both)
+            # Alpha-R (Left handed helix, positive Phi)
+            [(40, 40), (60, 20), (80, 40), (80, 60), (60, 70), (40, 60)],
+            # Alpha-L (Standard helix, negative Phi)
+            [(-80, -60), (-60, -70), (-40, -60), (-40, -40), (-60, -20), (-80, -40)],
+            # Beta (Both sides)
+            [(-180, 180), (-180, 90), (-60, 90), (-60, 180)],
+            [(60, 180), (60, 90), (180, 90), (180, 180)],
+            [(-180, -180), (-180, -90), (-60, -90), (-60, -180)],
+            [(60, -180), (60, -90), (180, -90), (180, -180)],
+        ],
+        "Allowed": [
+             # Practically everywhere except steric clashes (Phi=0, Psi=0)
+             [(-180, 180), (-180, -180), (180, -180), (180, 180)] # Too permissive?
+        ]
+    },
+    "PRO": {
+        "Favored": [
+            # Restricted Phi ~ -60 +/- 15
+            # Alpha region
+            [(-70, -20), (-50, -20), (-50, -50), (-70, -50)],
+            # Polyproline II (Phi ~ -75, Psi ~ 145)
+            [(-90, 120), (-60, 120), (-60, 180), (-90, 180)],
+        ],
+        "Allowed": [
+            [(-100, -180), (-40, -180), (-40, 180), (-100, 180)] # Vertical strip
+        ]
+    },
+    "Pre-Pro": {
+         # Residue BEFORE a Proline (often restricted)
+         # Similar to General but Beta region is shifted
+         "Favored": [
+             [(-180, 180), (-180, 80), (-60, 120), (-60, 180)], # Beta
+             [(-70, -30), (-60, -20), (-40, -40), (-40, -60), (-60, -70)], # Alpha
+         ],
+         "Allowed": [
+             [(-180, 180), (-180, -180), (-30, -180), (-30, 180)],
+         ]
+    }
+}
+
 # --- Standard Bond Lengths and Angles (Approximations) ---
 
 # Values are in Angstroms for bond lengths and degrees for angles
-
 # These are simplified averages and will not create perfectly accurate structures.
-
 
 # Peptide bond geometry
 
@@ -192,9 +257,7 @@ BOND_LENGTH_N_H: float = 1.01  # N-H (typical)
 
 
 # Van der Waals radii in Angstroms (approximate values)
-
 # Source: Wikipedia, various chemistry texts.
-
 # These are simplified values for common protein atoms.
 
 VAN_DER_WAALS_RADII: Dict[str, float] = {
