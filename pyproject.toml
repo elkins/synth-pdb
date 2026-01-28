@@ -49,6 +49,7 @@ classifiers = [
 dependencies = [
     "numpy>=1.20.0,<2.0.0",
     "biotite>=0.35.0",
+    "openmm>=8.0.0",
 ]
 
 [project.optional-dependencies]
