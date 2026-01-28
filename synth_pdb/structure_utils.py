@@ -24,6 +24,11 @@ def get_secondary_structure(structure: struc.AtomArray) -> List[str]:
     ss_list = []
     
     for i, _ in enumerate(res_starts):
+        # Safety check: if phi array is shorter than residue count (e.g. due to ions/HETATM)
+        if i >= len(phi) or i >= len(psi):
+            ss_list.append("coil")
+            continue
+
         # Get Angles (degrees)
         p = np.rad2deg(phi[i])
         s = np.rad2deg(psi[i])
