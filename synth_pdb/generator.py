@@ -29,6 +29,7 @@ from .data import (
     ROTAMER_LIBRARY,
     RAMACHANDRAN_PRESETS,
     RAMACHANDRAN_REGIONS,
+    BACKBONE_DEPENDENT_ROTAMER_LIBRARY,
 )
 from .pdb_utils import create_pdb_header, create_pdb_footer
 from .geometry import (
@@ -777,11 +778,11 @@ def generate_pdb_content(
             # Determine initial PSI for the first residue to propagate to next
             # We need to sample it based on conformation
             # residue_conformations is already defined and gap-filled before the loop
-            res0_conf = residue_conformations[0]
-            if res0_conf == 'random':
+            current_conformation = residue_conformations[0]
+            if current_conformation == 'random':
                  _, current_psi = _sample_ramachandran_angles(res_name)
             else:
-                 current_psi = RAMACHANDRAN_PRESETS[res0_conf]['psi'] + np.random.normal(0, 5)
+                 current_psi = RAMACHANDRAN_PRESETS[current_conformation]['psi'] + np.random.normal(0, 5)
 
         else:
             # EDUCATIONAL NOTE - Per-Residue Conformation Selection:
@@ -889,69 +890,83 @@ def generate_pdb_content(
             ref_res_template = ref_res_template[ref_res_template.atom_name != "H3"]
 
         # 3. Apply rotamers if available
-        if res_name in ROTAMER_LIBRARY:
+        # EDUCATIONAL NOTE - Rotamer Selection Strategy:
+        # We employ a 'Backbone-Dependent' selection strategy where possible.
+        # This means we check the residue's secondary structure context (Helix vs Sheet)
+        # to choose the most likely side-chain conformation.
+        # Logic:
+        # 1. Check if specific rotamers exist for this residue + conformation in BACKBONE_DEPENDENT_LIB.
+        # 2. If not, fall back to the generic ROTAMER_LIBRARY (Backbone-Independent).
+        
+        rotamers = None
+        
+        # Try Backbone-Dependent Lookup first
+        # current_conformation is available from earlier in the loop (e.g., 'alpha', 'beta')
+        if res_name in BACKBONE_DEPENDENT_ROTAMER_LIBRARY:
+            if current_conformation in BACKBONE_DEPENDENT_ROTAMER_LIBRARY[res_name]:
+                rotamers = BACKBONE_DEPENDENT_ROTAMER_LIBRARY[res_name][current_conformation]
+        
+        # Fallback to Backbone-Independent Library
+        if rotamers is None and res_name in ROTAMER_LIBRARY:
             rotamers = ROTAMER_LIBRARY[res_name]
             
-            # Skip if this amino acid has no rotamers (e.g., ALA, GLY)
-            if not rotamers:
-                pass
-            else:
-                # Weighted random selection based on experimental probabilities
-                weights = [r.get('prob', 0.0) for r in rotamers]
-                selected_rotamer = random.choices(rotamers, weights=weights, k=1)[0]
+        if rotamers:
+            # Weighted random selection based on experimental probabilities
+            weights = [r.get('prob', 0.0) for r in rotamers]
+            selected_rotamer = random.choices(rotamers, weights=weights, k=1)[0]
                 
-                # Apply chi angles
-                if 'chi1' in selected_rotamer:
-                    chi1_target = selected_rotamer["chi1"][0]
+            # Apply chi angles
+            if 'chi1' in selected_rotamer:
+                chi1_target = selected_rotamer["chi1"][0]
+                
+                # Logic to find the gamma atom (CG, CG1, OG, OG1, SG) for Chi1 definition (N-CA-CB-Gamma)
+                # Priority: CG > CG1 > OG > OG1 > SG
+                gamma_atom_name = None
+                for candidate in ["CG", "CG1", "OG", "OG1", "SG"]:
+                    if len(ref_res_template[ref_res_template.atom_name == candidate]) > 0:
+                        gamma_atom_name = candidate
+                        break
+                
+                if gamma_atom_name:
+                    # EDUCATIONAL NOTE - Sidechain Rotation:
+                    # Instead of placing a single atom (which breaks branched residues like VAL),
+                    # we rotate the ENTIRE sidechain about the CA-CB axis to reach target chi1.
+                    # We removed the +180.0 offset because NeRF and IUPAC both use 0 for Cis.
+                    ca_atom = ref_res_template[ref_res_template.atom_name == "CA"][0]
+                    cb_atom = ref_res_template[ref_res_template.atom_name == "CB"][0]
+                    n_atom = ref_res_template[ref_res_template.atom_name == "N"][0]
+                    g_atom = ref_res_template[ref_res_template.atom_name == gamma_atom_name][0]
                     
-                    # Logic to find the gamma atom (CG, CG1, OG, OG1, SG) for Chi1 definition (N-CA-CB-Gamma)
-                    # Priority: CG > CG1 > OG > OG1 > SG
-                    gamma_atom_name = None
-                    for candidate in ["CG", "CG1", "OG", "OG1", "SG"]:
-                        if len(ref_res_template[ref_res_template.atom_name == candidate]) > 0:
-                            gamma_atom_name = candidate
-                            break
+                    current_chi1 = calculate_dihedral_angle(
+                        n_atom.coord, ca_atom.coord, cb_atom.coord, g_atom.coord
+                    )
+                    # Rodrigues rotation formula CCW looking down CA->CB 
+                    # results in a NEGATIVE change in dihedral angle in our convention.
+                    # So rotation_angle = current - target
+                    diff_deg = current_chi1 - chi1_target
                     
-                    if gamma_atom_name:
-                        # EDUCATIONAL NOTE - Sidechain Rotation:
-                        # Instead of placing a single atom (which breaks branched residues like VAL),
-                        # we rotate the ENTIRE sidechain about the CA-CB axis to reach target chi1.
-                        # We removed the +180.0 offset because NeRF and IUPAC both use 0 for Cis.
-                        ca_atom = ref_res_template[ref_res_template.atom_name == "CA"][0]
-                        cb_atom = ref_res_template[ref_res_template.atom_name == "CB"][0]
-                        n_atom = ref_res_template[ref_res_template.atom_name == "N"][0]
-                        g_atom = ref_res_template[ref_res_template.atom_name == gamma_atom_name][0]
-                        
-                        current_chi1 = calculate_dihedral_angle(
-                            n_atom.coord, ca_atom.coord, cb_atom.coord, g_atom.coord
-                        )
-                        # Rodrigues rotation formula CCW looking down CA->CB 
-                        # results in a NEGATIVE change in dihedral angle in our convention.
-                        # So rotation_angle = current - target
-                        diff_deg = current_chi1 - chi1_target
-                        
-                        # Rotate all atoms downstream of CB
-                        # We identify sidechain atoms as everything except N, CA, C, O, H, HA
-                        backbone_names = {"N", "CA", "C", "O", "H", "HA", "CB"}
-                        for atom_idx in range(len(ref_res_template)):
-                            if ref_res_template.atom_name[atom_idx] not in backbone_names:
-                                # Rotate point about CA-CB axis
-                                p = ref_res_template.coord[atom_idx]
-                                v = cb_atom.coord - ca_atom.coord
-                                v /= np.linalg.norm(v)
-                                
-                                # Rodrigues' rotation formula
-                                alpha = np.deg2rad(diff_deg)
-                                cos_a = np.cos(alpha)
-                                sin_a = np.sin(alpha)
-                                
-                                rel_p = p - ca_atom.coord
-                                rotated_p = (
-                                    rel_p * cos_a + 
-                                    np.cross(v, rel_p) * sin_a + 
-                                    v * np.dot(v, rel_p) * (1 - cos_a)
-                                )
-                                ref_res_template.coord[atom_idx] = rotated_p + ca_atom.coord
+                    # Rotate all atoms downstream of CB
+                    # We identify sidechain atoms as everything except N, CA, C, O, H, HA
+                    backbone_names = {"N", "CA", "C", "O", "H", "HA", "CB"}
+                    for atom_idx in range(len(ref_res_template)):
+                        if ref_res_template.atom_name[atom_idx] not in backbone_names:
+                            # Rotate point about CA-CB axis
+                            p = ref_res_template.coord[atom_idx]
+                            v = cb_atom.coord - ca_atom.coord
+                            v /= np.linalg.norm(v)
+                            
+                            # Rodrigues' rotation formula
+                            alpha = np.deg2rad(diff_deg)
+                            cos_a = np.cos(alpha)
+                            sin_a = np.sin(alpha)
+                            
+                            rel_p = p - ca_atom.coord
+                            rotated_p = (
+                                rel_p * cos_a + 
+                                np.cross(v, rel_p) * sin_a + 
+                                v * np.dot(v, rel_p) * (1 - cos_a)
+                            )
+                            ref_res_template.coord[atom_idx] = rotated_p + ca_atom.coord
             
         # Extract N, CA, C from ref_res_template
         # Ensure these atoms are present in the template for superimposition

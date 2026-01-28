@@ -33,7 +33,7 @@ A command-line tool to generate Protein Data Bank (PDB) files with full atomic r
 - Customizable sequence (1-letter or 3-letter amino acid codes)
 - Random sequence generation with uniform or biologically plausible frequencies
 - **Conformational diversity**: Generate alpha helices, beta sheets, extended chains, or random conformations
-- **Rotamer-based side-chain placement** for all 20 standard amino acids (Dunbrack library)
+- **Backbone-Dependent Rotamers**: Side-chain conformations are selected based on local secondary structure (Helix/Sheet) to minimize steric clashes (Dunbrack library).
 - **Bulk Dataset Generation**: Generate thousands of (Structure, Sequence, Contact Map) triplets for AI training via `--mode dataset`.
 - **Metal Ion Coordination**: Automatic detection and structural injection of cofactors like **Zinc (Zn2+)** with physics-aware harmonic constraints. ✅
 - **Disulfide Bonds**: Automatic detection and annotation of **SSBOND** records for Cysteine pairs. ✅
@@ -74,10 +74,11 @@ A command-line tool to generate Protein Data Bank (PDB) files with full atomic r
 **Correlation**: High B-factor ↔ Low occupancy  
 **Pattern**: Backbone (0.95-1.00) > Side chains (0.85-0.95)
 
-#### 🔄 Rotamer Libraries
-**What**: Side chains adopt preferred conformations  
-**Source**: Dunbrack library (experimental distributions)  
-**Coverage**: All 20 standard amino acids
+#### 🔄 Backbone-Dependent Rotamer Libraries
+**What**: Side chains adopt preferred conformations dependent on backbone geometry.
+**Source**: Dunbrack library (experimental distributions).
+**Mechanism**: Uses Alpha-Helix or Beta-Sheet specific probabilities to avoid steric clashes (e.g., 'trans' rotamer is disfavored in helices).
+**Coverage**: All 20 standard amino acids.
 
 #### 🧬 Secondary Structures
 **What**: Regular backbone patterns (helices, sheets)  
@@ -862,7 +863,7 @@ Real protein structures require sophisticated methods like:
 - Energy minimization and conformational search
 - Crystallographic or NMR experimental data
 
-## Limitations
+## Limitations (TODO: This needs updating!)
 
 ### Structural Limitations
 
@@ -930,7 +931,7 @@ pytest tests/test_generator.py -v
 ```
 
 **Test Coverage**: 95% overall
-- 75 tests covering generation, validation, CLI, and edge cases
+- 275 tests covering generation, validation, CLI, and edge cases
 
 ### Project Structure
 

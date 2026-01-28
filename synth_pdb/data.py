@@ -548,3 +548,61 @@ ROTAMER_LIBRARY: Dict[str, List[Dict[str, List[float]]]] = {
     'GLY': [],
     'PRO': [],
 }
+
+# --- Backbone-Dependent Rotamer Library (Simplified) ---
+# EDUCATIONAL NOTE - Backbone Dependency:
+# Rotamer probabilities depend heavily on the local backbone conformation (Phi/Psi angles).
+# This is due to steric hindrance between side-chain atoms and the backbone.
+#
+# Key Biophysical Principles (Dunbrack, 2002):
+# 1. Alpha-Helix (-60, -45): 
+#    - The "trans" (t, 180 deg) rotamer for Chi1 is often strongly disfavored for 
+#      branched residues (Val, Ile, Thr) due to clashes with the backbone i-3 or i-4.
+#    - "g-" (-60 deg) is typically the dominant rotamer.
+#
+# 2. Beta-Sheet (-135, 135):
+#    - The extended backbone allows more freedom. "trans" rotamers become much more 
+#      favorable compared to helices.
+#
+# This simplified library maps secondary structure types ('alpha', 'beta', etc.)
+# to specific rotamer probability distributions.
+BACKBONE_DEPENDENT_ROTAMER_LIBRARY: Dict[str, Dict[str, List[Dict[str, List[float]]]]] = {
+    'VAL': {
+        'alpha': [
+            # In Helix: g- is dominant, trans is rare
+            {'chi1': [-60.0], 'prob': 0.90},  # g-
+            {'chi1': [180.0], 'prob': 0.05},  # t (rare)
+            {'chi1': [60.0],  'prob': 0.05},  # g+ (rare)
+        ],
+        'beta': [
+            # In Sheet: trans is very common
+            {'chi1': [-60.0], 'prob': 0.55},  # g-
+            {'chi1': [180.0], 'prob': 0.40},  # t (uniquely favored in sheets)
+            {'chi1': [60.0],  'prob': 0.05},  # g+
+        ],
+    },
+    'ILE': {
+        'alpha': [
+            {'chi1': [-60.0], 'chi2': [170.0], 'prob': 0.85},
+            {'chi1': [-60.0], 'chi2': [-60.0], 'prob': 0.10},
+            {'chi1': [180.0], 'chi2': [170.0], 'prob': 0.05}, # t disallowed
+        ],
+        'beta': [
+            {'chi1': [-60.0], 'chi2': [170.0], 'prob': 0.50},
+            {'chi1': [-60.0], 'chi2': [-60.0], 'prob': 0.20},
+            {'chi1': [180.0], 'chi2': [170.0], 'prob': 0.30}, # t allowed
+        ]
+    },
+    'THR': {
+        'alpha': [
+            {'chi1': [60.0], 'prob': 0.40},
+            {'chi1': [-60.0], 'prob': 0.55}, # g- 
+            {'chi1': [180.0], 'prob': 0.05},
+        ],
+        'beta': [
+            {'chi1': [60.0], 'prob': 0.30},
+            {'chi1': [-60.0], 'prob': 0.40},
+            {'chi1': [180.0], 'prob': 0.30}, # t allowed
+        ]
+    }
+}
