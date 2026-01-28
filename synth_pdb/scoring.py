@@ -33,57 +33,68 @@ def calculate_clash_score(atom_array: struc.AtomArray) -> float:
     if atom_array.array_length() < 2:
         return 0.0
 
-    # Get coordinates and elements
+    # Get coordinates and arrays ONCE to avoid object creation overhead
     coords = atom_array.coord
+    res_ids = atom_array.res_id
+    atom_names = atom_array.atom_name
     elements = atom_array.element
     
+    # Pre-calculate radii for all atoms
+    # Default 1.5 if not found
+    radii = np.array([VAN_DER_WAALS_RADII.get(e, 1.5) for e in elements])
+    
     # Get Cell List for efficient neighbor search
-    # Cell size should be max VdW radius * 2 roughly
     cell_list = struc.CellList(atom_array, cell_size=5.0)
     
     clash_score = 0.0
     
-    # Iterate through all atoms using the cell list to find neighbors
-    # This is much faster than N^2 for large structures
+    # Pre-define backbone names for check
+    backbone_names = frozenset(['C', 'O', 'N', 'CA'])
+    
+    # Iterate through all atoms
     for i in range(len(atom_array)):
         # Get potential neighbors within 5A
-        # Note: get_atoms returns indices
         indices = cell_list.get_atoms(coords[i], radius=5.0)
         
-        # Filter indices to only look at j > i to avoid double counting and self-interaction
+        # Filter indices to only look at j > i
         indices = indices[indices > i]
         
         if len(indices) == 0:
             continue
             
-        atom1 = atom_array[i]
+        # Get properties of atom 1
+        r1 = radii[i]
+        res_id1 = res_ids[i]
+        pos1 = coords[i]
+        is_bb1 = atom_names[i] in backbone_names
         
-        # Get VdW radius for atom 1
-        r1 = VAN_DER_WAALS_RADII.get(atom1.element, 1.5)
-        
+        # Iterate over neighbors
+        # Using direct array access is much faster than atom_array[j]
         for j in indices:
-            atom2 = atom_array[j]
+            res_id2 = res_ids[j]
             
             # Skip atoms in same residue (simplified exclusion)
             # A full forcefield excludes 1-2, 1-3, and scaled 1-4 interactions
             # Here we just blindly skip intra-residue to avoid self-clashes from bond geometry
-            if atom1.res_id == atom2.res_id:
+            if res_id1 == res_id2:
                 continue
                 
             # Skip peptide bond connections (adjacent residues)
             # This is a heuristic: adjacent residues have bonded atoms that are close
-            if abs(atom1.res_id - atom2.res_id) == 1:
-                # Still check for severe clashes, but ignore backbone-backbone closeness
-                if atom1.atom_name in ['C', 'O', 'N', 'CA'] and atom2.atom_name in ['C', 'O', 'N', 'CA']:
+            if abs(res_id1 - res_id2) == 1:
+                # If both are backbone, skip
+                if is_bb1 and (atom_names[j] in backbone_names):
                     continue
             
-            r2 = VAN_DER_WAALS_RADII.get(atom2.element, 1.5)
+            r2 = radii[j]
+            pos2 = coords[j]
             
             # Simple Lennard-Jones-like repulsion term
             # Energy ~ (Rmin / r)^12 
             # We want a soft-ish repulsion to guide optimization
             
-            dist_sq = np.sum((coords[i] - coords[j])**2)
+            # Distance calculation
+            dist_sq = np.sum((pos1 - pos2)**2)
             dist = np.sqrt(dist_sq)
             
             optimal_dist = r1 + r2
