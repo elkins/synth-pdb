@@ -1,98 +1,112 @@
+
 import pytest
-from unittest.mock import MagicMock, patch, ANY
+from unittest.mock import MagicMock, patch, ANY, mock_open
 import numpy as np
 import synth_pdb.generator
 from biotite.structure import Atom, AtomArray
+import builtins
 
-# Mock Biotite PDBFile for reading back
-class MockPDBFile:
-    def __init__(self):
-        self.structure = None
-    
-    @classmethod
-    def read(cls, path):
-        return cls()
-        
-    def get_structure(self, model=1):
-        # Return a structure that satisfies the disulfide condition (distance ~2.05)
-        # Create two CYS residues close to each other
-        arr = AtomArray(2) # 2 atoms (SG, SG) for simplicity of test
-        arr[0] = Atom([0,0,0], atom_name="SG", res_name="CYS", res_id=1, element="S")
-        arr[1] = Atom([0,0,-2.05], atom_name="SG", res_name="CYS", res_id=5, element="S")
-        return arr
+# Save original open to use in side_effect
+original_open = builtins.open
+
+def open_side_effect(file, mode='r', *args, **kwargs):
+    """
+    Side effect for open() mock. 
+    Only mocks the specific file we expect 'minimized.pdb'.
+    Everything else is passed to the real open().
+    """
+    if isinstance(file, str) and "minimized.pdb" in file:
+        return mock_open(read_data="ATOM      1  N   CYS A   1       0.000   0.000   0.000  1.00  0.00           N  ")()
+    return original_open(file, mode, *args, **kwargs)
 
 def test_disulfide_detection_uses_minimized_structure():
     """
-    Test that IF minimization happens, the generator uses the MINIMIZED 
-    structure (which has ~2.0A S-S bond) rather than the initial structure
-    (which might have >3A distance) for detecting disulfides.
+    Test that the generator uses the MINIMIZED structure coordinates for disulfide detection
+    when optimization is enabled.
     """
-    # 1. Setup initial structure (AtomArray) with CYS far apart
-    # Initial distance = 5.0A, so NO disulfide bond initially
-    initial_peptide = AtomArray(2)
-    initial_peptide[0] = Atom([0,0,0], atom_name="SG", res_name="CYS", res_id=1, element="S")
-    initial_peptide[1] = Atom([0,0,5.0], atom_name="SG", res_name="CYS", res_id=5, element="S")
     
-    # 2. Mock imports within generator
-    # We need to control pdb.PDBFile.read to return our "minimized" close structure
-    with patch("synth_pdb.generator.pdb.PDBFile", MockPDBFile): 
-        with patch("synth_pdb.generator.EnergyMinimizer") as mock_minimizer_cls:
-            # Setup successful minimization
-            mock_instance = mock_minimizer_cls.return_value
-            mock_instance.add_hydrogens_and_minimize.return_value = True # Success
-            
-            # Setup _resolve_sequence to return dummy sequence
-            with patch("synth_pdb.generator._resolve_sequence", return_value=["CYS", "ALA", "ALA", "ALA", "CYS"]):
-                 # Setup initial peptide construction to return our "far apart" structure
-                 # We need to intercept the creation of 'peptide'. 
-                 # Since generator constructs it piece by piece, we might need to mock
-                 # the entire construction loop or just ensure _detect_disulfide_bonds is called
-                 # with the CORRECT object.
-                 pass
-
-    # A better approach for this unit test is to mock _detect_disulfide_bonds and verify
-    # what it was called with.
+    # 1. Define the "Close" structure (simulating successful folding/minimization)
+    minimized_structure = AtomArray(2)
+    minimized_structure[0] = Atom([0,0,0], atom_name="SG", res_name="CYS", res_id=1, element="S")
+    minimized_structure[1] = Atom([2.1,0,0], atom_name="SG", res_name="CYS", res_id=4, element="S")
     
-    with patch("synth_pdb.generator.pdb.PDBFile", MockPDBFile), \
-         patch("synth_pdb.generator.EnergyMinimizer") as mock_minimizer_cls, \
-         patch("synth_pdb.generator._resolve_sequence", return_value=["CYS", "CYS"]), \
-         patch("synth_pdb.generator._detect_disulfide_bonds") as mock_detect, \
-         patch("synth_pdb.generator.struc.AtomArray", return_value=initial_peptide), \
-         patch("builtins.open", new_callable=MagicMock), \
-         patch("synth_pdb.generator.pdb.PDBFile.read", return_value=MockPDBFile()) as mock_read: # Ensure read is mocked
-         
-         # Setup Minimizer
-         mock_instance = mock_minimizer_cls.return_value
-         mock_instance.add_hydrogens_and_minimize.return_value = True
-         
-         # Call generator
-         # We need to mock the construction loop or let it crash/do nothing.
-         # Since we mock AtomArray, the loop might try to append to it. 
-         # Let's mock the whole construction part or catch the exception?
-         # No, easier: Run generate_pdb_content but mock create_pdb_header/footer to avoid errors too.
-         with patch("synth_pdb.generator.create_pdb_header", return_value="HEADER"), \
-              patch("synth_pdb.generator.create_pdb_footer", return_value="FOOTER"), \
-              patch("synth_pdb.generator._generate_ssbond_records", return_value=""):
+    # 2. Prepare Mocks
+    mock_minimizer = MagicMock()
+    mock_minimizer.add_hydrogens_and_minimize.return_value = True
+    
+    # Use MagicMock for PDBFile instance
+    mock_pdb_instance = MagicMock()
+    mock_pdb_instance.get_structure.return_value = minimized_structure
+    
+    with patch("synth_pdb.generator.EnergyMinimizer", return_value=mock_minimizer), \
+         patch("synth_pdb.generator.pdb.PDBFile") as mock_pdb_cls, \
+         patch("tempfile.TemporaryDirectory") as mock_tmp, \
+         patch("builtins.open", side_effect=open_side_effect), \
+         patch("synth_pdb.generator.biophysics") as mock_biophysics, \
+         patch("synth_pdb.generator.predict_order_parameters", return_value={}): 
             
-             try:
-                 # Run
-                 synth_pdb.generator.generate_pdb_content(sequence_str="CC", minimize_energy=True)
-             except:
-                 pass
-             
-             # Assertions:
-             # 1. PDBFile.read should have been called (proof we read back the file)
-             # mock_read.assert_called() # MockPDBFile.read is classmethod
-             
-             # 2. _detect_disulfide_bonds should be called with the structure returned by MockPDBFile
-             # The MockPDBFile.get_structure() returns residues 1 and 5 (check implementation above)
-             # The initial peptide had residues 1 and 5 too (in setup). 
-             # Let's give them different coordinates in MockPDBFile to distinguish.
-             pass
+            # Setup PDBFile mock
+            # Both constructor and read() return our instance
+            mock_pdb_cls.return_value = mock_pdb_instance
+            mock_pdb_cls.read.return_value = mock_pdb_instance # Critical: read() is a classmethod
+            
+            # Setup biophysics mock
+            mock_biophysics.apply_ph_titration.side_effect = lambda p, **kwargs: p
+            mock_biophysics.cap_termini.side_effect = lambda p: p
 
-def test_fix_verification():
+            mock_tmp.return_value.__enter__.return_value = "/tmp/mock_dir"
+            
+            # Run Generator
+            pdb_content = synth_pdb.generator.generate_pdb_content(
+                sequence_str="CYS-ALA-ALA-CYS", 
+                minimize_energy=True,
+                metal_ions='ignore'
+            )
+            
+            # 3. Verification
+            assert "SSBOND" in pdb_content, "SSBOND record should be present when using minimized structure coordinates"
+            
+            import re
+            ssbond_pattern = r"SSBOND\s+\d+\s+CYS\s+A\s+1\s+CYS\s+A\s+4"
+            assert re.search(ssbond_pattern, pdb_content), f"SSBOND record does not match expected residues 1 and 4. Content:\n{pdb_content}"
+            
+            print("\nSUCCESS: Disulfide bond detected from minimized structure!")
+
+def test_disulfide_detection_fails_if_far():
     """
-    Simpler verification: Call a snippet of logic or ensure the logic flow works.
-    Actually, let's trust the integration test we will run next.
+    Control test: Verify that if the structure is NOT minimized (or minimized structure is still far),
+    NO disulfide bond is detected.
     """
-    pass
+    # 1. Define "Far" structure
+    far_structure = AtomArray(2)
+    far_structure[0] = Atom([0,0,0], atom_name="SG", res_name="CYS", res_id=1, element="S")
+    far_structure[1] = Atom([10.0,0,0], atom_name="SG", res_name="CYS", res_id=4, element="S")
+    
+    mock_minimizer = MagicMock()
+    mock_minimizer.add_hydrogens_and_minimize.return_value = True
+    
+    mock_pdb_instance = MagicMock()
+    mock_pdb_instance.get_structure.return_value = far_structure
+    
+    with patch("synth_pdb.generator.EnergyMinimizer", return_value=mock_minimizer), \
+         patch("synth_pdb.generator.pdb.PDBFile") as mock_pdb_cls, \
+         patch("tempfile.TemporaryDirectory") as mock_tmp, \
+         patch("builtins.open", side_effect=open_side_effect), \
+         patch("synth_pdb.generator.biophysics") as mock_biophysics, \
+         patch("synth_pdb.generator.predict_order_parameters", return_value={}): 
+            
+            mock_pdb_cls.return_value = mock_pdb_instance
+            mock_pdb_cls.read.return_value = mock_pdb_instance
+            
+            mock_biophysics.apply_ph_titration.side_effect = lambda p, **kwargs: p
+            mock_biophysics.cap_termini.side_effect = lambda p: p
+
+            mock_tmp.return_value.__enter__.return_value = "/tmp/mock_dir"
+            
+            pdb_content = synth_pdb.generator.generate_pdb_content(
+                sequence_str="CYS-ALA-ALA-CYS",
+                minimize_energy=True,
+                metal_ions='ignore'
+            )
+            
+            assert "SSBOND" not in pdb_content, "SSBOND record should NOT be present for distant residues"
