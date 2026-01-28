@@ -997,7 +997,16 @@ This project is provided as-is for educational and testing purposes.
 
 ## Citation
 
-If you use `synth-pdb` in your research, please cite it using the metadata in the `CITATION.cff` file in this repository.
+If you use this software in your research, please cite:
+
+```bibtex
+@software{synth_pdb,
+  author = {Elkins, George},
+  title = {synth-pdb: Realistic Protein Structure Generator},
+  year = {2026},
+  url = {https://github.com/elkins/synth-pdb}
+}
+```
 
 ## 🛠️ Software & Libraries
 
