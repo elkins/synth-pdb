@@ -443,7 +443,7 @@ def _resolve_sequence(
         )
 
 
-def _sample_ramachandran_angles(res_name: str) -> Tuple[float, float]:
+def _sample_ramachandran_angles(res_name: str, next_res_name: Optional[str] = None) -> Tuple[float, float]:
     """
     Sample phi/psi angles from Ramachandran probability distribution.
     
@@ -451,8 +451,13 @@ def _sample_ramachandran_angles(res_name: str) -> Tuple[float, float]:
     for all other amino acids. Samples from favored regions using weighted
     Gaussian distributions.
     
+    New Feature: Pre-Proline Bias
+    If next_res_name is 'PRO' and current residue is not GLY or PRO,
+    uses a specific 'PRE_PRO' distribution (favors beta/extended).
+    
     Args:
         res_name: Three-letter amino acid code
+        next_res_name: (Optional) Code of the next residue
         
     Returns:
         Tuple of (phi, psi) angles in degrees
@@ -462,7 +467,12 @@ def _sample_ramachandran_angles(res_name: str) -> Tuple[float, float]:
     """
     # Get residue-specific or general distribution
     if res_name in RAMACHANDRAN_REGIONS:
+        # GLY or PRO specific maps take precedence
         regions = RAMACHANDRAN_REGIONS[res_name]
+    elif next_res_name == 'PRO':
+        # Pre-Proline effect!
+        # Standard residues (ALA, VAL, etc) before Proline have restricted conformation.
+        regions = RAMACHANDRAN_REGIONS.get('PRE_PRO', RAMACHANDRAN_REGIONS['general'])
     else:
         regions = RAMACHANDRAN_REGIONS['general']
     
@@ -780,7 +790,9 @@ def generate_pdb_content(
             # residue_conformations is already defined and gap-filled before the loop
             current_conformation = residue_conformations[0]
             if current_conformation == 'random':
-                 _, current_psi = _sample_ramachandran_angles(res_name)
+                 # Check next residue for Pre-Proline effect
+                 next_res_name = sequence[1] if len(sequence) > 1 else None
+                 _, current_psi = _sample_ramachandran_angles(res_name, next_res_name=next_res_name)
             else:
                  current_psi = RAMACHANDRAN_PRESETS[current_conformation]['psi'] + np.random.normal(0, 5)
 
@@ -801,7 +813,12 @@ def generate_pdb_content(
                 # 1. Modeling intrinsically disordered regions
                 # 2. Generating diverse structures for testing
                 # 3. Creating realistic loop/turn regions
-                current_phi, current_psi = _sample_ramachandran_angles(res_name)
+                # 2. Generating diverse structures for testing
+                # 3. Creating realistic loop/turn regions
+                
+                # Check next residue for Pre-Proline effect
+                next_res_name = sequence[i+1] if i < len(sequence) - 1 else None
+                current_phi, current_psi = _sample_ramachandran_angles(res_name, next_res_name=next_res_name)
             else:
                 # Use fixed angles from the conformation preset
                 # EDUCATIONAL NOTE - Preset Conformations:

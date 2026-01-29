@@ -153,6 +153,16 @@ RAMACHANDRAN_REGIONS: Dict[str, Dict[str, Any]] = {
             {'name': 'alpha', 'phi': -60.0, 'psi': -30.0, 'std': 8.0, 'weight': 0.30},
         ],
     },
+    'PRE_PRO': {
+        # Residue immediately preceding Proline.
+        # Steric clash with Pro CD limits Alpha region.
+        # Beta/Extended is heavily favored.
+        'favored': [
+            {'name': 'beta', 'phi': -135.0, 'psi': 135.0, 'std': 10.0, 'weight': 0.75}, # Majority Beta
+            {'name': 'alpha', 'phi': -60.0, 'psi': -45.0, 'std': 10.0, 'weight': 0.20}, # Minor Alpha
+            {'name': 'left', 'phi': 60.0, 'psi': 45.0, 'std': 10.0, 'weight': 0.05},  # Very minor Left
+        ],
+    },
 }
 
 # --- MolProbity-style Ramachandran Polygons ---
