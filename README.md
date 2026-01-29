@@ -857,19 +857,10 @@ WARNING  Steric clash (min distance): Atoms CA-3-A and CB-3-A are too close (1.8
 - Placeholder structures for software development
 
 ❌ **Inappropriate Uses:**
-- Molecular dynamics simulations
 - Homology modeling templates
 - Drug docking studies
 - Experimental predictions
 - Publication-quality structures
-
-### Why "synth-pdb"?
-
-The name reflects the tool's **intentionally simplistic** approach:
-- Uses idealized bond lengths and angles (not energy-minimized)
-- Linear backbone geometry (no native-like folding)
-- Rotamer sampling uses Dunbrack library (most common rotamers, not exhaustive sampling)
-- No solvent, no cofactors, no post-translational modifications
 
 Real protein structures require sophisticated methods like:
 - Molecular dynamics with force fields (AMBER, CHARMM)
@@ -1203,25 +1194,7 @@ For production-quality structure generation, consider:
 
 ## References & Acknowledgements
 
-This project's validation logic is heavily inspired by the foundational work of the **Richardson Lab** (Duke University) and the **Dunbrack Lab** (Fox Chase Cancer Center).
-
-### Foundational Papers
-
-*   **Ramachandran Validation (Top8000)**:  
-    Lovell, S. C., et al. (2003). "Structure validation by Calpha geometry: phi,psi and Cbeta deviation." *Proteins: Structure, Function, and Bioinformatics*, 50(3), 437–450.
-    > Used for:  Ramachandran polygons.
-
-*   **MolProbity**:  
-    Chen, V. B., et al. (2010). "MolProbity: all-atom structure validation for macromolecular crystallography." *Acta Crystallographica Section D*, 66(1), 12–21.
-    > Used for: Validation philosophy (favored/allowed/outlier classification).
-
-*   **Backbone-Dependent Rotamers**:  
-    Dunbrack, R. L., & Cohen, F. E. (1997). "Bayesian statistical analysis of protein side-chain rotamer preferences." *Protein Science*, 6(8), 1661–1681.
-    > Used for: .
-
-## References & Acknowledgements
-
-This project's validation logic is heavily inspired by the foundational work of the **Richardson Lab** (Duke University) and the **Dunbrack Lab** (Fox Chase Cancer Center).
+This project's validation logic is inspired by the foundational work of the **Richardson Lab** (Duke University) and the **Dunbrack Lab** (Fox Chase Cancer Center).
 
 ### Foundational Papers
 
