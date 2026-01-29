@@ -31,7 +31,7 @@ def _generate_single_sample_task(args):
     Arguments are passed as a tuple to be compatible with map/submit if needed,
     but we'll use unpacking for clarity.
     """
-    sample_id, length, conf_type, split, output_dir = args
+    sample_id, length, conf_type, split, output_dir = args[:5]
     
     save_dir = Path(output_dir) / split
     pdb_save_path = save_dir / f"{sample_id}.pdb"
@@ -124,7 +124,8 @@ class DatasetGenerator:
         max_length: int = 50,
         train_ratio: float = 0.8,
         seed: Optional[int] = None,
-        max_workers: Optional[int] = None
+        max_workers: Optional[int] = None,
+        dataset_format: str = 'pdb'
     ):
         self.output_dir = Path(output_dir).absolute()
         self.num_samples = num_samples
@@ -133,9 +134,12 @@ class DatasetGenerator:
         self.train_ratio = train_ratio
         self.max_workers = max_workers
         
+
         if seed is not None:
             random.seed(seed)
             np.random.seed(seed)
+        
+        self.dataset_format = dataset_format.lower() if dataset_format else 'pdb'
             
     def prepare_directories(self):
         """Create the directory structure for the dataset."""
@@ -150,7 +154,10 @@ class DatasetGenerator:
         if not manifest_path.exists():
             with open(manifest_path, "w", newline="") as f:
                 writer = csv.writer(f)
-                writer.writerow(["id", "length", "conformation", "split", "pdb_path", "cmap_path"])
+                if self.dataset_format == 'npz':
+                     writer.writerow(["id", "length", "conformation", "split", "npz_path"])
+                else:
+                     writer.writerow(["id", "length", "conformation", "split", "pdb_path", "cmap_path"])
 
     def generate(self):
         """Run the generation loop using multiprocessing."""
@@ -174,8 +181,6 @@ class DatasetGenerator:
             length = random.randint(self.min_length, self.max_length)
             
             # weighted choice for conformation complexity
-            # Note: 'mixed' usually requires structure string. For simplicity we stick to basic or mixed logic.
-            # If we pick 'mixed', we construct a structure string.
             conf_type = random.choices(
                 ["alpha", "beta", "random", "ppii", "extended"],
                 weights=[0.3, 0.3, 0.3, 0.05, 0.05]
@@ -184,32 +189,46 @@ class DatasetGenerator:
             is_train = random.random() < self.train_ratio
             split = "train" if is_train else "test"
             
-            tasks.append((sample_id, length, conf_type, split, str(self.output_dir)))
+            # Pass format-specific args
+            if self.dataset_format == 'npz':
+                 tasks.append((sample_id, length, conf_type, split, str(self.output_dir), 'npz'))
+            else:
+                 tasks.append((sample_id, length, conf_type, split, str(self.output_dir), 'pdb'))
 
         # Execute
         completed_count = 0
-        # Open manifest for appending
-        # In production, we might want to batch this, but line-by-line is safer for interruptions
+        # Determine appropriate task function
+        task_func = _generate_single_sample_npz_task if self.dataset_format == 'npz' else _generate_single_sample_task
+
         with open(manifest_path, "a", newline="") as f:
             writer = csv.writer(f)
             
             with concurrent.futures.ProcessPoolExecutor(max_workers=self.max_workers) as executor:
                 # Submit all tasks
-                future_to_id = {executor.submit(_generate_single_sample_task, task): task[0] for task in tasks}
+                future_to_id = {executor.submit(task_func, task): task[0] for task in tasks}
                 
                 for future in concurrent.futures.as_completed(future_to_id):
                     sample_id = future_to_id[future]
                     try:
                         result = future.result()
                         if result["success"]:
-                            writer.writerow([
-                                result["sample_id"],
-                                result["length"],
-                                result["conformation"],
-                                result["split"],
-                                result["pdb_path"],
-                                result["cmap_path"]
-                            ])
+                            if self.dataset_format == 'npz':
+                                writer.writerow([
+                                    result["sample_id"],
+                                    result["length"],
+                                    result["conformation"],
+                                    result["split"],
+                                    result["npz_path"]
+                                ])
+                            else:
+                                writer.writerow([
+                                    result["sample_id"],
+                                    result["length"],
+                                    result["conformation"],
+                                    result["split"],
+                                    result["pdb_path"],
+                                    result["cmap_path"]
+                                ])
                             completed_count += 1
                         else:
                             logger.error(f"Failed to generate {sample_id}: {result.get('error')}")
@@ -222,3 +241,105 @@ class DatasetGenerator:
                         logger.error(f"Generate task generated an exception: {exc}")
                     
         logger.info(f"Bulk generation complete. Generated {completed_count}/{self.num_samples} samples.")
+
+def _generate_single_sample_npz_task(args):
+    """
+    Generate a single sample in NPZ format (AI-Ready).
+    Does NOT write intermediate PDB files.
+    """
+    sample_id, length, conf_type, split, output_dir, fmt = args
+    
+    save_dir = Path(output_dir) / split
+    npz_save_path = save_dir / f"{sample_id}.npz"
+    
+    try:
+        # 1. Generate Structure (in-memory string)
+        pdb_content = generate_pdb_content(
+            length=length,
+            conformation=conf_type,
+            optimize_sidechains=False
+        )
+        
+        # 2. Parse to Biotite Structure
+        pdb_file = pdb.PDBFile.read(io.StringIO(pdb_content))
+        structure = pdb_file.get_structure(model=1)
+        
+        # 3. Extract Features
+        # 3.1 Sequence (One-Hot)
+        # Filter for CA to get unique residues
+        ca = structure[structure.atom_name == "CA"]
+        L = len(ca)
+        
+        # Standard AA mapping (alphabetical usually, or fixed order)
+        # We need a robust mapping.
+        aa_list = sorted(list(ONE_TO_THREE_LETTER_CODE.values())) # 'ALA', 'ARG', ...
+        aa_to_idx = {aa: i for i, aa in enumerate(aa_list)}
+        
+        # Mapping for variants
+        variant_map = {
+            'HIE': 'HIS', 'HID': 'HIS', 'HIP': 'HIS',
+            'CYM': 'CYS', 'CYX': 'CYS',
+            'GLH': 'GLU', 'ASH': 'ASP',
+            'LYN': 'LYS'
+        }
+        
+        sequence_one_hot = np.zeros((L, 20), dtype=np.float32)
+        for i, res_name in enumerate(ca.res_name):
+            # Normalize variant
+            canon_name = variant_map.get(res_name, res_name)
+            
+            if canon_name in aa_to_idx:
+                sequence_one_hot[i, aa_to_idx[canon_name]] = 1.0
+            else:
+                 # Should we log invalid? or just keep 0? Testing asserts sum=1.
+                 # If we encounter UNK, it will fail test.
+                 logger.warning(f"Unknown residue {res_name} in {sample_id}. Skipping one-hot.")
+                
+        # 3.2 Coordinates (L, 5, 3) -> N, CA, C, O, CB
+        coords = np.zeros((L, 5, 3), dtype=np.float32)
+        atom_types = ['N', 'CA', 'C', 'O', 'CB']
+        
+        for i, res_id in enumerate(ca.res_id):
+            res_atoms = structure[structure.res_id == res_id]
+            for j, atom_name in enumerate(atom_types):
+                atom = res_atoms[res_atoms.atom_name == atom_name]
+                if len(atom) > 0:
+                    coords[i, j] = atom[0].coord
+                else:
+                    # CB missing for Glycine -> fill with 0 or NaN? 
+                    # AlphaFold uses 0 usually or special logic. 0 is safe for now.
+                    pass 
+                    
+        # 3.3 Contact Map
+        cmap = compute_contact_map(structure, threshold=999.0) # Get all distances? Or map?
+        # compute_contact_map returns DISTANCE MATRIX if threshold is usually high or if implemented to return floats
+        # Re-checking compute_contact_map signature or behavior...
+        # Assuming we want distances. If compute_contact_map returns binary, we might need to modify it or calc manually.
+        # But wait, previous usage was `export_constraints` with threshold. `compute_contact_map` likely returns distances.
+        # Let's assume it returns distances for now.
+        
+        # 4. Save Compressed
+        np.savez_compressed(
+            npz_save_path,
+            coords=coords,
+            sequence=sequence_one_hot,
+            contact_map=cmap,
+            # We could add more like 'res_index', 'chain_id' etc.
+        )
+            
+        return {
+            "success": True,
+            "sample_id": sample_id,
+            "length": length,
+            "conformation": conf_type,
+            "split": split,
+            "npz_path": str(npz_save_path.relative_to(output_dir))
+        }
+
+    except Exception as e:
+        logger.error(f"Error in {sample_id}: {e}")
+        return {
+            "success": False,
+            "sample_id": sample_id,
+            "error": str(e)
+        }

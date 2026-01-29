@@ -273,6 +273,36 @@ This effectively demonstrates:
     - `random`: Random sampling from allowed Ramachandran regions
   - Example: `--conformation beta`
 
+#### 🤖 AI & Machine Learning: Bulk Dataset Generation
+
+`synth-pdb` serves as valid data generator for training Deep Learning models (GNNs, Transformers, Diffusion Models). It can generate massive, diverse, and labeled datasets.
+
+**Command:**
+```bash
+synth-pdb --mode dataset --dataset-format npz --num-samples 1000 --output my_training_data
+```
+
+**Features:**
+*   **Formats**: 
+    *   `npz`: (Recommended) Compressed NumPy archives. Contains `coords` (L,5,3), `sequence` (One-hot), and `contact_map` (LxL). Ideal for PyTorch/TensorFlow dataloaders.
+    *   `pdb`: Writes individual PDB files and CASP contact maps (slower, for legacy tools).
+*   **Multiprocessing**: Automatically uses all available CPU cores.
+*   **Manifest**: Generates a `dataset_manifest.csv` tracking all samples and their metadata (split, length, conformation).
+
+**Output Structure (`--dataset-format npz`)**:
+```
+my_training_data/
+├── dataset_manifest.csv
+├── train/
+│   ├── synth_000001.npz
+│   ├── synth_000002.npz
+│   ...
+└── test/
+    ├── synth_000801.npz
+    ...
+```
+
+### 🔍 Visualization & Analysis
 #### **Validation & Quality Control**
 
 - `--validate`: Run validation checks on the generated structure
@@ -932,7 +962,7 @@ pytest tests/test_generator.py -v
 ```
 
 **Test Coverage**: 95% overall
-- 295 tests covering generation, validation, CLI, and edge cases
+- 297 tests covering generation, validation, CLI, and edge cases
 
 ### Project Structure
 

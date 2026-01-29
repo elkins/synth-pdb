@@ -391,6 +391,13 @@ def main() -> None:
         default=1000,
         help="Number of MD steps for equilibration (default: 1000 approx 2ps)."
     )
+    parser.add_argument(
+        "--dataset-format",
+        type=str,
+        default="pdb",
+        choices=["pdb", "npz"],
+        help="Output format for dataset generation (default: pdb). 'npz' produces compressed arrays.",
+    )
     
     parser.add_argument(
         "--seed",
@@ -556,7 +563,8 @@ def main() -> None:
             min_length=args.min_length,
             max_length=args.max_length,
             train_ratio=args.train_ratio,
-            seed=args.seed
+            seed=args.seed,
+            dataset_format=args.dataset_format
         )
         generator.generate()
         logger.info(f"Dataset generation complete. Output directory: {os.path.abspath(out_dir)}")
