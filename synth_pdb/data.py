@@ -158,63 +158,71 @@ RAMACHANDRAN_REGIONS: Dict[str, Dict[str, Any]] = {
 # --- MolProbity-style Ramachandran Polygons ---
 # Polygonal definitions for "Favored" (98%) and "Allowed" (99.8%) regions.
 # Coordinates are (phi, psi) pairs in degrees.
-# These are approximate polygons based on standard plots (e.g. MolProbity/Top8000).
+# These regions are approximations of the "Favored" (98% contour) and "Allowed" (99.8% contour) regions
+# defined by the Top8000 dataset.
+#
+# Source Reference:
+# Lovell et al. "Structure validation by Calpha geometry: phi,psi and Cbeta deviation."
+# Proteins: Structure, Function, and Bioinformatics, 50: 437-450 (2003).
+# URL: http://kinemage.biochem.duke.edu/databases/top8000.php
+#
+# Note: The polygons below are simplified manual tracings of the contours for computational efficiency.
 
 RAMACHANDRAN_POLYGONS: Dict[str, Dict[str, List[List[Tuple[float, float]]]]] = {
     "General": {
         "Favored": [
-            # Alpha-Helical Region (Centered ~ -60, -45)
-            [(-70, -30), (-60, -20), (-40, -40), (-40, -60), (-60, -70), (-80, -60), (-90, -40)],
-            # Beta-Sheet Region (Centered ~ -120, 120 and -120, -150ish ?) -> Actually top-left quadrant
-            # Beta bounds: Phi [-180, -40], Psi [90, 180] and [-180, -180] wrapping?
-            # Main Beta Cluster
-            [(-180, 180), (-180, 80), (-120, 80), (-60, 120), (-60, 180)],
-            # Polyproline II / Extended (part of Beta usually, but separate cluster sometimes)
-            # Connecting bridge?
-            [(-180, -180), (-180, -150), (-150, -150), (-150, -180)],
+            # Alpha-Helical Region (Core)
+            [(-90, -70), (-70, -80), (-50, -60), (-40, -50), (-30, -30), (-50, -10), (-70, -10), (-90, -30)],
+            # Beta-Sheet Region (Broad top-left)
+            [(-180, 180), (-180, 90), (-110, 90), (-70, 120), (-50, 150), (-50, 180)],
+            # Polyproline II / Extended (Connecting to Beta)
+            [(-180, -180), (-180, -140), (-140, -140), (-140, -180)],
         ],
         "Allowed": [
-            # Broader regions surrounding the favored ones
-            [(-180, 180), (-180, -180), (-30, -180), (-30, 180)], # Covers entire left side mostly
+            # Alpha Allowed (Generous surround)
+            [(-110, -90), (-40, -90), (-20, -20), (-40, 10), (-110, 10)],
+            # Beta Allowed (Generous surround)
+            [(-180, 180), (-180, 60), (-50, 60), (-30, 140), (-30, 180)],
+            [(-180, -180), (-180, -120), (-120, -120), (-120, -180)],
         ]
     },
     "GLY": {
         "Favored": [
-            # Symmetric regions (Alpha Left/Right, Beta Left/Right)
-            # Right Alpha (Standard L-AA alpha is left, but Gly has both)
-            # Alpha-R (Left handed helix, positive Phi)
-            [(40, 40), (60, 20), (80, 40), (80, 60), (60, 70), (40, 60)],
-            # Alpha-L (Standard helix, negative Phi)
-            [(-80, -60), (-60, -70), (-40, -60), (-40, -40), (-60, -20), (-80, -40)],
-            # Beta (Both sides)
-            [(-180, 180), (-180, 90), (-60, 90), (-60, 180)],
-            [(60, 180), (60, 90), (180, 90), (180, 180)],
-            [(-180, -180), (-180, -90), (-60, -90), (-60, -180)],
-            [(60, -180), (60, -90), (180, -90), (180, -180)],
+            # Glycine is unique: Achiral, so symmetric.
+            # Alpha-Right (Positive Phi)
+            [(40, 20), (80, 20), (80, 80), (40, 80)],
+            # Alpha-Left (Negative Phi)
+            [(-80, -80), (-40, -80), (-40, -20), (-80, -20)],
+            # Beta / Extended (Both sides)
+            [(-180, 180), (-180, 100), (-60, 100), (-60, 180)],
+            [(60, 180), (60, 100), (180, 100), (180, 180)],
+            [(-180, -180), (-180, -100), (-60, -100), (-60, -180)],
+            [(60, -180), (60, -100), (180, -100), (180, -180)],
         ],
         "Allowed": [
-             # Practically everywhere except steric clashes (Phi=0, Psi=0)
-             [(-180, 180), (-180, -180), (180, -180), (180, 180)] # Too permissive?
+             # Practically everywhere except steric limit (Phi=0, Psi=0)
+             [(-180, 180), (-180, -180), (180, -180), (180, 180)]
         ]
     },
     "PRO": {
         "Favored": [
             # Restricted Phi ~ -60 +/- 15
             # Alpha region
-            [(-70, -20), (-50, -20), (-50, -50), (-70, -50)],
-            # Polyproline II (Phi ~ -75, Psi ~ 145)
+            [(-75, -20), (-50, -20), (-50, -50), (-75, -50)],
+            # Polyproline II (PPII) - Very common for Proline
             [(-90, 120), (-60, 120), (-60, 180), (-90, 180)],
         ],
         "Allowed": [
-            [(-100, -180), (-40, -180), (-40, 180), (-100, 180)] # Vertical strip
+            # Slightly wider strip
+            [(-100, -180), (-40, -180), (-40, 180), (-100, 180)]
         ]
     },
     "Pre-Pro": {
-         # Residue BEFORE a Proline (often restricted)
-         # Similar to General but Beta region is shifted
          "Favored": [
-             [(-180, 180), (-180, 80), (-60, 120), (-60, 180)], # Beta
-             [(-70, -30), (-60, -20), (-40, -40), (-40, -60), (-60, -70)], # Alpha
+             # Beta region is similar
+             [(-180, 180), (-180, 90), (-60, 120), (-60, 180)],
+             # Alpha region is strictly restricted (steric clash with Pro CD)
+             [(-70, -30), (-50, -20), (-40, -50), (-60, -70)],
          ],
          "Allowed": [
              [(-180, 180), (-180, -180), (-30, -180), (-30, 180)],

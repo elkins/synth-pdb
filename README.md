@@ -933,7 +933,7 @@ pytest tests/test_generator.py -v
 ```
 
 **Test Coverage**: 95% overall
-- 283 tests covering generation, validation, CLI, and edge cases
+- 289 tests covering generation, validation, CLI, and edge cases
 
 ### Project Structure
 
@@ -1178,3 +1178,51 @@ For production-quality structure generation, consider:
 - **Rosetta** (de novo structure prediction)
 - **AlphaFold** (AI-based prediction)
 - **PyMOL/Chimera** (structure visualization and manipulation)
+
+## Glossary of Scientific Terms & Acronyms
+
+- **B-factor**: Temperature factor (\pi^2\langle u^2 \rangle$) measuring atomic displacement/flexibility.
+- **Backbone-Dependent Rotamer**: A side-chain conformation probability that depends on the local backbone angles ($\phi, \psi$).
+- **Chi Angles ($\chi$)**: Dihedral angles describing side-chain conformation.
+- **MolProbity**: A structure validation web service providing the gold standard for Ramachandran and rotamer analysis.
+- **OBC2**: Onufriev-Bashford-Case model 2. An implicit solvent model used in OpenMM.
+- **Phi/Psi ($\phi, \psi$)**: Backbone dihedral angles. $\phi$ (N-C$\alpha$), $\psi$ (C$\alpha569XilsC).
+- **Ramachandran Plot**: A 2D plot of $\phi$ vs $\psi$ angles showing allowed backbone conformations.
+- **Rotamer**: Short for "Rotational Isomer". Preferred, low-energy side-chain conformations.
+- **Top8000**: A high-quality dataset of ~8000 protein chains (resolution < 2.0Å, low homology) used to derive accurate Ramachandran contours and rotamer libraries. (Reference: Lovell et al., 2003).
+
+## References & Acknowledgements
+
+This project's validation logic is heavily inspired by the foundational work of the **Richardson Lab** (Duke University) and the **Dunbrack Lab** (Fox Chase Cancer Center).
+
+### Foundational Papers
+
+*   **Ramachandran Validation (Top8000)**:  
+    Lovell, S. C., et al. (2003). "Structure validation by Calpha geometry: phi,psi and Cbeta deviation." *Proteins: Structure, Function, and Bioinformatics*, 50(3), 437–450.
+    > Used for:  Ramachandran polygons.
+
+*   **MolProbity**:  
+    Chen, V. B., et al. (2010). "MolProbity: all-atom structure validation for macromolecular crystallography." *Acta Crystallographica Section D*, 66(1), 12–21.
+    > Used for: Validation philosophy (favored/allowed/outlier classification).
+
+*   **Backbone-Dependent Rotamers**:  
+    Dunbrack, R. L., & Cohen, F. E. (1997). "Bayesian statistical analysis of protein side-chain rotamer preferences." *Protein Science*, 6(8), 1661–1681.
+    > Used for: .
+
+## References & Acknowledgements
+
+This project's validation logic is heavily inspired by the foundational work of the **Richardson Lab** (Duke University) and the **Dunbrack Lab** (Fox Chase Cancer Center).
+
+### Foundational Papers
+
+*   **Ramachandran Validation (Top8000)**:  
+    Lovell, S. C., et al. (2003). "Structure validation by Calpha geometry: phi,psi and Cbeta deviation." *Proteins: Structure, Function, and Bioinformatics*, 50(3), 437–450.
+    > Used for: `PDBValidator` Ramachandran polygons.
+
+*   **MolProbity**:  
+    Chen, V. B., et al. (2010). "MolProbity: all-atom structure validation for macromolecular crystallography." *Acta Crystallographica Section D*, 66(1), 12–21.
+    > Used for: Validation philosophy (favored/allowed/outlier classification).
+
+*   **Backbone-Dependent Rotamers**:  
+    Dunbrack, R. L., & Cohen, F. E. (1997). "Bayesian statistical analysis of protein side-chain rotamer preferences." *Protein Science*, 6(8), 1661–1681.
+    > Used for: `synth_pdb.data.BACKBONE_DEPENDENT_ROTAMER_LIBRARY`.
