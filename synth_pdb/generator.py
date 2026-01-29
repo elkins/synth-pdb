@@ -16,6 +16,7 @@ import logging
 from typing import List, Optional, Dict, Tuple
 from .data import (
     STANDARD_AMINO_ACIDS,
+    ALL_VALID_AMINO_ACIDS,
     ONE_TO_THREE_LETTER_CODE,
     AMINO_ACID_FREQUENCIES,
     BOND_LENGTH_N_CA,
@@ -418,12 +419,12 @@ def _resolve_sequence(
             # Assume 3-letter code format like 'ALA-GLY-VAL'
             amino_acids = [aa.upper() for aa in user_sequence_str_upper.split("-")]
             for aa in amino_acids:
-                if aa not in STANDARD_AMINO_ACIDS:
+                if aa not in ALL_VALID_AMINO_ACIDS:
                     raise ValueError(f"Invalid 3-letter amino acid code: {aa}")
             return amino_acids
         elif (
             len(user_sequence_str_upper) == 3
-            and user_sequence_str_upper in STANDARD_AMINO_ACIDS
+            and user_sequence_str_upper in ALL_VALID_AMINO_ACIDS
         ):
             # It's a single 3-letter amino acid code
             return [user_sequence_str_upper]
@@ -668,6 +669,8 @@ def generate_pdb_content(
     metal_ions: str = 'auto',
     minimization_k: float = 10.0, # Tolerance
     minimization_max_iter: int = 0, # 0 = unlimited
+    cis_proline_frequency: float = 0.05, # Probability of Cis-Proline (0.05 = 5%)
+    phosphorylation_rate: float = 0.0, # Probability of S/T/Y phosphorylation
 ) -> str:
     """
     Generates PDB content for a linear peptide chain.
@@ -718,6 +721,36 @@ def generate_pdb_content(
         user_sequence_str=sequence_str,
         use_plausible_frequencies=use_plausible_frequencies,
     )
+
+    # EDUCATIONAL NOTE - Post-Translational Modifications (PTMs):
+    # -----------------------------------------------------------
+    # Phosphorylation (addition of a phosphate group, PO4^3-) is a reversible
+    # modification that acts as a molecular switch.
+    # 
+    # Biophysical Impact:
+    # 1. Electrostatics: Adds a massive negative charge (-2e at physiological pH).
+    #    This can repel nearby negative residues or attract positive ones (Salt Bridges),
+    #    drastically altering the local conformation.
+    # 2. Sterics: The phosphate group is bulky, often forcing the backbone into
+    #    new shapes to accommodate it.
+    #
+    # Simulation:
+    # We convert the standard residue (SER/THR/TYR) to its phosphorylated form
+    # (SEP/TPO/PTR) which OpenMM's AMBER forcefield recognizes and treats with
+    # correct physics (charge and partial double bond parameters).
+    if phosphorylation_rate > 0:
+         # ... conversion logic ...
+        modified_sequence = []
+        for aa in sequence:
+            if aa == 'SER' and random.random() < phosphorylation_rate:
+                modified_sequence.append('SEP')
+            elif aa == 'THR' and random.random() < phosphorylation_rate:
+                modified_sequence.append('TPO')
+            elif aa == 'TYR' and random.random() < phosphorylation_rate:
+                modified_sequence.append('PTR')
+            else:
+                modified_sequence.append(aa)
+        sequence = modified_sequence
 
     if not sequence:
         if sequence_str is not None and len(sequence_str) == 0:
@@ -842,9 +875,10 @@ def generate_pdb_content(
             # However, X-Pro bonds have a ~5% probability of being Cis (0 deg).
             # This is important for realistic distributions.
             MEAN_OMEGA = OMEGA_TRANS
+            MEAN_OMEGA = OMEGA_TRANS
             if res_name == 'PRO':
-                # 5% probability of Cis
-                if random.random() < 0.05:
+                # Apply user-defined Cis probability (biological default ~5%)
+                if random.random() < cis_proline_frequency:
                     MEAN_OMEGA = 0.0 # Cis
             
             current_omega = MEAN_OMEGA + np.random.uniform(-OMEGA_VARIATION, OMEGA_VARIATION)

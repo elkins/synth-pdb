@@ -30,6 +30,15 @@ STANDARD_AMINO_ACIDS: List[str] = [
     "TYR",
 ]
 
+# Post-Translational Modifications
+MODIFIED_AMINO_ACIDS: List[str] = [
+    "SEP", # Phosphoserine
+    "TPO", # Phosphothreonine
+    "PTR", # Phosphotyrosine
+]
+
+ALL_VALID_AMINO_ACIDS: List[str] = STANDARD_AMINO_ACIDS + MODIFIED_AMINO_ACIDS
+
 # --- Amino Acid Frequencies (Approximate percentages in proteins) ---
 # Source: Based on general protein composition data (e.g., from D. M. Smith, The Encyclopedia of Life Sciences, 2001)
 # These are normalized to sum to 1.0

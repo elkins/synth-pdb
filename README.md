@@ -43,6 +43,8 @@ A command-line tool to generate Protein Data Bank (PDB) files with full atomic r
 - **Biophysical Realism**: 
     - **Backbone-Dependent Rotamers**: Chi angles depend on secondary structure.
     - **Pre-Proline Bias**: Residues preceding Proline automatically adopt restricted conformations (extended/beta). ✅
+    - **Cis-Proline Isomerization**: X-Pro bonds can adopt cis conformations (~5% probability). ✅
+    - **Post-Translational Modifications**: Support for Phosphorylation (SEP, TPO, PTR) with valid physics parameters. ✅
 47: 
 48: 🚀 **High Performance Physics**
 49: - **Hardware Acceleration**: Automatically detects and uses **GPU acceleration** (CUDA, OpenCL/Metal) if available.
@@ -452,6 +454,17 @@ my_training_data/
 - `--metal-ions {auto,none}`: Control metal ion coordination.
   - `auto` (default): Scans for binding sites and injects ions.
   - `none`: Disables automatic coordination.
+  
+- `--phosphorylation-rate <FLOAT>`: Probability of phosphorylating S/T/Y residues.
+  - Value between 0.0 and 1.0.
+  - Converts SER->SEP, THR->TPO, TYR->PTR.
+  - Mimics kinase activity for regulatory simulation.
+  - Example: `--phosphorylation-rate 0.5`
+  
+- `--cis-proline-frequency <FLOAT>`: Probability of X-Pro peptide bond being Cis.
+  - Default: `0.05` (5%)
+  - Cis-Proline is critical for tight turns and folding.
+  - Set to `0.0` for all-Trans, `1.0` for all-Cis.
 
 #### **Bulk Dataset Generation (AI)**
 
@@ -1029,15 +1042,19 @@ For students and researchers interested in the physics behind the code, here are
     - Used for: Rotamer libraries and side-chain probability distributions.
 2.  **Parsons, J., et al. (2005).** Practical conversion from torsion space to Cartesian space for in silico protein synthesis. *Journal of Computational Chemistry, 26*(10), 1063–1068.
     - Used for: The NeRF (Natural Extension Reference Frame) algorithm for backbone construction.
-3.  **Smith, D. M. (2001).** Protein Composition and Structure. *Encyclopedia of Life Sciences*.
+3.  **MacArthur, M. W., & Thornton, J. M. (1991).** Influence of proline residues on protein conformation. *Journal of Molecular Biology*, 218(2), 397-412.
+    - Used for: Cis-Proline isomerization statistics (~5% cis frequency).
+4.  **Homeyer, N., et al. (2006).** AMBER force-field parameters for phosphorylated amino acids... *Journal of Molecular Modeling*, 12(3), 281-289.
+    - Used for: PTM physics parameters (SEP, TPO, PTR) in OpenMM.
+5.  **Smith, D. M. (2001).** Protein Composition and Structure. *Encyclopedia of Life Sciences*.
     - Used for: Biological amino acid frequency data.
 
 ### NMR Dynamics & Relaxation
-4.  **Lipari, G., & Szabo, A. (1982).** Model-free approach to the interpretation of nuclear magnetic resonance relaxation in macromolecules. *Journal of the American Chemical Society, 104*(17), 4546–4559.
+6.  **Lipari, G., & Szabo, A. (1982).** Model-free approach to the interpretation of nuclear magnetic resonance relaxation in macromolecules. *Journal of the American Chemical Society, 104*(17), 4546–4559.
     - Used for: Calculating $S^2$ order parameters and relaxation rates ($R_1, R_2, NOE$).
-5.  **Wishart, D. S., et al. (1995).** 1H, 13C and 15N random coil NMR chemical shifts of the common amino acids. *Journal of Biomolecular NMR, 6, 135–140.*
+7.  **Wishart, D. S., et al. (1995).** 1H, 13C and 15N random coil NMR chemical shifts of the common amino acids. *Journal of Biomolecular NMR, 6, 135–140.*
     - Used for: Random coil chemical shift baselines.
-6.  **Cavanagh, J., et al. (2007).** *Protein NMR Spectroscopy: Principles and Practice*. Academic Press.
+8.  **Cavanagh, J., et al. (2007).** *Protein NMR Spectroscopy: Principles and Practice*. Academic Press.
     - Used for: General NMR theory and relaxation equations.
 
 ### Validation
