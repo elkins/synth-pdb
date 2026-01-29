@@ -78,6 +78,35 @@ SECONDARY_SHIFTS: Dict[str, Dict[str, float]] = {
     "H":  {"alpha": -0.2, "beta": 0.3},
 }
 
+# --- Ring Current Intensity Factors ---
+# EDUCATIONAL NOTE - Ring Current Physics:
+# ========================================
+# Aromatic rings (Benchmark: Benzene) have delocalized pi-electrons that circulate
+# when exposed to a magnetic field, creating an opposing induced magnetic field.
+#
+# - Regions ABOVE/BELOW the ring are SHIELDED (Field opposes external field -> Lower ppm).
+# - Regions in the PLANE of the ring are DESHIELDED (Field adds to external field -> Higher ppm).
+#
+# Model: Point Dipole approximation.
+# Shift = Intensity * (1 - 3*cos^2(theta)) / r^3
+#
+# References for further reading:
+# 1. Haigh, C. W., & Mallion, R. B. (1980). "Ring current theories in nuclear magnetic resonance". 
+#    Progress in Nuclear Magnetic Resonance Spectroscopy, 13(4), 303-344.
+# 2. Pople, J. A. (1956). "Proton magnetic shielding in aromatic compounds". 
+#    The Journal of Chemical Physics, 24(5), 1111.
+# 3. Case, D. A. (1995). "Chemical shifts in proteins". 
+#    Current Opinion in Structural Biology, 5(2), 272-276.
+#
+# Intensities are relative to Benzene.
+RING_INTENSITIES = {
+    "PHE": 1.2,  # Benzene ring (Standard)
+    "TYR": 1.2,  # Phenol ring (Similar to Benzene)
+    "TRP": 1.3,  # Indole (Stronger system)
+    "HIS": 0.5,  # Imidazole (Weaker, depends on protonation)
+}
+
+
 from synth_pdb.structure_utils import get_secondary_structure
 
 def predict_chemical_shifts(structure: struc.AtomArray) -> Dict[str, Dict[str, Dict[str, float]]]:
@@ -106,10 +135,15 @@ def predict_chemical_shifts(structure: struc.AtomArray) -> Dict[str, Dict[str, D
     Returns:
         shifts: Dict[chain_id, Dict[res_id, Dict[atom_name, value]]]
     """
-    logger.info("Predicting Chemical Shifts (SPARTA-lite)...")
+    logger.info("Predicting Chemical Shifts (SPARTA-lite + Ring Currents)...")
     
     # Use shared utility for SS classification
     ss_list = get_secondary_structure(structure)
+    
+    # Pre-calculate Ring Centers and Normals for Tertiary Effects
+    rings = _get_aromatic_rings(structure)
+    if rings:
+        logger.info(f"Found {len(rings)} aromatic rings for tertiary shift calculation.")
     
     # We need to iterate over residues
     res_starts = struc.get_residue_starts(structure)
@@ -141,8 +175,26 @@ def predict_chemical_shifts(structure: struc.AtomArray) -> Dict[str, Dict[str, D
             noise = np.random.normal(0, 0.15) if base_val != 0 else 0
             
             if base_val != 0:
-                final_val = base_val + offset + noise
-                atom_shifts[atom_type] = round(final_val, 3)
+                # 1. Base + Secondary Shift
+                val = base_val + offset + noise
+                
+                # 2. Add Tertiary Ring Current Effects
+                # Only affects protons (H, HA, HB...) and sometimes Carbon.
+                # Primarily Protons are interesting for NOESY/Structure.
+                if "H" in atom_type or atom_type == "H":
+                    # Get atom coordinate
+                    # We need to find the atom in the structure to get its coord
+                    # This is slightly inefficient (O(N*M)) but fine for peptides.
+                    # Optimization: Iterate atoms directly instead? 
+                    # Structure structure here is the whole array, res_atoms is the residue slice.
+                    try:
+                        target_atom = res_atoms[res_atoms.atom_name == atom_type][0]
+                        rc_shift = _calculate_ring_current_shift(target_atom.coord, rings)
+                        val += rc_shift
+                    except IndexError:
+                        pass # Atom not found in structure (e.g. sometimes amide H is missing)
+                
+                atom_shifts[atom_type] = round(val, 3)
         
         if chain_id not in results:
             results[chain_id] = {}
@@ -190,3 +242,84 @@ def calculate_csi(shifts: Dict[str, Dict[int, Dict[str, float]]], structure: str
                 csi_data[chain_id][res_id] = delta
                 
     return csi_data
+    return csi_data
+
+def _get_aromatic_rings(structure):
+    """
+    Identify aromatic rings and calculate their centers and normal vectors.
+    """
+    rings = []
+    
+    # Iterate residues
+    res_starts = struc.get_residue_starts(structure)
+    for idx in res_starts:
+        res = structure[idx]
+        res_name = res.res_name
+        
+        if res_name in RING_INTENSITIES:
+            # Extract ring atoms to calculate geometry
+            # Simplified definition of ring atoms
+            res_slice = structure[structure.res_id == res.res_id]
+            
+            if res_name in ["PHE", "TYR"]:
+                # 6-membered ring: CG, CD1, CD2, CE1, CE2, CZ
+                ring_atoms = res_slice[np.isin(res_slice.atom_name, ["CG", "CD1", "CD2", "CE1", "CE2", "CZ"])]
+            elif res_name == "TRP":
+                # Indole is 9 atoms, effective center near CD2/CE2 bond.
+                # Simplified: averaging all ring atoms
+                ring_names = ["CG", "CD1", "CD2", "NE1", "CE2", "CE3", "CZ2", "CZ3", "CH2"]
+                ring_atoms = res_slice[np.isin(res_slice.atom_name, ring_names)]
+            elif res_name == "HIS":
+                # 5-membered ring: CG, ND1, CD2, CE1, NE2
+                ring_atoms = res_slice[np.isin(res_slice.atom_name, ["CG", "ND1", "CD2", "CE1", "NE2"])]
+            else:
+                continue
+                
+            if len(ring_atoms) >= 3:
+                # Geometric Center
+                center = np.mean(ring_atoms.coord, axis=0)
+                
+                # Normal Vector (Cross product of two vectors in the ring)
+                # v1: Center -> Atom 0
+                # v2: Center -> Atom 1
+                # Normal = v1 x v2
+                v1 = ring_atoms[0].coord - center
+                v2 = ring_atoms[1].coord - center
+                normal = np.cross(v1, v2)
+                norm = np.linalg.norm(normal)
+                if norm > 0:
+                    normal = normal / norm
+                    intensity = RING_INTENSITIES[res_name]
+                    rings.append((center, normal, intensity))
+                    
+    return rings
+
+def _calculate_ring_current_shift(proton_coord, rings):
+    """
+    Calculate total ring current shift for a proton from all rings.
+    Formula: delta = Intensity * B_factor * (1 - 3*cos^2(theta)) / r^3
+    """
+    total_shift = 0.0
+    B_FACTOR = 11.0 # Empirical scaling factor (ppm * A^3)
+    
+    for center, normal, intensity in rings:
+        # Vector from ring center to proton
+        v = proton_coord - center
+        r = np.linalg.norm(v)
+        
+        if r < 1.0: 
+            continue # Too close/clashing, ignore singularity
+            
+        # Cos(theta) = dot(v, n) / (|v|*|n|) -> |n|=1
+        costheta = np.dot(v, normal) / r
+        
+        # Geometric Factor G(r, theta) = (1 - 3*cos^2(theta)) / r^3
+        # If theta = 0 (above ring), cos=1 -> (1-3)/r^3 = -2/r^3 (Shielding)
+        # If theta = 90 (in plane), cos=0 -> (1-0)/r^3 =  1/r^3 (Deshielding)
+        geom_factor = (1.0 - 3.0 * costheta**2) / (r**3)
+        
+        shift = intensity * B_FACTOR * geom_factor
+        
+        total_shift += shift
+        
+    return total_shift
