@@ -73,18 +73,37 @@ def calculate_angle(
 ) -> float:
     """
     Calculates the angle (in degrees) formed by three coordinates, with coord2 as the vertex.
+    Supports both single coordinates (shape (3,)) and batched arrays (shape (N, 3)).
     """
+    coord1 = np.asarray(coord1)
+    coord2 = np.asarray(coord2)
+    coord3 = np.asarray(coord3)
+
     vec1 = coord1 - coord2
     vec2 = coord3 - coord2
 
-    # Avoid division by zero for zero-length vectors
-    norm_vec1 = np.linalg.norm(vec1)
-    norm_vec2 = np.linalg.norm(vec2)
+    # Calculate norms along the last axis to support both 1D and 2D arrays
+    axis = -1
+    norm_vec1 = np.linalg.norm(vec1, axis=axis)
+    norm_vec2 = np.linalg.norm(vec2, axis=axis)
 
-    if norm_vec1 == 0 or norm_vec2 == 0:
-        return 0.0
+    # Calculate dot product
+    if vec1.ndim > 1:
+        dot_prod = np.sum(vec1 * vec2, axis=axis)
+    else:
+        dot_prod = np.dot(vec1, vec2)
 
-    cosine_angle = np.dot(vec1, vec2) / (norm_vec1 * norm_vec2)
+    # Handle zeros safely
+    denominator = norm_vec1 * norm_vec2
+    
+    with np.errstate(divide='ignore', invalid='ignore'):
+        cosine_angle = np.true_divide(dot_prod, denominator)
+        # Check for scalar vs array
+        if np.ndim(cosine_angle) == 0:
+            if denominator == 0: return 0.0
+        else:
+             cosine_angle[denominator == 0] = 0.0
+    
     cosine_angle = np.clip(cosine_angle, -1.0, 1.0)
     angle_rad = np.arccos(cosine_angle)
     return np.degrees(angle_rad)
@@ -95,34 +114,63 @@ def calculate_dihedral_angle(
 ) -> float:
     """
     Calculates the dihedral angle (in degrees) defined by four points (p1, p2, p3, p4).
+    Supports both single coordinates and batched arrays.
     Uses the robust vector-based normal approach (IUPAC convention).
     """
+    p1 = np.asarray(p1)
+    p2 = np.asarray(p2)
+    p3 = np.asarray(p3)
+    p4 = np.asarray(p4)
+
     v1 = p2 - p1
     v2 = p3 - p2
     v3 = p4 - p3
     
     # Normals to the two planes
-    n1 = np.cross(v1, v2).astype(float)
-    n2 = np.cross(v2, v3).astype(float)
+    # np.cross operates on the last axis by default for shapes (N, 3, 3)? 
+    # Actually np.cross default axis is -1 which is correct for (3,) and (N,3)
+    # BUT we need to be careful with type casting.
+    
+    # For cross product of (N, 3), result is (N, 3)
+    n1 = np.cross(v1, v2)
+    n2 = np.cross(v2, v3)
     
     # Normalize normals
-    n1_norm = np.linalg.norm(n1)
-    n2_norm = np.linalg.norm(n2)
+    axis = -1
+    n1_norm = np.linalg.norm(n1, axis=axis)
+    n2_norm = np.linalg.norm(n2, axis=axis)
     
-    if n1_norm == 0 or n2_norm == 0:
-        return 0.0
-        
-    n1 /= n1_norm
-    n2 /= n2_norm
+    # Safe normalization
+    with np.errstate(divide='ignore', invalid='ignore'):
+        if n1.ndim > 1:
+            n1 = n1 / n1_norm[:, None]
+            n2 = n2 / n2_norm[:, None]
+            # Handle zeros
+            n1[np.isnan(n1)] = 0.0
+            n2[np.isnan(n2)] = 0.0
+        else:
+            if n1_norm > 0: n1 = n1 / n1_norm
+            if n2_norm > 0: n2 = n2 / n2_norm
     
     # Unit vector along the second bond
-    u2 = v2.astype(float) / np.linalg.norm(v2)
+    v2_norm = np.linalg.norm(v2, axis=axis)
+    
+    with np.errstate(divide='ignore', invalid='ignore'):
+         if v2.ndim > 1:
+            u2 = v2 / v2_norm[:, None]
+            u2[np.isnan(u2)] = 0.0
+         else:
+            u2 = v2 / v2_norm if v2_norm > 0 else v2 * 0
     
     # Orthonormal basis in the plane perpendicular to b2
     m1 = np.cross(n1, u2)
     
-    x = np.dot(n1, n2)
-    y = np.dot(m1, n2)
+    if n1.ndim > 1:
+        x = np.sum(n1 * n2, axis=axis)
+        y = np.sum(m1 * n2, axis=axis)
+    else:
+        x = np.dot(n1, n2)
+        y = np.dot(m1, n2)
     
     return np.degrees(np.arctan2(y, x))
 

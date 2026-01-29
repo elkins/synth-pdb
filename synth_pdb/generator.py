@@ -666,6 +666,8 @@ def generate_pdb_content(
     equilibrate: bool = False,
     equilibrate_steps: int = 1000,
     metal_ions: str = 'auto',
+    minimization_k: float = 10.0, # Tolerance
+    minimization_max_iter: int = 0, # 0 = unlimited
 ) -> str:
     """
     Generates PDB content for a linear peptide chain.
@@ -1117,7 +1119,12 @@ def generate_pdb_content(
                         steps=equilibrate_steps
                     )
                 else:
-                    success = minimizer.add_hydrogens_and_minimize(input_pdb_path, output_pdb_path)
+                    success = minimizer.add_hydrogens_and_minimize(
+                        input_pdb_path, 
+                        output_pdb_path,
+                        max_iterations=minimization_max_iter,
+                        tolerance=minimization_k
+                    )
                 
                 if success:
                     logger.info("Minimization/Equilibration successful.")

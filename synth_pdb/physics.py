@@ -126,7 +126,7 @@ class EnergyMinimizer:
         perform local optimization.
         """
         if not HAS_OPENMM: return False
-        return self._run_simulation(pdb_file_path, output_path, max_iterations, tolerance, add_hydrogens=False)
+        return self._run_simulation(pdb_file_path, output_path, max_iterations=max_iterations, tolerance=tolerance, add_hydrogens=False)
 
     def equilibrate(self, pdb_file_path, output_path, steps=1000):
         """
@@ -145,7 +145,7 @@ class EnergyMinimizer:
              return False
         return self._run_simulation(pdb_file_path, output_path, add_hydrogens=True, equilibration_steps=steps)
 
-    def add_hydrogens_and_minimize(self, pdb_file_path, output_path):
+    def add_hydrogens_and_minimize(self, pdb_file_path, output_path, max_iterations=0, tolerance=10.0):
         """
         Robust minimization pipeline: Adds Hydrogens -> Creates/Minimizes System -> Saves Result.
         
@@ -163,7 +163,7 @@ class EnergyMinimizer:
         if not HAS_OPENMM:
              logger.error("Cannot add hydrogens: OpenMM not found.")
              return False
-        return self._run_simulation(pdb_file_path, output_path, add_hydrogens=True)
+        return self._run_simulation(pdb_file_path, output_path, add_hydrogens=True, max_iterations=max_iterations, tolerance=tolerance)
 
     def _run_simulation(self, input_path, output_path, max_iterations=0, tolerance=10.0, add_hydrogens=True, equilibration_steps=0):
         logger.info(f"Processing physics for {input_path}...")
@@ -176,7 +176,7 @@ class EnergyMinimizer:
             if add_hydrogens:
                 modeller = app.Modeller(topology, positions)
                 
-                # THE "AI TRINITY" AHA MOMENT - Hydrogen Stripping:
+                # IMPORTANT NOTE - Hydrogen Stripping:
                 # We found that OpenMM's addHydrogens() would fail or produce inconsistent 
                 # protonation states if Biotite's template-based hydrogens were present.
                 # Stripping all hydrogens and letting OpenMM re-add them according to 
@@ -272,7 +272,7 @@ class EnergyMinimizer:
                             if (atom.residue.id == str(bridge["res_ib"]) and atom.name == bridge["atom_b"]): idx_b = atom.index
                         if idx_a != -1 and idx_b != -1: salt_bridge_restraints.append((idx_a, idx_b, bridge["distance"] / 10.0))
                 except Exception as e: logger.warning(f"Detection failed: {e}")
-                # THE "AI TRINITY" AHA MOMENT - HETATM Preservation:
+                # IMPORTANT NOTE - HETATM Preservation:
                 # OpenMM's Modeller.addHydrogens() sometimes culls residues it doesn't recognize.
                 # Specifically, if our ZN ion is in its own chain or has a non-standard name.
                 non_protein_data = []
@@ -354,13 +354,48 @@ class EnergyMinimizer:
                 system.addForce(sb_force)
 
             integrator = mm.LangevinIntegrator(300 * unit.kelvin, 1.0 / unit.picosecond, 2.0 * unit.femtoseconds)
-            simulation = app.Simulation(topology, system, integrator)
+            
+            # OPTIMIZATION: Hardware Acceleration
+            # OpenMM defaults to 'CPU' or 'Reference' if not guided. We explicitly request GPU platforms.
+            platform = None
+            properties = {}
+            for name in ['CUDA', 'Metal', 'OpenCL']:
+                try:
+                    platform = mm.Platform.getPlatformByName(name)
+                    # Optimization properties for CUDA/OpenCL
+                    if name in ['CUDA', 'OpenCL']:
+                        properties = {'Precision': 'mixed'}
+                    logger.info(f"Using OpenMM Platform: {name}")
+                    break
+                except Exception:
+                    continue
+            
+            # Try to create simulation with selected platform
+            simulation = None
+            if platform:
+                try:
+                    simulation = app.Simulation(topology, system, integrator, platform, properties)
+                except Exception as e:
+                    logger.warning(f"Failed to initialize {platform.getName()} platform: {e}")
+                    platform = None # Trigger fallback
+
+            if simulation is None:
+                # Fallback to default (likely CPU)
+                # Note: We must create a NEW integrator because the previous one might be bound/corrupted? 
+                # OpenMM integrators are bound to a context once used. 
+                # But here we failed to create the context, so integrator should be fine? 
+                # Safer to re-create it just in case.
+                integrator = mm.LangevinIntegrator(300 * unit.kelvin, 1.0 / unit.picosecond, 2.0 * unit.femtoseconds)
+                logger.info("Using OpenMM Platform: CPU (Fallback)")
+                simulation = app.Simulation(topology, system, integrator)
+
             simulation.context.setPositions(positions)
             
-            # THE "AI TRINITY" AHA MOMENT: 
+            # IMPORTANT NOTE:
             # Energy minimization alone isn't enough for structural stability.
             # We must also equilibrate (simulation.step) to let the structure settle
             # into a local minimum that respects the custom coordination restraints.
+            logger.info(f"Minimizing (Tolerance={tolerance} kJ/mol, MaxIter={max_iterations})...")
             simulation.minimizeEnergy(maxIterations=max_iterations, tolerance=tolerance*unit.kilojoule/(unit.mole*unit.nanometer))
             
             if equilibration_steps > 0:
