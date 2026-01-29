@@ -39,6 +39,7 @@ A command-line tool to generate Protein Data Bank (PDB) files with full atomic r
 - **Disulfide Bonds**: Automatic detection and annotation of **SSBOND** records for Cysteine pairs. ✅
 - **Salt Bridge Stabilization**: Automatic detection of ionic interactions with harmonic restraints in OpenMM. ✅
 - **Advanced Chemical Shifts**: SPARTA-lite prediction + **Ring Current Effects** (shielding/deshielding from aromatic rings). ✅
+- **Relaxation Rates**: Lipari-Szabo Model-Free formalism with **SASA-modulated Order Parameters** ($S^2$), allowing "buried" residues to be more rigid than "exposed" ones. ✅
 
 🔬 **Validation Suite**
 - Bond length validation
@@ -934,7 +935,7 @@ pytest tests/test_generator.py -v
 ```
 
 **Test Coverage**: 95% overall
-- 289 tests covering generation, validation, CLI, and edge cases
+- 291 tests covering generation, validation, CLI, and edge cases
 
 ### Project Structure
 
@@ -1190,6 +1191,7 @@ For production-quality structure generation, consider:
 - **Phi/Psi ($\phi, \psi$)**: Backbone dihedral angles. $\phi$ (N-C$\alpha$), $\psi$ (C$\alpha569XilsC).
 - **Ramachandran Plot**: A 2D plot of $\phi$ vs $\psi$ angles showing allowed backbone conformations.
 - **Rotamer**: Short for "Rotational Isomer". Preferred, low-energy side-chain conformations.
+- **SASA**: Solvent Accessible Surface Area. The surface area of a biomolecule that is accessible to a solvent (like water). Used to determine if a residue is buried (low SASA) or exposed (high SASA).
 - **Top8000**: A high-quality dataset of ~8000 protein chains (resolution < 2.0Å, low homology) used to derive accurate Ramachandran contours and rotamer libraries. (Reference: Lovell et al., 2003).
 
 ## References & Acknowledgements

@@ -71,6 +71,22 @@ def predict_order_parameters(structure: struc.AtomArray) -> Dict[int, float]:
     ss_list = get_secondary_structure(structure)
     res_starts = struc.get_residue_starts(structure)
     
+    # Calculate SASA for "Packing Awareness"
+    try:
+        # vdw_radii: Simple lookup. Biotite has defaults but good to be explicit or use default.
+        # atom_sasa: Array of same length as structure
+        # probe_radius=1.4 standard for water
+        atom_sasa = struc.sasa(structure, probe_radius=1.4)
+        
+        # Handle NaNs from obscure atoms (e.g. unknown element radii)
+        if np.any(np.isnan(atom_sasa)):
+            logger.warning("SASA calculation returned NaNs. Replacing with 0.0 (ignored in sum) or max?")
+            atom_sasa = np.nan_to_num(atom_sasa, nan=50.0)
+            
+    except Exception as e:
+        logger.warning(f"SASA calculation failed ({e}). Defaulting to 1.0 (Exposed).")
+        atom_sasa = np.ones(len(structure)) * 50.0 # Arbitrary high value
+        
     s2_map = {}
     
     # Identify termini residues (by ID)
@@ -82,24 +98,48 @@ def predict_order_parameters(structure: struc.AtomArray) -> Dict[int, float]:
     start_res = res_ids[0]
     end_res = res_ids[-1]
     
+    # Heuristic Max SASA per residue (Angstrom^2)
+    # Ala-X-Ala roughly 200 A^2? 
+    # Let's use a conservative 150.0 A^2 as "Fully Exposed" reference.
+    MAX_SASA = 150.0
+    
     for i, start_idx in enumerate(res_starts):
         # Identify residue ID
         # structure[start_idx] gives first atom of residue
         rid = structure.res_id[start_idx]
         
+        # Calculate Total Residue SASA
+        stop_idx = res_starts[i+1] if i+1 < len(res_starts) else len(structure)
+        res_sasa = np.sum(atom_sasa[start_idx : stop_idx])
+        
+        # Relative SASA (0.0 = Buried, 1.0 = Exposed)
+        rel_sasa = min(res_sasa / MAX_SASA, 1.0)
+        
         ss = ss_list[i] if i < len(ss_list) else "coil"
         
-        # Base S2
+        # Base S2 from Secondary Structure
         if ss in ["alpha", "beta"]:
-            s2 = 0.85
+            base_s2 = 0.85
         else:
-            s2 = 0.65 # Coil/Loop
+            base_s2 = 0.70 # Increased base slightly, so exposed loops drop to ~0.50
             
         # Termini effects override secondary structure
         # Fraying usually affects first/last 2-3 residues
         if rid <= start_res + 1 or rid >= end_res - 1:
-            s2 = 0.45
+            base_s2 = 0.50
             
+        # Modulate by SASA
+        # Buried (rel_sasa=0) -> Bonus rigidity (+0.1)
+        # Exposed (rel_sasa=1) -> Penalty flexibility (-0.1)
+        # Formula: S2 = Base + (0.1 * (1 - rel_sasa)) - (0.1 * rel_sasa)
+        # Simplified: S2 = Base + 0.1 - 0.2 * rel_sasa
+        
+        # Or simpler:
+        # S2 = Base - 0.2 * rel_sasa (So exposed is lower)
+        # Let's align with plan: 0.85 -> 0.65 range.
+        
+        s2 = base_s2 + 0.05 * (1.0 - rel_sasa) - 0.15 * rel_sasa
+        
         # Add realistic noise
         s2 += np.random.normal(0, 0.02)
         s2 = np.clip(s2, 0.01, 0.98)
