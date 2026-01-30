@@ -799,6 +799,25 @@ BACKBONE_DEPENDENT_ROTAMER_LIBRARY: Dict[str, Dict[str, List[Dict[str, List[floa
     }
 }
 
+# --- Beta-Turn Definitions ---
+# Beta-turns involve 4 residues (i to i+3). The geometry is defined by the
+# Phi and Psi angles of residues i+1 and i+2.
+#
+# References:
+# - Venkatachalam CM (1968). Biopolymers.
+# - Richardson JS (1981). Adv. Protein Chem.
+#
+# Format: "Type": [(Phi_i+1, Psi_i+1), (Phi_i+2, Psi_i+2)]
+# Values in degrees.
+BETA_TURN_TYPES: Dict[str, List[Tuple[float, float]]] = {
+    "typeI":  [(-60.0, -30.0), (-90.0, 0.0)],
+    "typeII": [(-60.0, 120.0), (80.0, 0.0)],   # Classic Type II (Res 3 often Gly)
+    "typeI'": [(60.0, 30.0), (90.0, 0.0)],     # Inverse Type I (Goldenberg)
+    "typeII'": [(60.0, -120.0), (-80.0, 0.0)], # Inverse Type II
+    # Type VIII is also common
+    "typeVIII": [(-60.0, -30.0), (-120.0, 120.0)],
+}
+
 # --- Chi Angle Definitions ---
 # Defines the atoms required to calculate each Chi angle.
 # N-CA-CB-G  (Chi1)

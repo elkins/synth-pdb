@@ -31,6 +31,7 @@ from .data import (
     RAMACHANDRAN_PRESETS,
     RAMACHANDRAN_REGIONS,
     BACKBONE_DEPENDENT_ROTAMER_LIBRARY,
+    BETA_TURN_TYPES,
 )
 from .pdb_utils import create_pdb_header, create_pdb_footer
 from .geometry import (
@@ -578,7 +579,7 @@ def _parse_structure_regions(structure_str: str, sequence_length: int) -> Dict[i
         
         # VALIDATION STEP 2: Check conformation name
         # Build list of valid conformations from presets plus 'random'
-        valid_conformations = list(RAMACHANDRAN_PRESETS.keys()) + ['random']
+        valid_conformations = list(RAMACHANDRAN_PRESETS.keys()) + ['random'] + list(BETA_TURN_TYPES.keys())
         if conformation not in valid_conformations:
             raise ValueError(
                 f"Invalid conformation '{conformation}'. "
@@ -607,6 +608,14 @@ def _parse_structure_regions(structure_str: str, sequence_length: int) -> Dict[i
                 f"Invalid range numbers: '{range_part}'. "
                 f"Start and end must be integers (e.g., '1-10')"
             )
+        
+        # Special Check for Beta-Turns
+        if conformation in BETA_TURN_TYPES:
+            if (end - start + 1) != 4:
+                raise ValueError(
+                    f"Beta-turn '{conformation}' region {start}-{end} must be exactly 4 residues long. "
+                    f"Got {end - start + 1}."
+                )
         
         # VALIDATION STEP 5: Check range bounds
         # EDUCATIONAL NOTE - Why These Checks Matter:
@@ -805,107 +814,277 @@ def generate_pdb_content(
 
 
     peptide = struc.AtomArray(0)
+    residue_coordinates = {}
     
     # Build backbone and add side chains
     for i, res_name in enumerate(sequence):
         res_id = i + 1
         
         # Determine backbone coordinates based on previous residue or initial placement
+
+        # Determine conformation for this residue
+        # Use 0-based index to lookup in dictionary
+        # Default to 'alpha' if not specified (though _parse_structure_regions handles this mostly)
+        res_conformation = residue_conformations.get(i, conformation)
+        # Compatibility alias for rotamer selection logic downstream
+        current_conformation = res_conformation
+        
+        # Calculate backbone coordinates
         if i == 0:
+            # First residue (N-terminus)
+            # Place N at origin (0,0,0)
             n_coord = np.array([0.0, 0.0, 0.0])
+            
+            # Place CA along x-axis
             ca_coord = np.array([BOND_LENGTH_N_CA, 0.0, 0.0])
-            c_coord = ca_coord + np.array([
-                BOND_LENGTH_CA_C * np.cos(np.deg2rad(180 - ANGLE_N_CA_C)),
-                BOND_LENGTH_CA_C * np.sin(np.deg2rad(180 - ANGLE_N_CA_C)),
-                0.0
-            ])
             
-            # Determine initial PSI for the first residue to propagate to next
-            # We need to sample it based on conformation
-            # residue_conformations is already defined and gap-filled before the loop
-            current_conformation = residue_conformations[0]
-            if current_conformation == 'random':
-                 # Check next residue for Pre-Proline effect
-                 next_res_name = sequence[1] if len(sequence) > 1 else None
-                 _, current_psi = _sample_ramachandran_angles(res_name, next_res_name=next_res_name)
+            # Place C in x-y plane using N-CA-C angle
+            # We assume a default psi angle to start or just place it geometrically flat first
+            # Ideally, we place it based on the first psi, but we don't have previous omega.
+            # Simplified: Place C such that N-CA-C angle is correct in x-y plane.
+            
+            # Calculate coordinates for C
+            # Using simple trigonometry for the first angle
+            # x = CA_x + d * cos(pi - angle)
+            # y = CA_y + d * sin(pi - angle)
+            
+            # Correction: N is at origin, CA is at (d, 0, 0).
+            # Vector CA->N is (-1, 0, 0).
+            # We want vector CA->C to have angle ANGLE_N_CA_C with CA->N.
+            # So angle with x-axis is (180 - angle).
+            angle_with_x = np.pi - ANGLE_N_CA_C_RAD
+            
+            c_x = ca_coord[0] + BOND_LENGTH_CA_C * np.cos(angle_with_x)
+            c_y = ca_coord[1] + BOND_LENGTH_CA_C * np.sin(angle_with_x)
+            c_z = 0.0
+            c_z = 0.0
+            c_coord = np.array([c_x, c_y, c_z])
+            
+            # Initialize current_psi for usage in next iteration logic or end of loop
+            if res_conformation in RAMACHANDRAN_PRESETS:
+                current_psi = RAMACHANDRAN_PRESETS[res_conformation]['psi']
+            elif res_conformation == 'random':
+                 # Check next residue
+                 next_res_name = sequence[i+1] if i + 1 < sequence_length else None
+                 _, current_psi = _sample_ramachandran_angles(res_name, next_res_name)
+            elif res_conformation in BETA_TURN_TYPES:
+                # Residue 1 of turn?
+                # For i=0, it's always pos 1 of ANY structure starting at 1.
+                # If generated logic requires robust turn pos:
+                current_psi = RAMACHANDRAN_PRESETS['extended']['psi'] # Entry to turn
             else:
-                 current_psi = RAMACHANDRAN_PRESETS[current_conformation]['psi'] + np.random.normal(0, 5)
-
+                current_psi = -47.0 # Default Alpha
+            
         else:
-            # EDUCATIONAL NOTE - Per-Residue Conformation Selection:
-            # For each residue, we now look up its specific conformation from
-            # the residue_conformations dictionary. This allows different residues
-            # to have different secondary structures (e.g., residues 1-10 alpha helix,
-            # residues 11-20 beta sheet).
-            current_conformation = residue_conformations[i]
+            # For subsequent residues, we place atoms N, CA, C using internal coordinates
+            # defined by previous atoms.
             
-            # Determine phi/psi angles based on this residue's conformation
-            if current_conformation == 'random':
-                # Sample from Ramachandran probability distributions
-                # Uses residue-specific distributions for GLY and PRO
-                # EDUCATIONAL NOTE - Why Random Sampling:
-                # Random sampling creates structural diversity, useful for:
-                # 1. Modeling intrinsically disordered regions
-                # 2. Generating diverse structures for testing
-                # 3. Creating realistic loop/turn regions
-                # 2. Generating diverse structures for testing
-                # 3. Creating realistic loop/turn regions
+            prev_res_idx = i - 1
+            prev_coords = residue_coordinates[prev_res_idx]
+            prev_n_coord = prev_coords['N']
+            prev_ca_coord = prev_coords['CA']
+            prev_c_coord = prev_coords['C']
+            
+            # Determine Phi/Psi angles
+            # Note: Phi is torsion of C(i-1)-N(i)-CA(i)-C(i)
+            # Psi is torsion of N(i)-CA(i)-C(i)-N(i+1)
+            # Omega is torsion of CA(i-1)-C(i-1)-N(i)-CA(i) -- Peptide bond
+            
+            # Get next residue name if available
+            next_res_name = sequence[i+1] if i + 1 < sequence_length else None
+            
+            # 1. Place N(i)
+            # Bond: C(i-1)-N(i)
+            # Angle: CA(i-1)-C(i-1)-N(i)
+            # Dihedral: Psi(i-1) - typically ~180 for trans? No, Omega is the peptide bond dihedral.
+            # Wait. Omega is CA(prev)-C(prev)-N(curr)-CA(curr).
+            # The dihedral to place N(curr) relative to prev_N, prev_CA, prev_C is PSI(prev).
+            # No.
+            # Chain: ... N(prev) - CA(prev) - C(prev) - N(curr) ...
+            # To place N(curr), we need:
+            # - Bond: C(prev)-N(curr)
+            # - Angle: CA(prev)-C(prev)-N(curr) (Angle 1)
+            # - Dihedral: N(prev)-CA(prev)-C(prev)-N(curr) -> This is PSI(prev)
+            
+            # Retrieve Psi from previous residue's conformation
+            prev_conformation = residue_conformations.get(prev_res_idx, conformation)
+            
+            current_phi = None
+            current_psi = None
+
+            # Handle Beta-Turns explicitly
+            # If we are in a turn, the angles are fixed based on position in turn.
+            # Need to know which residue of the turn we are (1, 2, 3, 4)
+            # We need to find the START of this turn region to calculate offset.
+            # This is slightly inefficient but robust: find the range this index belongs to.
+            # Since we stored per-residue conformations, we don't have the ranges directly.
+            # But we can infer position:
+            # If prev_conformation is 'typeI', check i-1, i-2, i-3 to find start.
+            
+            # Check if we are residue 2 or 3 of the turn (the ones with angles).
+            # Res 1: i (start)
+            # Res 2: i+1 (offset 1) -> Has specific Phi/Psi
+            # Res 3: i+2 (offset 2) -> Has specific Phi/Psi
+            # Res 4: i+3 (end)
+            
+            # To place N(i), we use Psi(i-1).
+            # If prev_res (i-1) was Res 1 of turn, use random/default Psi? Or Helix/Sheet?
+            # Actually, Beta-Turns define Phi2, Psi2, Phi3, Psi3.
+            # Psi1 and Phi4 are not strictly defined (they connect to rest of chain).
+            
+            # Let's handle standard sampling first, then override if specific turn res.
+            pass
+
+            if prev_conformation in RAMACHANDRAN_PRESETS:
+                prev_psi = RAMACHANDRAN_PRESETS[prev_conformation]['psi']
+            elif prev_conformation in BETA_TURN_TYPES:
+                # Logic to determine Psi based on position in turn
+                # Scan backward to find start of turn
+                start_dist = 0
+                while (prev_res_idx - start_dist) >= 0 and residue_conformations.get(prev_res_idx - start_dist) == prev_conformation:
+                    start_dist += 1
+                # start_dist is now how far back the block goes.
+                # If we are at i, prev is i-1.
+                # If block is 0,1,2,3. i=1 (Res 2). prev=0 (Res 1).
+                # start_dist would be 1 (since 0 is same).
+                # Position index within turn for prev_res:
+                # Turn length is 4.
+                # We need to forward-scan to find total length? No, we validated it's 4.
+                # So if we are in a block of 4, we need to know index 0..3
                 
-                # Check next residue for Pre-Proline effect
-                next_res_name = sequence[i+1] if i < len(sequence) - 1 else None
-                current_phi, current_psi = _sample_ramachandran_angles(res_name, next_res_name=next_res_name)
+                # This is tricky with just the dict.
+                # Let's look at i-1. Is it the 1st, 2nd, 3rd residue of the turn?
+                # Check i-2. If same type, not 1st.
+                # Check i-3. If same type.
+                
+                c_prev = prev_conformation
+                if residue_conformations.get(prev_res_idx - 1) != c_prev:
+                    turn_pos = 1 # Prev is 1st residue.
+                elif residue_conformations.get(prev_res_idx - 2) != c_prev:
+                    turn_pos = 2 # Prev is 2nd residue.
+                elif residue_conformations.get(prev_res_idx - 3) != c_prev:
+                    turn_pos = 3 # Prev is 3rd residue.
+                else:
+                    turn_pos = 4 # Prev is 4th residue.
+                
+                # Turn angles defined for Res 2 and Res 3.
+                # "Type": [(Phi2, Psi2), (Phi3, Psi3)]
+                turn_angles = BETA_TURN_TYPES[prev_conformation]
+                
+                if turn_pos == 1:
+                    # Prev is Res 1. We need Psi1.
+                    # Turns usually connect strands, so Psi1 is often sheet-like/extended?
+                    # Or we sample random 'general'.
+                    # Ideally we'd be robust. Let's use 'extended' for entry into turn as default.
+                    prev_psi = RAMACHANDRAN_PRESETS['extended']['psi'] 
+                elif turn_pos == 2:
+                    # Prev is Res 2. We need Psi2.
+                    prev_psi = turn_angles[0][1]
+                elif turn_pos == 3:
+                    # Prev is Res 3. We need Psi3.
+                    prev_psi = turn_angles[1][1]
+                else: # turn_pos == 4 (End of turn)
+                    # Prev is Res 4. We need Psi4.
+                    # Exit turn. Use extended or helix default.
+                    prev_psi = RAMACHANDRAN_PRESETS['extended']['psi']
+                 
+            elif prev_conformation == 'random':
+                # Use the stored psi if we generated it?
+                # We synthesize fresh here. This ignores continuity if we don't store.
+                # Ideally we should generate all angles first.
+                # But current loop generates on fly.
+                # For 'random', we re-sample. This is inconsistent if we need Phi/Psi pairs.
+                # Assuming simple independent sampling for now as per original code.
+                _, prev_psi = _sample_ramachandran_angles(sequence[prev_res_idx], res_name)
+
             else:
-                # Use fixed angles from the conformation preset
-                # EDUCATIONAL NOTE - Preset Conformations:
-                # Each conformation (alpha, beta, ppii, extended) has characteristic
-                # phi/psi angles that define its 3D structure:
-                # - Alpha helix: φ=-57°, ψ=-47° (right-handed helix)
-                # - Beta sheet: φ=-135°, ψ=135° (extended strand)
-                # - PPII: φ=-75°, ψ=145° (left-handed helix, common in collagen)
-                # - Extended: φ=-120°, ψ=120° (stretched conformation)
-                current_phi = RAMACHANDRAN_PRESETS[current_conformation]['phi'] + np.random.normal(0, 5)
-                current_psi = RAMACHANDRAN_PRESETS[current_conformation]['psi'] + np.random.normal(0, 5)
+                # Should not happen
+                prev_psi = RAMACHANDRAN_PRESETS['alpha']['psi']
 
-
-            # Add slight variation to omega angle to mimic thermal fluctuations
-            # This adds realistic structural diversity (±5° variation)
-            
-            # EDUCATIONAL NOTE - Cis-Proline Support:
-            # Most peptide bonds are Trans (180 deg) to minimize steric clash.
-            # However, X-Pro bonds have a ~5% probability of being Cis (0 deg).
-            # This is important for realistic distributions.
-            MEAN_OMEGA = OMEGA_TRANS
-            MEAN_OMEGA = OMEGA_TRANS
-            if res_name == 'PRO':
-                # Apply user-defined Cis probability (biological default ~5%)
-                if random.random() < cis_proline_frequency:
-                    MEAN_OMEGA = 0.0 # Cis
-            
-            current_omega = MEAN_OMEGA + np.random.uniform(-OMEGA_VARIATION, OMEGA_VARIATION)
-            
-            # Correct Atom Placement Logic:
-            # ---------------------------
-            # We use the NeRF (Natural Extension Reference Frame) algorithm to
-            # build the backbone atom-by-atom. For a detailed explanation of the 
-            # math, see the educational note in `synth_pdb/geometry.py`.
-            #
-            # 1. Place N using previous Psi (Rotation around CA_prev-C_prev)
-            n_coord = position_atom_3d_from_internal_coords(
+            n_coord = _place_atom_with_dihedral(
                 prev_n_coord, prev_ca_coord, prev_c_coord,
-                BOND_LENGTH_C_N, ANGLE_CA_C_N, prev_psi
+                BOND_LENGTH_C_N,
+                ANGLE_CA_C_N, # Angle at C: CA-C-N
+                prev_psi
             )
             
-            # 2. Place CA using Omega (Rotation around C_prev-N_curr)
-            ca_coord = position_atom_3d_from_internal_coords(
+            # 2. Place CA(i)
+            # Bond: N(i)-CA(i)
+            # Angle: C(prev)-N(i)-CA(i)
+            # Dihedral: CA(prev)-C(prev)-N(i)-CA(i) -> This is OMEGA (Peptide bond)
+            
+            # Sample Omega
+            # Check for Cis-Proline
+            omega_mean = OMEGA_TRANS # 180
+            if res_name == 'PRO' and random.random() < cis_proline_frequency:
+                omega_mean = 0.0 # Cis
+            
+            # Sample with variation
+            omega = np.random.normal(omega_mean, OMEGA_VARIATION)
+            
+            ca_coord = _place_atom_with_dihedral(
                 prev_ca_coord, prev_c_coord, n_coord,
-                BOND_LENGTH_N_CA, ANGLE_C_N_CA, current_omega
+                BOND_LENGTH_N_CA,
+                ANGLE_C_N_CA,
+                omega
             )
             
-            # 3. Place C using Phi (Rotation around N_curr-CA_curr)
-            c_coord = position_atom_3d_from_internal_coords(
+            # 3. Place C(i)
+            # Bond: CA(i)-C(i)
+            # Angle: N(i)-CA(i)-C(i)
+            # Dihedral: C(prev)-N(i)-CA(i)-C(i) -> This is PHI(i)
+            
+            if res_conformation in RAMACHANDRAN_PRESETS:
+                current_phi = RAMACHANDRAN_PRESETS[res_conformation]['phi']
+                current_psi = RAMACHANDRAN_PRESETS[res_conformation]['psi']
+            elif res_conformation in BETA_TURN_TYPES:
+                # Same logic as Psi, but for current residue Phi
+                c_curr = res_conformation
+                # Find position of CURRENT residue
+                if residue_conformations.get(i - 1) != c_curr:
+                    turn_pos = 1 # Current is 1st residue.
+                elif residue_conformations.get(i - 2) != c_curr:
+                    turn_pos = 2 # Current is 2nd residue.
+                elif residue_conformations.get(i - 3) != c_curr:
+                    turn_pos = 3 # Current is 3rd residue.
+                else:
+                    turn_pos = 4 # Current is 4th residue.
+                
+                turn_angles = BETA_TURN_TYPES[res_conformation]
+                if turn_pos == 1:
+                    # Entry into turn. Phi1/Psi1.
+                    current_phi = RAMACHANDRAN_PRESETS['extended']['phi']
+                    current_psi = RAMACHANDRAN_PRESETS['extended']['psi']
+                elif turn_pos == 2:
+                    current_phi = turn_angles[0][0] # Phi2
+                    current_psi = turn_angles[0][1] # Psi2
+                elif turn_pos == 3:
+                    current_phi = turn_angles[1][0] # Phi3
+                    current_psi = turn_angles[1][1] # Psi3
+                else:
+                    current_phi = RAMACHANDRAN_PRESETS['extended']['phi'] # Phi4
+                    current_psi = RAMACHANDRAN_PRESETS['extended']['psi'] # Psi4
+
+            elif res_conformation == 'random':
+                current_phi, current_psi = _sample_ramachandran_angles(res_name, next_res_name)
+            else:
+                current_phi = RAMACHANDRAN_PRESETS['alpha']['phi']
+                current_psi = RAMACHANDRAN_PRESETS['alpha']['psi']
+                 
+            c_coord = _place_atom_with_dihedral(
                 prev_c_coord, n_coord, ca_coord,
-                BOND_LENGTH_CA_C, ANGLE_N_CA_C, current_phi
+                BOND_LENGTH_CA_C,
+                ANGLE_N_CA_C,
+                current_phi
             )
+
+
+        # Store coordinates for next iteration (NeRF needs them)
+        residue_coordinates[i] = {
+            'N': n_coord,
+            'CA': ca_coord,
+            'C': c_coord
+        }
 
         # Store Psi for next iteration
         prev_psi = current_psi

@@ -2,7 +2,7 @@
 
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/elkins/synth-pdb/blob/master/interactive_relaxation.ipynb)
 
-[![PyPI version](https://img.shields.io/badge/pypi-v1.11.0-blue)](https://pypi.org/project/synth-pdb/)
+[![PyPI version](https://img.shields.io/badge/pypi-v1.12.0-blue)](https://pypi.org/project/synth-pdb/)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Tests](https://github.com/elkins/synth-pdb/actions/workflows/test.yml/badge.svg)](https://github.com/elkins/synth-pdb/actions/workflows/test.yml)
@@ -990,7 +990,7 @@ pytest tests/test_generator.py -v
 ```
 
 **Test Coverage**: 95% overall
-- 297 tests covering generation, validation, CLI, and edge cases
+- 309 tests covering generation, validation, CLI, and edge cases
 
 ### Project Structure
 
@@ -1224,6 +1224,16 @@ synth-pdb --sequence "ACDEF" --gen-shifts --shift-output custom_shifts.nef
 ```
 
 
+
+### Synthetic J-Couplings (`--gen-couplings`)
+Generates scalar couplings ($^3J$) based on the Karplus equation:
+$$ ^3J(\theta) = A \cos^2\theta + B \cos\theta + C $$
+
+Primarily predicts the **HN-HA** coupling, which is a powerful indicator of secondary structure:
+- **Alpha Helix**: Small values (< 6 Hz)
+- **Beta Sheet**: Large values (> 8 Hz)
+
+**Outputs:** A CSV file (`_couplings.csv`) containing `res_id`, `residue`, and predicted `J_HN_HA` values.
 
 ### 🧲 Note for NMR Spectroscopists
 

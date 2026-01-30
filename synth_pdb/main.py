@@ -273,6 +273,18 @@ def main() -> None:
         help="Optional: Output NEF filename for chemical shifts.",
     )
     
+    # Phase 9.5: J-Couplings
+    parser.add_argument(
+        "--gen-couplings",
+        action="store_true",
+        help="Generate synthetic 3J(HN-HA) scalar couplings based on phi angles.",
+    )
+    parser.add_argument(
+        "--coupling-output",
+        type=str,
+        help="Optional: Output CSV filename for J-couplings.",
+    )
+    
     # Phase 10: Constraint Export
     parser.add_argument(
         "--export-constraints",
@@ -351,6 +363,18 @@ def main() -> None:
         type=float,
         default=7.4,
         help="pH for determining protonation states (default: 7.4). Affects Histidine (HIS/HIP/HIE)."
+    )
+    parser.add_argument(
+        "--cis-proline-frequency",
+        type=float,
+        default=0.05,
+        help="Probability (0.0-1.0) of Proline adopting the Cis conformation (default: 0.05).",
+    )
+    parser.add_argument(
+        "--phosphorylation-rate",
+        type=float,
+        default=0.0,
+        help="Probability (0.0-1.0) of Ser/Thr/Tyr phosphorylation (default: 0.0).",
     )
     
     # Phase 2: MD Equilibration
@@ -603,6 +627,8 @@ def main() -> None:
                 equilibrate=args.equilibrate,
                 equilibrate_steps=args.md_steps,
                 metal_ions=args.metal_ions,
+                cis_proline_frequency=args.cis_proline_frequency,
+                phosphorylation_rate=args.phosphorylation_rate,
             )
 
             if not current_pdb_content:
@@ -772,7 +798,7 @@ def main() -> None:
                 # We perform calculations first, so we can capture data (like restraints) for visualization if needed.
                 generated_restraints = None # To hold restraints for viewer
                 
-                if args.gen_nef or args.gen_relax or args.gen_shifts or args.export_constraints or args.export_torsion or args.gen_msa or args.export_distogram:
+                if args.gen_nef or args.gen_relax or args.gen_shifts or args.gen_couplings or args.export_constraints or args.export_torsion or args.gen_msa or args.export_distogram:
                     if args.mode != "generate":
                         logger.warning("Synthetic Data Generation is currently only supported in single structure 'generate' mode.")
                     else:
@@ -837,7 +863,39 @@ def main() -> None:
                                 shifts = predict_chemical_shifts(structure)
                                 shift_filename = args.shift_output if args.shift_output else output_filename.replace(".pdb", "_shifts.nef")
                                 write_nef_chemical_shifts(shift_filename, seq_str, shifts)
+                                shift_filename = args.shift_output if args.shift_output else output_filename.replace(".pdb", "_shifts.nef")
+                                write_nef_chemical_shifts(shift_filename, seq_str, shifts)
                                 logger.info(f"NEF Chemical Shift Data generated: {os.path.abspath(shift_filename)}")
+
+                            # 3.5 J-Couplings (Phase 9.5)
+                            if args.gen_couplings:
+                                from .coupling import predict_couplings_from_structure
+                                # Reuse torsion calc if not already done
+                                # Ideally we'd optimize to not recalc, but calculation is cheap.
+                                angles_list = calculate_torsion_angles(structure)
+                                
+                                # Convert generic List[Dict] to Dict[int, float] for phis
+                                phi_map = {}
+                                for angle_data in angles_list:
+                                    if angle_data['phi'] is not None:
+                                        phi_map[angle_data['res_id']] = angle_data['phi']
+                                    else:
+                                        phi_map[angle_data['res_id']] = np.nan
+                                        
+                                couplings = predict_couplings_from_structure(phi_map)
+                                
+                                coupling_csv = args.coupling_output if args.coupling_output else output_filename.replace(".pdb", "_couplings.csv")
+                                
+                                with open(coupling_csv, "w") as f:
+                                    f.write("res_id,residue,J_HN_HA\n")
+                                    # Write sorted by resid
+                                    for angle_data in angles_list:
+                                        rid = angle_data['res_id']
+                                        res = angle_data['residue']
+                                        jval = couplings.get(rid, np.nan)
+                                        f.write(f"{rid},{res},{jval:.4f}\n")
+                                        
+                                logger.info(f"J-Couplings exported: {os.path.abspath(coupling_csv)}")
                                 
                             # 4. Constraint Export (Phase 10)
                             if args.export_constraints:
