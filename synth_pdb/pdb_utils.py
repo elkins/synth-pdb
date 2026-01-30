@@ -109,11 +109,30 @@ def create_pdb_footer() -> str:
     return "\n".join(footer_lines)
 
 
+def extract_header_records(full_pdb_content: str, record_type: str = "SSBOND") -> str:
+    """
+    Extracts specific header records (e.g. SSBOND) from a full PDB content string.
+    
+    Args:
+        full_pdb_content: Complete PDB file content
+        record_type: Record type to extract (default: SSBOND)
+        
+    Returns:
+        str: Extracted records joined by newlines
+    """
+    records = []
+    for line in full_pdb_content.splitlines():
+        if line.startswith(record_type):
+            records.append(line)
+    return "\n".join(records)
+
+
 def assemble_pdb_content(
     atomic_content: str,
     sequence_length: int,
     date: Optional[str] = None,
     command_args: Optional[str] = None,
+    extra_records: Optional[str] = None,
 ) -> str:
     """
     Assembles complete PDB file content from atomic coordinates and metadata.
@@ -123,6 +142,7 @@ def assemble_pdb_content(
         sequence_length: Number of residues in the peptide
         date: Date string in PDB format. If None, uses current date.
         command_args: Command-line arguments for reproducibility
+        extra_records: Optional string of extra header records (e.g. SSBONDs) to insert
         
     Returns:
         str: Complete PDB file content with headers and footers
@@ -130,4 +150,9 @@ def assemble_pdb_content(
     header = create_pdb_header(sequence_length, date, command_args)
     footer = create_pdb_footer()
     
-    return f"{header}\n{atomic_content.strip()}\n{footer}"
+    content = f"{header}\n"
+    if extra_records:
+        content += f"{extra_records}\n"
+    content += f"{atomic_content.strip()}\n{footer}"
+    
+    return content

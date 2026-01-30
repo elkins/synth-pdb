@@ -72,25 +72,74 @@ def predict_order_parameters(structure: struc.AtomArray) -> Dict[int, float]:
     res_starts = struc.get_residue_starts(structure)
     
     # Calculate SASA for "Packing Awareness"
+    sasa_per_residue = {}
     try:
+        # Map non-standard residues to standard ones for SASA calculation
+        # This prevents "atom not found" or missing radii errors
+        temp_struc = structure.copy()
+        
+        # Histidine Tautomers
+        temp_struc.res_name[np.isin(temp_struc.res_name, ["HIE", "HID", "HIP"])] = "HIS"
+        
+        # Phosphorylated Residues
+        temp_struc.res_name[temp_struc.res_name == "SEP"] = "SER"
+        temp_struc.res_name[temp_struc.res_name == "TPO"] = "THR"
+        temp_struc.res_name[temp_struc.res_name == "PTR"] = "TYR"
+        
+        # Filter out extra atoms (P, O1P, etc.) that Biotite doesn't have radii for
+        ptm_atom_names = ["P", "O1P", "O2P", "O3P"]
+        ptm_mask = np.isin(temp_struc.atom_name, ptm_atom_names)
+        if np.any(ptm_mask):
+             temp_struc = temp_struc[~ptm_mask]
+
+        # CRITICAL FIX for Metal Ions (ZN, etc.):
+        # Biotite's sasa function with ProtOr radii set fails for non-amino-acid residues
+        # like 'ZN' because they are not in the lookup table.
+        # We simply exclude them from the calculation. While this slightly reduces accuracy
+        # (ignoring burial by ions), it prevents the entire SASA calculation from crashing.
+        # We assume any residue not in our standard/modified list is a cofactor/ion.
+        # Actually, simpler: Just filter by hetero flag if ions are HETATM.
+        # But let's be explicit about filtering out known ions to be safe.
+        
+        # Keep only amino acids (standard + converted PTMs)
+        # We check against a known set of 3-letter codes?
+        # Or just remove ZN, MG, CA, NA, CL.
+        ion_res_names = ["ZN", "MG", "CA", "NA", "CL", "K", "FE", "CU", "MN"]
+        ion_mask = np.isin(temp_struc.res_name, ion_res_names)
+        if np.any(ion_mask):
+             temp_struc = temp_struc[~ion_mask]
+
         # vdw_radii: Simple lookup. Biotite has defaults but good to be explicit or use default.
         # atom_sasa: Array of same length as structure
         # probe_radius=1.4 standard for water
-        atom_sasa = struc.sasa(structure, probe_radius=1.4)
+        filtered_sasa = struc.sasa(temp_struc, probe_radius=1.4)
         
-        # Handle NaNs from obscure atoms (e.g. unknown element radii)
-        if np.any(np.isnan(atom_sasa)):
-            logger.warning("SASA calculation returned NaNs. Replacing with 0.0 (ignored in sum) or max?")
-            atom_sasa = np.nan_to_num(atom_sasa, nan=50.0)
+        # Handle NaNs
+        if np.any(np.isnan(filtered_sasa)):
+             filtered_sasa = np.nan_to_num(filtered_sasa, nan=50.0)
+
+        # Aggregate SASA by residue (robust to atom count changes)
+        curr_res_id = -99999
+        current_sum = 0.0
+        
+        for i, atom in enumerate(temp_struc):
+             if atom.res_id != curr_res_id:
+                 if curr_res_id != -99999:
+                     sasa_per_residue[curr_res_id] = current_sum
+                 curr_res_id = atom.res_id
+                 current_sum = 0.0
+             current_sum += filtered_sasa[i]
+        # Last residue
+        if curr_res_id != -99999:
+             sasa_per_residue[curr_res_id] = current_sum
             
     except Exception as e:
-        logger.warning(f"SASA calculation failed ({e}). Defaulting to 1.0 (Exposed).")
-        atom_sasa = np.ones(len(structure)) * 50.0 # Arbitrary high value
+        logger.warning(f"SASA calculation failed ({e}). Defaulting to Exposed (1.0).")
+        # sasa_per_residue will be empty, loop below handles this via .get() default
         
     s2_map = {}
     
     # Identify termini residues (by ID)
-    # Be careful with multi-chain
     res_ids = np.unique(structure.res_id)
     if len(res_ids) == 0:
         return {}
@@ -98,19 +147,15 @@ def predict_order_parameters(structure: struc.AtomArray) -> Dict[int, float]:
     start_res = res_ids[0]
     end_res = res_ids[-1]
     
-    # Heuristic Max SASA per residue (Angstrom^2)
-    # Ala-X-Ala roughly 200 A^2? 
-    # Let's use a conservative 150.0 A^2 as "Fully Exposed" reference.
+    # Heuristic Max SASA per residue (Angstrom^2) for normalization
     MAX_SASA = 150.0
     
     for i, start_idx in enumerate(res_starts):
         # Identify residue ID
-        # structure[start_idx] gives first atom of residue
         rid = structure.res_id[start_idx]
         
-        # Calculate Total Residue SASA
-        stop_idx = res_starts[i+1] if i+1 < len(res_starts) else len(structure)
-        res_sasa = np.sum(atom_sasa[start_idx : stop_idx])
+        # Get SASA from map (default to MAX_SASA/Exposed if failed/missing)
+        res_sasa = sasa_per_residue.get(rid, MAX_SASA)
         
         # Relative SASA (0.0 = Buried, 1.0 = Exposed)
         rel_sasa = min(res_sasa / MAX_SASA, 1.0)
@@ -131,11 +176,7 @@ def predict_order_parameters(structure: struc.AtomArray) -> Dict[int, float]:
         # Modulate by SASA
         # Buried (rel_sasa=0) -> Bonus rigidity (+0.1)
         # Exposed (rel_sasa=1) -> Penalty flexibility (-0.1)
-        # Formula: S2 = Base + (0.1 * (1 - rel_sasa)) - (0.1 * rel_sasa)
-        # Simplified: S2 = Base + 0.1 - 0.2 * rel_sasa
-        
-        # Or simpler:
-        # S2 = Base - 0.2 * rel_sasa (So exposed is lower)
+        # Formula: S2 = Base + 0.1 - 0.2 * rel_sasa
         # Let's align with plan: 0.85 -> 0.65 range.
         
         s2 = base_s2 + 0.05 * (1.0 - rel_sasa) - 0.15 * rel_sasa

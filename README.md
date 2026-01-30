@@ -632,6 +632,11 @@ synth-pdb --sequence "VVVVVGGVVVVV" --structure "1-5:beta,6-8:random,9-12:beta" 
 # 🧪 Polyproline II Helix (Collagen-like)
 # Left-handed helix, compact and visually distinct
 synth-pdb --sequence "GPGPPGPPGPPGPP" --conformation ppii --minimize --visualize
+
+# 🧪 The "Kitchen Sink" (Features Demo)
+# Combines distinct secondary structures (Helix, Sheet) with a Type I Beta Turn and PTMs.
+# Look for the magenta helix, purple turn, and orange phosphorylated residues (SEP/TPO/PTR).
+synth-pdb --length 25 --structure "1-10:alpha,11-14:typeI,15-25:beta" --phosphorylation-rate 0.3 --visualize
 ```
 
 **Visualization Tips:**

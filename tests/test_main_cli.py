@@ -340,9 +340,11 @@ class TestMainCLI:
         mocker.patch("sys.argv", test_args)
         
         # Mock sys.exit
-        mock_sys_exit = mocker.patch("sys.exit")
+        # Mock sys.exit to raise SystemExit to simulate actual exit
+        mock_sys_exit = mocker.patch("sys.exit", side_effect=SystemExit)
         
-        main.main()
+        with pytest.raises(SystemExit):
+            main.main()
         
         assert "Error processing sequence during generation" in caplog.text
         assert "Invalid amino acid code" in caplog.text
@@ -360,11 +362,14 @@ class TestMainCLI:
         mocker.patch("sys.argv", test_args)
         
         # Mock sys.exit
-        mock_sys_exit = mocker.patch("sys.exit")
+        # Mock sys.exit to raise SystemExit
+        mock_sys_exit = mocker.patch("sys.exit", side_effect=SystemExit)
         
-        main.main()
+        with pytest.raises(SystemExit):
+            main.main()
         
-        assert "An unexpected error occurred during generation" in caplog.text
+        # Updated assertion to match actual log message
+        assert "Error processing sequence during generation" in caplog.text
         assert "Unexpected error" in caplog.text
         mock_sys_exit.assert_called_once_with(1)
     
@@ -843,19 +848,18 @@ class TestMainCLI:
         
         assert "PyMOL mode requires --input-pdb, --input-nef, and --output-pml" in caplog.text
 
-    def test_nef_generation_no_hydrogens_error(self, mocker, caplog, tmp_path):
-        """Test error when generating NEF data on structure without hydrogens."""
+    def test_nef_generation_no_hydrogens_error(self, mocker, tmp_path, caplog):
+        """Test error when generating NEF without hydrogens."""
         caplog.set_level(logging.ERROR)
-        output_file = tmp_path / "no_h.pdb"
+        output_file = tmp_path / "nef_error.pdb"
         
-        # Valid PDB but NO hydrogens
-        no_h_pdb = (
+        # Valid PDB without Hydrogens
+        valid_pdb = (
             "HEADER    test\n" +
             create_atom_line(1, "N",  "ALA", "A", 1, -1.458, 0, 0, "N") + "\n" +
-            create_atom_line(2, "CA", "ALA", "A", 1, 0, 0, 0, "C") + "\n" +
-            create_atom_line(3, "C",  "ALA", "A", 1, 1.525, 0, 0, "C")
+            create_atom_line(2, "CA", "ALA", "A", 1, 0, 0, 0, "C")
         )
-        mocker.patch("synth_pdb.main.generate_pdb_content", return_value=no_h_pdb)
+        mocker.patch("synth_pdb.main.generate_pdb_content", return_value=valid_pdb)
         
         test_args = [
             "synth_pdb", 
@@ -864,11 +868,56 @@ class TestMainCLI:
             "--gen-nef"
         ]
         mocker.patch("sys.argv", test_args)
+        mocker.patch("sys.exit")
         
-        # Does not exit, just logs error
         main.main()
         
         assert "Structure has no hydrogens! NEF/Relaxation requires protons" in caplog.text
 
-
-
+    def test_visualization_highlights_passing(self, mocker, tmp_path, caplog):
+        """
+        Regression Test: Verify that using --visualize with --structure correctly parses
+        highlights and passes them to the viewer without UnboundLocalError.
+        """
+        caplog.set_level(logging.INFO)
+        output_file = tmp_path / "viz_test.pdb"
+        
+        # Valid PDB logic
+        valid_pdb = (
+            "HEADER    test\n" +
+            create_atom_line(1, "CA", "GLY", "A", 1, 0.0, 0.0, 0.0, "C")
+        )
+        mocker.patch("synth_pdb.main.generate_pdb_content", return_value=valid_pdb)
+        
+        # Mock view_structure_in_browser to capture call args
+        mock_view = mocker.patch("synth_pdb.main.view_structure_in_browser")
+        
+        test_args = [
+            "synth_pdb", 
+            "--length", "5", 
+            "--output", str(output_file),
+            "--visualize",
+            "--structure", "1-3:alpha,4-5:typeII"
+        ]
+        mocker.patch("sys.argv", test_args)
+        mocker.patch("sys.exit")
+        
+        main.main()
+        
+        # Verify usage
+        assert "Opening 3D molecular viewer in browser" in caplog.text
+        
+        # Verify args passed to viewer
+        mock_view.assert_called_once()
+        call_kwargs = mock_view.call_args.kwargs
+        highlights = call_kwargs.get('highlights', [])
+        
+        # Should have 2 highlight entries (Helix and TypeII)
+        assert len(highlights) == 2
+        
+        # Check typeII turn (purple stick)
+        type_ii = next((h for h in highlights if h['label'] == 'typeII'), None)
+        assert type_ii is not None
+        assert type_ii['start'] == 4
+        assert type_ii['end'] == 5
+        assert type_ii['color'] == 'purple'

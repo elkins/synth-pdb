@@ -17,7 +17,7 @@ from .decoys import DecoyGenerator
 from .docking import DockingPrep
 import os
 from .validator import PDBValidator
-from .pdb_utils import extract_atomic_content, assemble_pdb_content
+from .pdb_utils import extract_atomic_content, assemble_pdb_content, extract_header_records
 from .viewer import view_structure_in_browser
 
 # Get a logger for this module
@@ -158,7 +158,7 @@ def main() -> None:
         "--structure",
         type=str,
         default=None,
-        help="Per-region conformation specification (NEW!). Format: 'start-end:conformation,...' Example: '1-10:alpha,11-20:beta'. Allows mixed secondary structures. Unspecified residues use --conformation default.",
+        help="Per-region conformation specification. Format: 'start-end:conformation,...'. Supports secondary structures (alpha, beta) and Turn types (typeI, typeII, typeVIII). Example: '1-10:alpha,11-14:typeII,15-20:beta'.",
     )
     parser.add_argument(
         "--visualize",
@@ -669,10 +669,42 @@ def main() -> None:
                 final_violations = current_violations
                 break
 
-        except ValueError as ve:
-            logger.error(f"Error processing sequence during generation (attempt {attempt_num}): {ve}. Skipping.")
+        except (ValueError, TypeError, RuntimeError, Exception) as e:
+            logger.error(f"Error processing sequence during generation: {e}")
+            sys.exit(1)
+
+    # Parse structure definitions for highlighting in Viewer
+    highlights = []
+    if args.structure:
+        try:
+            # Format: "1-5:beta,6-9:typeII"
+            parts = args.structure.split(",")
+            for part in parts:
+                if ":" in part:
+                     rng, s_type = part.split(":")
+                     if "-" in rng:
+                         start_s, end_s = rng.split("-")
+                         start, end = int(start_s), int(end_s)
+                         
+                         # Only highlight specific turns or interesting features
+                         if "type" in s_type or "beta" in s_type and "turn" in s_type: # e.g. typeII, beta-turn
+                             highlights.append({
+                                 'start': start, 
+                                 'end': end, 
+                                 'color': 'purple', 
+                                 'style': 'stick', # Stick makes turn geometry visible
+                                 'label': s_type
+                             })
+                         elif "helix" in s_type or "alpha" in s_type:
+                             highlights.append({
+                                 'start': start, 
+                                 'end': end, 
+                                 'color': 'magenta', 
+                                 'style': 'cartoon',
+                                 'label': 'Alpha Helix'
+                             })
         except Exception as e:
-            logger.error(f"An unexpected error occurred during generation (attempt {attempt_num}): {e}. Skipping.")
+            logger.warning(f"Could not parse structure for highlighting: {e}")
 
     if final_pdb_content is None:
         logger.error(f"Failed to generate a suitable PDB file after {generation_attempts} attempts.")
@@ -680,6 +712,11 @@ def main() -> None:
     else:
         # Extract atomic content from the initially selected PDB for subsequent refinement or final assembly.
         final_pdb_atomic_content = extract_atomic_content(final_pdb_content)
+        
+        # PRESERVE HEADER RECORDS (SSBOND)
+        # generator.py creates them, but extract_atomic_content strips them.
+        # We must re-inject them during assembly.
+        preserved_ssbonds = extract_header_records(final_pdb_content, "SSBOND")
 
         # Apply refinement if requested
         if args.refine_clashes > 0:
@@ -712,7 +749,8 @@ def main() -> None:
                 # Build command string for temporary header
                 cmd_string = _build_command_string(args)
                 temp_full_pdb = assemble_pdb_content(
-                    new_atomic_content_after_tweak, 1, command_args=cmd_string
+                    new_atomic_content_after_tweak, 1, command_args=cmd_string,
+                    extra_records=preserved_ssbonds # Keeps context valid if validator checks bonds
                 )
                 temp_validator = PDBValidator(pdb_content=temp_full_pdb)
                 temp_validator.validate_all()
@@ -761,7 +799,8 @@ def main() -> None:
             # Assemble the full PDB content with header and footer
             cmd_string = _build_command_string(args)
             final_full_pdb_content_to_write = assemble_pdb_content(
-                final_pdb_atomic_content, final_sequence_length, command_args=cmd_string
+                final_pdb_atomic_content, final_sequence_length, command_args=cmd_string,
+                extra_records=preserved_ssbonds
             )
 
             if args.output:
@@ -946,7 +985,9 @@ def main() -> None:
                             filename=output_filename,
                             style="cartoon",
                             color="spectrum",
-                            restraints=generated_restraints # Pass captured restraints
+                            restraints=generated_restraints, # Pass captured restraints
+                            highlights=highlights, # Pass beta-turn highlights
+                            show_hbonds=True
                         )
                     except Exception as e:
                         logger.error(f"Failed to open 3D viewer: {e}") 

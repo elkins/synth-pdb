@@ -9,6 +9,15 @@ import logging
 import tempfile
 import webbrowser
 from pathlib import Path
+import io
+import traceback
+import numpy as np
+import biotite.structure as struc
+
+import biotite.structure.io.pdb as pdb
+import biotite.structure.hbond as hbond
+
+
 
 logger = logging.getLogger(__name__)
 
@@ -19,6 +28,9 @@ def view_structure_in_browser(
     style: str = "cartoon",
     color: str = "spectrum",
     restraints: list = None,
+    highlights: list = None,
+    show_hbonds: bool = True,
+
 ) -> None:
     """
     Open 3D structure viewer in browser.
@@ -41,7 +53,8 @@ def view_structure_in_browser(
         logger.info(f"Opening 3D viewer for {filename}")
         
         # Generate HTML with embedded 3Dmol.js viewer
-        html = _create_3dmol_html(pdb_content, filename, style, color, restraints)
+        html = _create_3dmol_html(pdb_content, filename, style, color, restraints, highlights, show_hbonds)
+        
         
         # Save to temporary file
         with tempfile.NamedTemporaryFile(
@@ -61,7 +74,13 @@ def view_structure_in_browser(
 
 
 def _create_3dmol_html(
-    pdb_data: str, filename: str, style: str, color: str, restraints: list = None
+    pdb_data: str, 
+    filename: str, 
+    style: str, 
+    color: str, 
+    restraints: list = None, 
+    highlights: list = None,
+    show_hbonds: bool = False
 ) -> str:
     """
     Generate HTML with embedded 3Dmol.js viewer.
@@ -85,7 +104,11 @@ def _create_3dmol_html(
         filename: Name of PDB file for display
         style: Representation style (cartoon/stick/sphere/line)
         color: Color scheme (spectrum/chain/ss/white)
+        color: Color scheme (spectrum/chain/ss/white)
         restraints: Optional list of restraint dicts to visualize as cylinders
+        highlights: Optional list of dicts {'start', 'end', 'color', 'label'} for secondary structure
+        show_hbonds: Whether to calculate and show backbone H-bonds
+
         
     Returns:
         Complete HTML document as string
@@ -95,8 +118,143 @@ def _create_3dmol_html(
     # and finally $ (to avoid interpolation issues with ${...})
     pdb_escaped = pdb_data.replace("\\", "\\\\").replace("`", "\\`").replace("$", "\\$")
     
+    # Calculate H-bonds if requested
+    hbond_cmds = ""
+    if show_hbonds:
+        hbonds = _find_hbonds(pdb_data)
+        if hbonds:
+             hbond_cmds += "/* Detected Backbone H-Bonds */\n"
+             for hb in hbonds:
+                 # Add dashed yellow cylinder
+                 # We use start_resi and end_resi
+                 # Note: JS indices for arrays are 0-based but 3Dmol resi selection is 1-based (PDB numbering)
+                 
+                 # 3Dmol selection needs explicit atom names for start/end
+                 start_sel = f"{{chain:'A', resi:{hb['start_resi']}, atom:'{hb['start_atom']}'}}"
+                 end_sel = f"{{chain:'A', resi:{hb['end_resi']}, atom:'{hb['end_atom']}'}}"
+                 
+                 # JS logic to find atoms and draw line
+                 # We wrap in a block to reuse variable names safely
+                 hbond_cmds += f"""
+                 {{
+                     let sel1 = {start_sel};
+                     let sel2 = {end_sel};
+                     let atoms1 = viewer.selectedAtoms(sel1);
+                     let atoms2 = viewer.selectedAtoms(sel2);
+                     if(atoms1.length > 0 && atoms2.length > 0) {{
+                         viewer.addLine({{
+                             start: {{x: atoms1[0].x, y: atoms1[0].y, z: atoms1[0].z}},
+                             end:   {{x: atoms2[0].x, y: atoms2[0].y, z: atoms2[0].z}},
+                             color: 'magenta', /* High contrast vs white background */
+                             dashed: true,
+                             linewidth: 10,  /* Doubled width for better visibility */
+                             opacity: 1.0    /* Full opacity */
+                         }});
+                     }}
+                 }}
+                 """
+
+    # Generate SSBOND Visualization Logic
+    # We parse the PDB again (lightweight) to find SSBOND records
+    ssbond_cmds = ""
+    ssbonds = _find_ssbonds(pdb_data)
+    if ssbonds:
+        ssbond_cmds += "/* Detected Disulfide Bonds */\n"
+        for ss in ssbonds:
+             # Add thick yellow cylinder between SG atoms
+             
+             # 3Dmol selection
+             start_sel = f"{{chain:'{ss['c1']}', resi:{ss['r1']}, atom:'SG'}}"
+             end_sel = f"{{chain:'{ss['c2']}', resi:{ss['r2']}, atom:'SG'}}"
+             
+             ssbond_cmds += f"""
+             {{
+                 let sel1 = {start_sel};
+                 let sel2 = {end_sel};
+                 let atoms1 = viewer.selectedAtoms(sel1);
+                 let atoms2 = viewer.selectedAtoms(sel2);
+                 if(atoms1.length > 0 && atoms2.length > 0) {{
+                     viewer.addCylinder({{
+                         start: {{x: atoms1[0].x, y: atoms1[0].y, z: atoms1[0].z}},
+                         end:   {{x: atoms2[0].x, y: atoms2[0].y, z: atoms2[0].z}},
+                         radius: 0.15,
+                         color: 'yellow', /* Conventional disulfide color */
+                         fromCap: 1, toCap: 1,
+                         opacity: 1.0
+                     }});
+                     
+                     /* Force stick visibility for these residues so the bond doesn't float in space */
+                     viewer.addStyle({{chain: sel1.chain, resi: sel1.resi}}, {{stick:{{radius:0.2}}}});
+                     viewer.addStyle({{chain: sel2.chain, resi: sel2.resi}}, {{stick:{{radius:0.2}}}});
+                 }}
+             }}
+             """
+
+    # Generate Highlights JS
+    highlight_cmds = ""
+    if highlights:
+         for h in highlights:
+             start = h['start']
+             end = h['end']
+             h_color = h.get('color', 'purple')
+             h_style = h.get('style', 'stick')
+             h_label = h.get('label', '')
+             
+             # Create array of residues [3, 4, 5, 6]
+             res_array = str(list(range(start, end + 1)))
+             
+             # Add style override
+             if h_style == 'stick':
+                 highlight_cmds += f"viewer.addStyle({{chain:'A', resi:{res_array}}}, {{stick:{{colorscheme:'{h_color}', radius:0.2}}}});\n"
+             elif h_style == 'cartoon':
+                 highlight_cmds += f"viewer.addStyle({{chain:'A', resi:{res_array}}}, {{cartoon:{{color:'{h_color}'}}}});\n"
+             
+             # Add label at center residue
+             center_res = (start + end) // 2
+             if h_label:
+                 highlight_cmds += f"viewer.addLabel('{h_label}', {{fontSize:12, fontColor:'white', backgroundColor:'black', backgroundOpacity:0.7}}, {{chain:'A', resi:{center_res}, atom:'CA'}});\n"
+
+    # Generate PTM labels logic
+    # We essentially grep the PDB for SEP/TPO/PTR and add labels
+    ptm_cmds = ""
+    # Python-side coarse detection for optimization, but JS will do the heavy lifting
+    if "SEP" in pdb_escaped or "TPO" in pdb_escaped or "PTR" in pdb_escaped:
+        ptm_cmds += """
+        /* PTM Visualization Logic with Fallback for Minimized Structures */
+        /* If P atom exists (un-minimized), put label on P. */
+        /* If P atom missing (minimized/stripped), put label on sidechain oxygen/carbon. */
+        
+        /* SEP */
+        viewer.addLabel("SEP", {fontSize:10, fontColor:'black', backgroundColor:'orange'}, {resn:'SEP', atom:'P'});
+        viewer.addLabel("SEP", {fontSize:10, fontColor:'black', backgroundColor:'orange'}, {resn:'SEP', atom:'OG', not:{atom:'P'}}); /* Fallback */
+        
+        /* TPO */
+        viewer.addLabel("TPO", {fontSize:10, fontColor:'black', backgroundColor:'orange'}, {resn:'TPO', atom:'P'});
+        viewer.addLabel("TPO", {fontSize:10, fontColor:'black', backgroundColor:'orange'}, {resn:'TPO', atom:'OG1', not:{atom:'P'}}); /* Fallback */
+        
+        /* PTR */
+        viewer.addLabel("PTR", {fontSize:10, fontColor:'black', backgroundColor:'orange'}, {resn:'PTR', atom:'P'});
+        viewer.addLabel("PTR", {fontSize:10, fontColor:'black', backgroundColor:'orange'}, {resn:'PTR', atom:'OH', not:{atom:'P'}}); /* Fallback */
+
+        /* Ensure PTMs serve as spheres too */
+        viewer.addStyle({resn:['SEP','TPO','PTR']}, {stick:{radius:0.2}});
+        
+        /* Orange Sphere on P if present */
+        viewer.addStyle({resn:['SEP','TPO','PTR'], atom:'P'}, {sphere:{radius:1.0, color:'orange'}});
+        
+        /* Orange Sphere on Oxygen if P missing (to simulate modified state) */
+        /* Note: This might overlap with normal oxygen, but creates the visual cue requested by user */
+        /* SEP -> OG */
+        viewer.addStyle({resn:'SEP', atom:'OG'}, {sphere:{radius:0.8, color:'orange', opacity:0.7}});
+        /* TPO -> OG1 */
+        viewer.addStyle({resn:'TPO', atom:'OG1'}, {sphere:{radius:0.8, color:'orange', opacity:0.7}});
+        /* PTR -> OH */
+        viewer.addStyle({resn:'PTR', atom:'OH'}, {sphere:{radius:0.8, color:'orange', opacity:0.7}});
+        """
+
     # Serialize restraints to JSON-like logic in JS
     js_restraints = ""
+
     if restraints:
         js_restraints = "let restraints = [\n"
         for r in restraints:
@@ -389,8 +547,12 @@ def _create_3dmol_html(
         {js_restraints}
 
         function drawRestraints() {{
-            // clear existing shapes first
-            viewer.removeAllShapes();
+            // Remove previously tracked restraint shapes only
+            if (typeof allShapes !== 'undefined' && allShapes.length > 0) {{
+                for(let i=0; i<allShapes.length; i++) {{
+                    viewer.removeShape(allShapes[i]);
+                }}
+            }}
             allShapes = [];
 
             if (!showRestraints) return;
@@ -444,6 +606,10 @@ def _create_3dmol_html(
         }}
 
         function applyStyle() {{
+            viewer.removeAllShapes(); // Clear all shapes (H-bonds, arrows, etc)
+            viewer.removeAllLabels(); // Clear all labels
+            allShapes = []; // Reset tracked restraints
+            
             viewer.setStyle({{}}, {{}}); // Clear style
 
             let styleObj = {{}};
@@ -464,12 +630,23 @@ def _create_3dmol_html(
 
             // ALWAYS render HETATMs (like Zinc) as spheres so they don't disappear in cartoon mode
             // We use multiple selectors (element and resn) to be as robust as possible
+            // Note: We escape braces for Python f-string
             viewer.addStyle({{element: 'Zn'}}, {{sphere: {{radius: 1.2, color: 'silver'}}}});
             viewer.addStyle({{resn: 'ZN'}}, {{sphere: {{radius: 1.2, color: 'silver'}}}});
             viewer.addStyle({{hetatom: true}}, {{sphere: {{radius: 1.2, color: 'silver'}}}});
 
+            // Apply Custom Highlights (Beta Turns, PTMs, H-bonds)
+            // These are injected from Python
+            {highlight_cmds}
+            {ptm_cmds}
+            {hbond_cmds}
+            {ssbond_cmds}
+            
+            drawRestraints(); // Re-draw restraints (if enabled)
+            
             viewer.render();
         }}
+
 
         function setStyle(style) {{
             currentStyle = style;
@@ -531,3 +708,121 @@ def _create_3dmol_html(
 </html>
 """
     return html
+
+
+def _find_ssbonds(pdb_content: str) -> list:
+    """
+    Parse SSBOND records from PDB header.
+    Returns list of dicts: {'c1', 'r1', 'c2', 'r2'}
+    """
+    ssbonds = []
+    try:
+        for line in pdb_content.splitlines():
+            if line.startswith("SSBOND"):
+                # SSBOND   1 CYS A    6    CYS A   11
+                # 16:    Chain ID 1
+                # 18-21: Residue number 1
+                # 30:    Chain ID 2
+                # 32-35: Residue number 2
+                
+                try:
+                    c1 = line[15]
+                    r1 = int(line[17:22].strip()) # 18-21 in spec, but generous slicing
+                    c2 = line[29]
+                    r2 = int(line[31:36].strip()) # 32-35 in spec
+                    
+                    ssbonds.append({
+                        'c1': c1, 'r1': r1,
+                        'c2': c2, 'r2': r2
+                    })
+                except (ValueError, IndexError):
+                    continue
+        return ssbonds
+    except Exception as e:
+        logger.warning(f"Could not parse SSBOND records: {e}")
+        return []
+
+
+def _find_hbonds(pdb_content: str) -> list:
+    """
+    Find backbone hydrogen bonds (O to N) using simple geometric criteria.
+    Returns list of dicts: {'start_resi', 'start_atom', 'end_resi', 'end_atom'}
+    """
+    try:
+        pdb_file = pdb.PDBFile.read(io.StringIO(pdb_content))
+        structure = pdb_file.get_structure(model=1)
+        
+        # Use Biotite's hbond analysis
+        # Only backbone-backbone (triplet returned: [donor_idx, hydrogen_idx, acceptor_idx])
+
+        # Note: synth-pdb often generates explicit hydrogens. If missing, biotite might fail or need mask.
+        # We assume explicit hydrogens here or rely on acceptor-donor distance.
+        
+        # Actually, biotite.structure.hbond works well if H usually exists. 
+        # But synth-pdb might output files without H if generated without minimization/prep?
+        # Let's assume hydrogens are present for now (since we usually have them).
+        
+        # Try finding hydrogens first to see if we can use strict hbond
+        has_hydrogens = np.any(structure.element == "H")
+        
+        triplets = []
+        if has_hydrogens:
+            try:
+                triplets = hbond(structure, selection1="atom_name N", selection2="atom_name O")
+            except Exception:
+                pass # Fallback
+        
+        hbonds = []
+        
+        if len(triplets) > 0:
+            # Strict mode worked
+            for donor_idx, h_idx, acceptor_idx in triplets:
+                donor = structure[donor_idx]
+                acceptor = structure[acceptor_idx]
+                hbonds.append({
+                    'start_resi': acceptor.res_id,
+                    'start_atom': acceptor.atom_name, # O
+                    'end_resi': donor.res_id,
+                    'end_atom': donor.atom_name # N
+                })
+        else:
+            # Fallback: Geometric distance check (O...N < 3.5 A)
+            # This is "good enough" for visualization
+            ns = structure[structure.atom_name == "N"]
+            os_atoms = structure[structure.atom_name == "O"]
+            
+            if len(ns) > 0 and len(os_atoms) > 0:
+                n_coords = ns.coord
+                o_coords = os_atoms.coord
+                
+                # Brute force distance matrix (N_n x N_o)
+                # n_coords[:, None, :] is (N_n, 1, 3)
+                # o_coords[None, :, :] is (1, N_o, 3)
+                # Broadcasting gives (N_n, N_o, 3) displacement vectors
+                diff = n_coords[:, np.newaxis, :] - o_coords[np.newaxis, :, :]
+                dists = np.linalg.norm(diff, axis=2)
+                
+                # Find pairs < 4.0 Angstrom (relaxed for visualization)
+                # Returns tuple of arrays (row_indices, col_indices)
+                n_indices, o_indices = np.where(dists < 4.0)
+                
+                for i, j in zip(n_indices, o_indices):
+                    n_atom = ns[i]
+                    o_atom = os_atoms[j]
+                    
+                    # Check sequence separation
+                    seq_sep = abs(n_atom.res_id - o_atom.res_id)
+                    if seq_sep >= 3:
+                         hbonds.append({
+                            'start_resi': o_atom.res_id,
+                            'start_atom': o_atom.atom_name,
+                            'end_resi': n_atom.res_id,
+                            'end_atom': n_atom.atom_name
+                        })
+
+        return hbonds
+        
+    except Exception as e:
+        logger.warning(f"Could not calculate H-bonds: {e}\n{traceback.format_exc()}")
+        return []
+

@@ -175,6 +175,84 @@ class EnergyMinimizer:
             salt_bridge_restraints = []
             if add_hydrogens:
                 modeller = app.Modeller(topology, positions)
+
+                # HEURISTIC BACKBONE BONDING (Fix for Missing Bonds to PTMs)
+                # OpenMM's PDB Parser often fails to connect a Standard residue (e.g., ALA) 
+                # to a subsequent Non-Standard residue (e.g., SEP) because the standard template's
+                # external bonding rules don't match the unknown residue.
+                # We manually stitch these C-N bonds if geometry is correct (< 1.6 A).
+                try:
+                    residues = list(modeller.topology.residues())
+                    # Cache bonds for fast lookup
+                    existing_bonds = set()
+                    for b in modeller.topology.bonds():
+                        existing_bonds.add(frozenset([b[0].index, b[1].index]))
+
+                    for i in range(len(residues) - 1):
+                        res1 = residues[i]
+                        res2 = residues[i+1]
+                        
+                        # Find C of current and N of next
+                        c_atom = None
+                        n_atom = None
+                        for a in res1.atoms(): 
+                            if a.name == 'C': c_atom = a; break
+                        for a in res2.atoms(): 
+                            if a.name == 'N': n_atom = a; break
+                            
+                        if c_atom and n_atom:
+                            # Check if bonded
+                            if frozenset([c_atom.index, n_atom.index]) not in existing_bonds:
+                                # Check distance
+                                p1 = modeller.positions[c_atom.index].value_in_unit(unit.angstroms)
+                                p2 = modeller.positions[n_atom.index].value_in_unit(unit.angstroms)
+                                dist = np.linalg.norm(np.array(p1) - np.array(p2))
+                                
+                                if dist < 1.6: # Generous tolerance for 1.33A bond
+                                    logger.debug(f"Stitching missing backbone bond: {res1.name}{res1.index+1}-{res2.name}{res2.index+1}")
+                                    modeller.topology.addBond(c_atom, n_atom)
+                except Exception as e:
+                    logger.warning(f"Backbone stitching failed: {e}")
+
+                # IMPORTANT: PTM and Tautomer Reversion
+                # OpenMM's standard forcefields (amber14-all) do not include templates for:
+                # 1. Phosphorylated residues (SEP, TPO, PTR)
+                # 2. Explicit histidine tautomers (HIE, HID, HIP) as INPUT names (it prefers HIS + addHydrogens)
+                #
+                # To prevent "No template found" errors, we revert these to standard residues
+                # and let OpenMM's addHydrogens(pH=7.0) re-assign protonation states physically.
+                # For PTMs, we unfortunately lose the phosphate group during minimization (limit of standard FF),
+                # but this is better than crashing.
+                ptm_map = {
+                    'SEP': 'SER', 'TPO': 'THR', 'PTR': 'TYR',
+                    'HIE': 'HIS', 'HID': 'HIS', 'HIP': 'HIS'
+                }
+                
+                # We reuse the Modeller to rename non-standard residues and delete extra atoms (Phosphates)
+                # BEFORE hydrogen stripping.
+                
+                atoms_to_delete = []
+                # Identify extra atoms to delete (Phosphates)
+                # Standard SER/THR/TYR do not have: P, O1P, O2P, O3P, or any H bonded to them.
+                # Common names: P, O1P, O2P, O3P, OG (SEP/SER match), OG1 (THR/TPO match).
+                ptm_atom_names = ["P", "O1P", "O2P", "O3P", "O1P", "O2P", "O3P"] 
+                
+                for res in modeller.topology.residues():
+                    if res.name in ptm_map:
+                        original = res.name
+                        target = ptm_map[res.name]
+                        logger.debug(f"Reverting residue {res.index} {original} -> {target} for minimization.")
+                        res.name = target
+                        
+                        # Mark phosphate atoms for deletion if it was a PTM
+                        if original in ['SEP', 'TPO', 'PTR']:
+                            for atom in res.atoms():
+                                if atom.name in ptm_atom_names:
+                                    atoms_to_delete.append(atom)
+                                    
+                if atoms_to_delete:
+                    logger.info(f"Removing {len(atoms_to_delete)} phosphate atoms for standard forcefield compatibility.")
+                    modeller.delete(atoms_to_delete)
                 
                 # IMPORTANT NOTE - Hydrogen Stripping:
                 # We found that OpenMM's addHydrogens() would fail or produce inconsistent 
@@ -249,7 +327,8 @@ class EnergyMinimizer:
                     import io
                     import biotite.structure.io.pdb as biotite_pdb
                     tmp_io = io.StringIO()
-                    # Use modeller's results after stripping hydrogens
+                    # Use modeller's results: Topology is now CLEAN (Standard Residues)
+                    # This ensures parsing works fine.
                     app.PDBFile.writeFile(modeller.topology, modeller.positions, tmp_io)
                     tmp_io.seek(0)
                     b_struc = biotite_pdb.PDBFile.read(tmp_io).get_structure(model=1)
