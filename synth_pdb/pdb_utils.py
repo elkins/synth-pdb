@@ -133,6 +133,7 @@ def assemble_pdb_content(
     date: Optional[str] = None,
     command_args: Optional[str] = None,
     extra_records: Optional[str] = None,
+    conect_records: Optional[str] = None,
 ) -> str:
     """
     Assembles complete PDB file content from atomic coordinates and metadata.
@@ -143,6 +144,7 @@ def assemble_pdb_content(
         date: Date string in PDB format. If None, uses current date.
         command_args: Command-line arguments for reproducibility
         extra_records: Optional string of extra header records (e.g. SSBONDs) to insert
+        conect_records: Optional string of CONECT records to insert at the end
         
     Returns:
         str: Complete PDB file content with headers and footers
@@ -153,6 +155,9 @@ def assemble_pdb_content(
     content = f"{header}\n"
     if extra_records:
         content += f"{extra_records}\n"
-    content += f"{atomic_content.strip()}\n{footer}"
+    content += f"{atomic_content.strip()}\n"
+    if conect_records:
+        content += f"{conect_records.strip()}\n"
+    content += footer
     
     return content

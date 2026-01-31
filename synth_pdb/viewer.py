@@ -113,6 +113,16 @@ def _create_3dmol_html(
     Returns:
         Complete HTML document as string
     """
+    # Identify max residue for backbone bridging
+    res_ids = []
+    for line in pdb_data.splitlines():
+        if line.startswith("ATOM"):
+            try:
+                rid = int(line[22:26].strip())
+                res_ids.append(rid)
+            except: continue
+    max_res = max(res_ids) if res_ids else 1
+
     # Escape PDB data for JavaScript
     # We escape backslashes first, then backticks (used in template literals),
     # and finally $ (to avoid interpolation issues with ${...})
@@ -186,6 +196,41 @@ def _create_3dmol_html(
                      /* Force stick visibility for these residues so the bond doesn't float in space */
                      viewer.addStyle({{chain: sel1.chain, resi: sel1.resi}}, {{stick:{{radius:0.2}}}});
                      viewer.addStyle({{chain: sel2.chain, resi: sel2.resi}}, {{stick:{{radius:0.2}}}});
+                 }}
+             }}
+             """
+
+    # Generate CONECT Visualization Logic
+    # This bridges the visual gap for cyclic peptides and other extra bonds
+    conect_cmds = ""
+    conects = _find_conects(pdb_data)
+    if conects:
+        conect_cmds += "/* Detected CONECT Records (Cyclic/Extra Bonds) */\n"
+        
+        # Bridge the gap: style terminal backbones as sticks so they meet the ribbon
+        # Ribbon ends at CA. We need path: [Ribbon End CA] --stick-- [N or C] --thick cylinder-- [...]
+        # Style entire first and last residues as sticks to be robust
+        conect_cmds += f"viewer.addStyle({{chain:'A', resi:1}}, {{stick:{{radius:0.18, color:'cyan'}}}});\n"
+        conect_cmds += f"viewer.addStyle({{chain:'A', resi:{max_res}}}, {{stick:{{radius:0.18, color:'cyan'}}}});\n"
+        
+        # Explicitly ensure CA-C and N-CA path is visible as cyan sticks for contrast
+        conect_cmds += f"viewer.addStyle({{chain:'A', resi:1, atom:['N','CA']}}, {{stick:{{radius:0.25, color:'cyan'}}}});\n"
+        conect_cmds += f"viewer.addStyle({{chain:'A', resi:{max_res}, atom:['CA','C']}}, {{stick:{{radius:0.25, color:'cyan'}}}});\n"
+
+        for s1, s2 in conects:
+             conect_cmds += f"""
+             {{
+                 let atoms1 = viewer.selectedAtoms({{serial:{s1}}});
+                 let atoms2 = viewer.selectedAtoms({{serial:{s2}}});
+                 if(atoms1.length > 0 && atoms2.length > 0) {{
+                     viewer.addCylinder({{
+                         start: {{x: atoms1[0].x, y: atoms1[0].y, z: atoms1[0].z}},
+                         end:   {{x: atoms2[0].x, y: atoms2[0].y, z: atoms2[0].z}},
+                         radius: 0.25, /* Thicker for definitive closure */
+                         color: 'cyan', 
+                         fromCap: 1, toCap: 1,
+                         opacity: 1.0
+                     }});
                  }}
              }}
              """
@@ -641,6 +686,7 @@ def _create_3dmol_html(
             {ptm_cmds}
             {hbond_cmds}
             {ssbond_cmds}
+            {conect_cmds}
             
             drawRestraints(); // Re-draw restraints (if enabled)
             
@@ -824,5 +870,34 @@ def _find_hbonds(pdb_content: str) -> list:
         
     except Exception as e:
         logger.warning(f"Could not calculate H-bonds: {e}\n{traceback.format_exc()}")
+        return []
+
+
+def _find_conects(pdb_content: str) -> list:
+    """
+    Parse CONECT records from PDB content.
+    Returns list of tuples: (serial1, serial2)
+    """
+    conects = []
+    try:
+        for line in pdb_content.splitlines():
+            if line.startswith("CONECT"):
+                # CONECT serial1 serial2 ...
+                try:
+                    parts = line.split()
+                    if len(parts) >= 3:
+                        s1 = int(parts[1])
+                        # A CONECT record can have multiple bonds for the first atom
+                        for s2_str in parts[2:]:
+                            s2 = int(s2_str)
+                            # Avoid duplicates (1, 80) and (80, 1) in our drawing list
+                            # (PDB files often list both directions)
+                            if (s1, s2) not in conects and (s2, s1) not in conects:
+                                conects.append((s1, s2))
+                except (ValueError, IndexError):
+                    continue
+        return conects
+    except Exception as e:
+        logger.warning(f"Could not parse CONECT records: {e}")
         return []
 

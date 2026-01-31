@@ -194,7 +194,7 @@ class TestPhysicsCoverage:
             result = minimizer.minimize("in.pdb", "out.pdb", max_iterations=50, tolerance=5.0)
             
             assert result is True
-            mock_run.assert_called_once_with("in.pdb", "out.pdb", max_iterations=50, tolerance=5.0, add_hydrogens=False)
+            mock_run.assert_called_once_with("in.pdb", "out.pdb", max_iterations=50, tolerance=5.0, add_hydrogens=False, cyclic=False)
 
     @patch("synth_pdb.physics.HAS_OPENMM", True)
     @patch("synth_pdb.physics.app")
@@ -351,7 +351,7 @@ class TestPhysicsCoverage:
         # Test add_hydrogens_and_minimize
         with patch.object(minimizer, '_run_simulation', return_value=True) as mock_run:
             minimizer.add_hydrogens_and_minimize("in.pdb", "out.pdb")
-            mock_run.assert_called_with("in.pdb", "out.pdb", add_hydrogens=True, max_iterations=0, tolerance=10.0)
+            mock_run.assert_called_with("in.pdb", "out.pdb", add_hydrogens=True, max_iterations=0, tolerance=10.0, cyclic=False)
             
         # Test equilibrate with steps
         # This requires mocking _run_simulation internals to verify simulation.step(steps) is called
@@ -359,7 +359,7 @@ class TestPhysicsCoverage:
         # was called with correct equilibration_steps arg by the wrapper
         with patch.object(minimizer, '_run_simulation', return_value=True) as mock_run:
             minimizer.equilibrate("in.pdb", "out.pdb", steps=500)
-            mock_run.assert_called_with("in.pdb", "out.pdb", add_hydrogens=True, equilibration_steps=500)
+            mock_run.assert_called_with("in.pdb", "out.pdb", add_hydrogens=True, equilibration_steps=500, cyclic=False)
 
     @patch("synth_pdb.physics.HAS_OPENMM", True)
     @patch("synth_pdb.physics.app")

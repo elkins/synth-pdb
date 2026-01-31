@@ -33,7 +33,7 @@ from .data import (
     BACKBONE_DEPENDENT_ROTAMER_LIBRARY,
     BETA_TURN_TYPES,
 )
-from .pdb_utils import create_pdb_header, create_pdb_footer
+from .pdb_utils import create_pdb_header, create_pdb_footer, extract_atomic_content, assemble_pdb_content
 from .geometry import (
     position_atom_3d_from_internal_coords,
     calculate_angle,
@@ -680,13 +680,15 @@ def generate_pdb_content(
     minimization_max_iter: int = 0, # 0 = unlimited
     cis_proline_frequency: float = 0.05, # Probability of Cis-Proline (0.05 = 5%)
     phosphorylation_rate: float = 0.0, # Probability of S/T/Y phosphorylation
+    cyclic: bool = False, # Head-to-Tail cyclization
 ) -> str:
     """
-    Generates PDB content for a linear peptide chain.
+    Generates PDB content for a linear or cyclic peptide chain.
     
-    EDUCATIONAL NOTE - New Feature: Per-Region Conformation Control
-    This function now supports specifying different conformations for different
-    regions of the peptide, enabling creation of realistic mixed secondary structures.
+    EDUCATIONAL NOTE - New Feature: Cyclic Peptides
+    Cyclic peptides have their N-terminus bonded to their C-terminus. 
+    This modification increases metabolic stability and is common in 
+    therapeutic peptides (e.g., Cyclosporin).
     
     Args:
         length: Number of residues (ignored if sequence_str provided)
@@ -703,9 +705,19 @@ def generate_pdb_content(
                   If provided, overrides conformation for specified regions.
                   Unspecified residues use the default conformation parameter.
         optimize_sidechains: Run Monte Carlo side-chain optimization
-        minimize_energy: Run OpenMM energy minimization
+        minimize_energy: Run OpenMM energy minimization (REQUIRED for cyclic closure)
         forcefield: Forcefield to use for minimization
         seed: Random seed for reproducible generation
+        ph: pH for titration
+        cap_termini: Add ACE/NME caps (Disabled if cyclic=True)
+        equilibrate: Run MD equilibration
+        equilibrate_steps: Number of MD steps
+        metal_ions: Handle metal ions
+        minimization_k: Tolerance
+        minimization_max_iter: Max iterations
+        cis_proline_frequency: Frequency of cis-proline
+        phosphorylation_rate: Frequency of phosphorylation
+        cyclic: Whether to generate a cyclic peptide (Head-to-Tail)
     
     Returns:
         str: Complete PDB file content
@@ -719,6 +731,15 @@ def generate_pdb_content(
     - Immunoglobulins: multiple beta sheets connected by loops
     - Helix-turn-helix motifs: two alpha helices connected by a turn
     This feature allows users to create these realistic structures.
+
+    EDUCATIONAL NOTE - Macrocyclization (Cyclic Peptides):
+    -----------------------------------------------------
+    Cyclic peptides (macrocycles) are chains where the N-terminus and C-terminus 
+    are covalently linked. This has profound biological implications:
+    1. Metabolic Stability: Resistance to exopeptidases that chew protein ends.
+    2. Binding Affinity: By "locking" the molecule into a specific shape, 
+       the entropic penalty of binding to a target is greatly reduced.
+    3. Bioavailability: Many legendary drugs (like Cyclosporine A) are macrocycles.
     """
     if seed is not None:
          logger.info(f"Setting random seed to {seed} for reproducibility.")
@@ -1116,17 +1137,30 @@ def generate_pdb_content(
         # We must explicitly remove terminal-only atoms from all residues to represent 
         # a continuous polypeptide chain correctly and avoid OpenMM template errors.
         
+        # EDUCATIONAL NOTE - Terminal Atom Management in Rings:
+        # In a linear peptide, the ends are "unfinished" (OXT at C-term, extra H at N-term).
+        # In a cyclic peptide, these atoms are SACRIFICED to form the peptide bond 
+        # between the ends. Failing to remove them leads to "impossible" geometry
+        # with 5-valent carbons or nitrogen atoms with too many bonds.
+        
         # 1. Remove OXT for all except absolute C-terminus
-        if i < len(sequence) - 1:
+        # If cyclic, even the absolute C-terminus loses OXT to form the head-to-tail bond.
+        if i < len(sequence) - 1 or cyclic:
             ref_res_template = ref_res_template[ref_res_template.atom_name != "OXT"]
             # Also remove HXT (Hydroxyl Hydrogen) if present in template
             ref_res_template = ref_res_template[ref_res_template.atom_name != "HXT"]
             
         # 2. Remove extra N-terminal Hydrogens (H2, H3) for all except absolute N-terminus
-        # Standard internal residues only have 'H'.
-        if i > 0:
+        # If cyclic, even the absolute N-terminus loses H2/H3 as it's no longer a zwitterion.
+        if i > 0 or cyclic:
             ref_res_template = ref_res_template[ref_res_template.atom_name != "H2"]
             ref_res_template = ref_res_template[ref_res_template.atom_name != "H3"]
+            
+            # PROLINE FIX: Internal/Cyclic Proline has NO amide hydrogen (H).
+            # Biotite templates often include a single 'H' which must be stripped
+            # to avoid OpenMM template mismatch errors in cyclic peptides.
+            if res_name == "PRO":
+                ref_res_template = ref_res_template[ref_res_template.atom_name != "H"]
 
         # 3. Apply rotamers if available
         # EDUCATIONAL NOTE - Rotamer Selection Strategy:
@@ -1278,7 +1312,8 @@ def generate_pdb_content(
     # correct electrostatics in the forcefield.
     
     # 1. Terminal Capping (ACE/NME) - If requested
-    if cap_termini:
+    # Cyclic peptides are naturally "capped" by their own ends, so we disable this.
+    if cap_termini and not cyclic:
          peptide = biophysics.cap_termini(peptide)
          
     # 2. pH Titration (Protonation States)
@@ -1318,14 +1353,17 @@ def generate_pdb_content(
                 # OpenMM's addHydrogens is robust if we start with clean headers.
                 # But inputting existing Hydrogens (from Biotite templates) often causes
                 # template mismatch errors ("too many H atoms" or naming issues).
-                # So we STRIP all hydrogens before passing to OpenMM.
-                # Biotite elements are upper case.
-                peptide_heavy = peptide[peptide.element != "H"]
+                # So we STRIP all hydrogens before passing to OpenMM for standard linear chains.
+                # FOR CYCLIC: We KEEP them to help OpenMM identify internal residues vs termini.
+                if cyclic:
+                    peptide_to_save = peptide
+                else:
+                    peptide_to_save = peptide[peptide.element != "H"]
                 
                 # Actually we can use assemble_pdb_content but we need atomic lines first
                 # Or just use biotite to write
                 pdb_file = pdb.PDBFile()
-                pdb_file.set_structure(peptide_heavy)
+                pdb_file.set_structure(peptide_to_save)
                 pdb_file.write(input_pdb_path)
                 
                 minimizer = EnergyMinimizer(forcefield_name=forcefield)
@@ -1336,14 +1374,16 @@ def generate_pdb_content(
                     success = minimizer.equilibrate(
                         input_pdb_path, 
                         output_pdb_path, 
-                        steps=equilibrate_steps
+                        steps=equilibrate_steps,
+                        cyclic=cyclic
                     )
                 else:
                     success = minimizer.add_hydrogens_and_minimize(
                         input_pdb_path, 
                         output_pdb_path,
                         max_iterations=minimization_max_iter,
-                        tolerance=minimization_k
+                        tolerance=minimization_k,
+                        cyclic=cyclic
                     )
                 
                     if success:
@@ -1472,15 +1512,36 @@ def generate_pdb_content(
     # This ensures consistency between the structure (Helices/Loops) and the Data (B-factors/Relaxation).
     s2_map = predict_order_parameters(peptide)
     
+    # Sanitize: Extract only atomic content to avoid header duplication/mess
+    atomic_and_ter_content = extract_atomic_content(atomic_and_ter_content)
+    
     # Process each line and add realistic B-factors and occupancy
     processed_lines = []
+    
+    # Track atom serials for CONECT records (visualization support)
+    n_term_serial = None
+    c_term_serial = None
+    sg_serials = {} # res_num -> serial
+    serial = 0 # Initialize to avoid UnboundLocalError
+    
     for line in atomic_and_ter_content.splitlines():
         if line.startswith("ATOM"):
-            # Extract atom information from PDB line (PDB format is column-based)
+            # Serial is in columns 7-11 (0-indexed: 6-11)
+            serial = int(line[6:11].strip())
             atom_name = line[12:16].strip()
             res_name = line[17:20].strip()
             res_num = int(line[22:26].strip())
             
+            # Collect serials for cyclic/disulfide CONECT records
+            if cyclic:
+                if res_num == 1 and atom_name == "N":
+                    n_term_serial = serial
+                if res_num == total_residues and atom_name == "C":
+                    c_term_serial = serial
+            
+            if res_name == "CYS" and atom_name == "SG":
+                sg_serials[res_num] = serial
+
             # Lookup S2 for this residue (default 0.85 if not found)
             current_s2 = s2_map.get(res_num, 0.85)
 
@@ -1491,16 +1552,13 @@ def generate_pdb_content(
             occupancy = _calculate_occupancy(atom_name, res_num, total_residues, res_name, bfactor)
             
             # Replace B-factor and occupancy in the line
-            # Occupancy: columns 55-60 (0-indexed: 54-60)
-            # B-factor: columns 61-66 (0-indexed: 60-66)
             line = line[:54] + f"{occupancy:6.2f}" + f"{bfactor:6.2f}" + line[66:]
         
         processed_lines.append(line)
     
     atomic_and_ter_content = "\n".join(processed_lines) + "\n"
 
-    # Manually add TER record if biotite doesn't add one at the end of the last chain.
-    # Check if the last record written by biotite is an ATOM/HETATM, if so, add TER manually.
+    # Ensure TER record exists at the end
     lines = atomic_and_ter_content.strip().splitlines()
     if not lines:
         logger.error("Generated PDB content is empty! Falling back to raw sequence string.")
@@ -1508,42 +1566,44 @@ def generate_pdb_content(
     
     last_line = lines[-1]
     if last_line.startswith("ATOM") or last_line.startswith("HETATM"):
-        # Get last atom details from the peptide AtomArray
         last_atom = peptide[-1]
-        ter_atom_num = peptide.array_length() + 1  # TER serial number is last ATOM serial + 1
-        ter_res_name = last_atom.res_name
-        ter_chain_id = last_atom.chain_id
-        ter_res_num = last_atom.res_id
-        ter_record = f"TER   {ter_atom_num: >5}      {ter_res_name: >3} {ter_chain_id: <1}{ter_res_num: >4}".ljust(80)
+        # serial is guaranteed to be at least its initial value 0
+        ter_atom_num = serial + 1
+        ter_record = f"TER   {ter_atom_num: >5}      {last_atom.res_name: >3} {last_atom.chain_id: <1}{last_atom.res_id: >4}".ljust(80)
         atomic_and_ter_content = atomic_and_ter_content.strip() + "\n" + ter_record + "\n"
 
-
-    # Ensure each line is 80 characters by padding with spaces if necessary
+    # Ensure each line is 80 characters
     padded_atomic_and_ter_content_lines = []
     for line in atomic_and_ter_content.splitlines():
-
-        if len(line) < 80:
-            padded_atomic_and_ter_content_lines.append(line.ljust(80))
-        else:
-            padded_atomic_and_ter_content_lines.append(line)
+        padded_atomic_and_ter_content_lines.append(line.ljust(80))
     
-    # Join with newline and then strip any trailing whitespace from the overall block
     final_atomic_content_block = "\n".join(padded_atomic_and_ter_content_lines).strip()
     
-    # Use centralized header/footer generation
-    # Use centralized header/footer generation
-    header_content = create_pdb_header(sequence_length)
-    footer_content = create_pdb_footer()
+    # Generate CONECT records for visualization
+    conect_records = []
+    if cyclic and n_term_serial and c_term_serial:
+        conect_records.append(f"CONECT{n_term_serial:5d}{c_term_serial:5d}".ljust(80))
     
-    # EDUCATIONAL NOTE - Disulfide Bond Annotation:
-    # Detect potential disulfide bonds and generate SSBOND records.
-    # These records must appear in the header section.
+    # Detect disulfides to get records and serials
     disulfides = _detect_disulfide_bonds(peptide)
     ssbond_records = _generate_ssbond_records(disulfides, chain_id='A')
     
-    # Final assembly of content
-    # If we have SSBOND records, insert them after the main header
-    if ssbond_records:
-        return f"{header_content}\n{ssbond_records}{final_atomic_content_block}\n{footer_content}"
-    else:
-        return f"{header_content}\n{final_atomic_content_block}\n{footer_content}"
+    if disulfides:
+        for r1, r2 in disulfides:
+            s1 = sg_serials.get(r1)
+            s2 = sg_serials.get(r2)
+            if s1 and s2:
+                conect_records.append(f"CONECT{s1:5d}{s2:5d}".ljust(80))
+
+    conect_block = "\n".join(conect_records)
+    if conect_block:
+        conect_block += "\n"
+
+    # Final assembly using centralized utility
+    return assemble_pdb_content(
+        final_atomic_content_block,
+        sequence_length,
+        command_args=_build_command_string(args) if 'args' in locals() else None,
+        extra_records=ssbond_records if ssbond_records else None,
+        conect_records=conect_block if conect_block else None
+    )

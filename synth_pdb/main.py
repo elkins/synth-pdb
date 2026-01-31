@@ -53,6 +53,9 @@ def _build_command_string(args: argparse.Namespace) -> str:
         cmd_parts.append("--minimize")
         cmd_parts.append(f"--forcefield {args.forcefield}")
     
+    if args.cyclic:
+        cmd_parts.append("--cyclic")
+    
     # Phase 7/8/9 flags
     if args.gen_nef:
         cmd_parts.append("--gen-nef")
@@ -174,6 +177,11 @@ def main() -> None:
         "--minimize",
         action="store_true",
         help="Run physics-based energy minimization using OpenMM (Phase 2). Requires 'openmm' installed.",
+    )
+    parser.add_argument(
+        "--cyclic",
+        action="store_true",
+        help="Generate a head-to-tail cyclic peptide. Implies --minimize and disables --cap-termini.",
     )
     parser.add_argument(
         "--forcefield",
@@ -462,6 +470,11 @@ def main() -> None:
         args.validate = True # Refinement implies validation during initial generation
         logger.info(f"--refine-clashes is set to {args.refine_clashes}. Validation will be performed.")
 
+    if args.cyclic:
+        logger.info("--cyclic is set. Enabling energy minimization for ring closure and disabling terminal caps.")
+        args.minimize = True
+        args.cap_termini = False
+
     # Validate length only if no sequence is provided
     if args.sequence is None:
         if args.length is None or args.length <= 0:
@@ -629,6 +642,7 @@ def main() -> None:
                 metal_ions=args.metal_ions,
                 cis_proline_frequency=args.cis_proline_frequency,
                 phosphorylation_rate=args.phosphorylation_rate,
+                cyclic=args.cyclic,
             )
 
             if not current_pdb_content:
@@ -717,6 +731,7 @@ def main() -> None:
         # generator.py creates them, but extract_atomic_content strips them.
         # We must re-inject them during assembly.
         preserved_ssbonds = extract_header_records(final_pdb_content, "SSBOND")
+        preserved_conects = extract_header_records(final_pdb_content, "CONECT")
 
         # Apply refinement if requested
         if args.refine_clashes > 0:
@@ -800,7 +815,8 @@ def main() -> None:
             cmd_string = _build_command_string(args)
             final_full_pdb_content_to_write = assemble_pdb_content(
                 final_pdb_atomic_content, final_sequence_length, command_args=cmd_string,
-                extra_records=preserved_ssbonds
+                extra_records=preserved_ssbonds,
+                conect_records=preserved_conects
             )
 
             if args.output:

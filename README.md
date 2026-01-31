@@ -45,6 +45,7 @@ A command-line tool to generate Protein Data Bank (PDB) files with full atomic r
     - **Pre-Proline Bias**: Residues preceding Proline automatically adopt restricted conformations (extended/beta). ✅
     - **Cis-Proline Isomerization**: X-Pro bonds can adopt cis conformations (~5% probability). ✅
     - **Post-Translational Modifications**: Support for Phosphorylation (SEP, TPO, PTR) with valid physics parameters. ✅
+- **Cyclic Peptides (Macrocycles)**: Support for **Head-to-Tail cyclization**. Closes the peptide bond between N- and C-termini using physics-based minimization. ✅
 47: 
 48: 🚀 **High Performance Physics**
 49: - **Hardware Acceleration**: Automatically detects and uses **GPU acceleration** (CUDA, OpenCL/Metal) if available.
@@ -97,6 +98,13 @@ The preferred shape of a side chain strongly depends on the shape of the backbon
 *   **Sheet ($\beta$)**: The backbone is extended, creating more room for different rotamers.
 
 **Implementation**: Synth-PDB uses a simplified version of the **Dunbrack Library**. It intelligently checks the backbone geometry ($\phi, \psi$) before picking a side chain shape, ensuring biophysical realism.
+
+#### ⭕ Macrocyclization (Cyclic Peptides)
+**What**: Creating a covalent bond between the N-terminal Amine and the C-terminal Carboxyl group to form a closed ring.
+**Biophysical Magnitude**:
+*   **Conformational Entropy**: Rigidifies the peptide. A linear peptide is a "floppy" string; a cyclic peptide is a "locked" ring. This reduces the entropy loss upon binding to a receptor, significantly increasing affinity.
+*   **Metabolic Stability**: Most degradation in the blood happens via *exopeptidases* (enzymes that clip ends). With no ends to clip, macrocycles are much more stable and long-lived in biological systems.
+*   **Pre-organization**: Cyclic peptides are "pre-organized" for their biological function, making them excellent drug scaffolds.
 **Coverage**: Supports **All 20 Standard Amino Acids** (including charged/polar residues).
 
 #### 🧬 Secondary Structures
@@ -138,6 +146,11 @@ The preferred shape of a side chain strongly depends on the shape of the backbon
 **Detection**: Automatic detection of close CYS-CYS pairs (SG-SG distance 2.0-2.2 Å)
 **Output**: SSBOND records added to PDB header
 **Importance**: Annotates stabilizing post-translational modifications
+
+#### ⭕ Cyclic Peptides (Macrocyclization)
+**What**: Binds the N-terminal Nitrogen to the C-terminal Carbon to form a closed ring.
+**Mechanism**: Uses OpenMM's physics engine to regularize the covalent bond and minimize ring strain.
+**Bio-Context**: Many potent drugs (e.g., Cyclosporine) and toxins are cyclic peptides. Cyclization increases metabolic stability and reduces conformational entropy, improving binding affinity.
 
 ### Educational Philosophy & Integrity
 
@@ -445,6 +458,11 @@ my_training_data/
   - C-terminus: N-methylamide (`NME`)
   - Removes charged termini ($\text{NH}_3^+$/$\text{COO}^-$) for realistic peptide modeling.
 
+- `--cyclic`: Generate a **Head-to-Tail cyclic peptide**.
+  - Connects the N-terminus and C-terminus with a covalent peptide bond.
+  - **Requirement**: Automatically implies `--minimize` to ensure proper closure.
+  - **Incompatibility**: Disables `--cap-termini`.
+
 - `--equilibrate`: Run Molecular Dynamics (MD) equilibration.
   - Simulates the protein at **300 Kelvin** (solution state).
   - Uses Langevin Dynamics to shake atoms out of local minima.
@@ -637,6 +655,10 @@ synth-pdb --sequence "GPGPPGPPGPPGPP" --conformation ppii --minimize --visualize
 # Combines distinct secondary structures (Helix, Sheet) with a Type I Beta Turn and PTMs.
 # Look for the magenta helix, purple turn, and orange phosphorylated residues (SEP/TPO/PTR).
 synth-pdb --length 25 --structure "1-10:alpha,11-14:typeI,15-25:beta" --phosphorylation-rate 0.3 --visualize
+
+# ⭕ The "Molecular Hoop" (Macrocycle)
+# A simple flexible ring of Glycines. Perfect for visualizing ring closure.
+synth-pdb --sequence "GGGGGGGGGGGG" --cyclic --minimize --visualize
 ```
 
 **Visualization Tips:**
@@ -725,6 +747,14 @@ A highly conserved regulatory protein with a complex mixed alpha/beta fold (beta
 synth-pdb --sequence MQIFVKTLTGKTITLEVEPSDTIENVKAKIQDKEGIPPDQQRLIFAGKQLEDGRTLSDYNIQKESTLHLVLRLRGG --structure "1-7:beta,12-16:beta,23-34:alpha,41-45:beta,48-49:beta,56-59:alpha,66-70:beta" --minimize --best-of-N 5 --output ubiquitin.pdb
 ```
 *Educational Concept*: Generating complex, multi-domain topologies. Physics-based minimization (`--minimize`) resolves steric clashes better than geometric heuristics alone.
+
+**5. SFTI-1 (Sunflower Trypsin Inhibitor)**
+*14 residues | PDB: 1SFI*
+A small, potent protease inhibitor that is both **cyclic** and stabilized by a **disulfide bond**.
+```bash
+synth-pdb --sequence "GRCTKSIPPICFPD" --cyclic --minimize --visualize --output sfti1.pdb
+```
+*Educational Concept*: Combining multiple stabilizing modifications (**Cyclization** + **Disulfide Bonds**) to create a rigid, functional scaffold.
 
 #### 🏗️ "Architectural" Protein Examples (The Giants)
 
@@ -995,7 +1025,7 @@ pytest tests/test_generator.py -v
 ```
 
 **Test Coverage**: 95% overall
-- 309 tests covering generation, validation, CLI, and edge cases
+- 322 tests covering generation, validation, CLI, and edge cases
 
 ### Project Structure
 
@@ -1023,6 +1053,10 @@ For students and researchers interested in the physics behind the code, here are
 *   **Cis-Proline (~5% Frequency):**
     *   MacArthur, M. W., & Thornton, J. M. (1991). Influence of proline residues on protein conformation. *J Mol Biol*, 218(2), 397-412.
     *   Weiss, M. S., et al. (1998). Cis-proline. *Acta Cryst D*, 54, 323-329.
+
+*   **Macrocyclization & Cyclic Peptides:**
+    *   Horton, D. A., et al. (2003). The combinatorial synthesis of bicyclic peptides. *Chem. Rev.*, 103(3), 893-930. (Seminal review on macrocycles).
+    *   Craik, D. J., et al. (2013). The future of peptide-based drugs. *Chem. Biol. Drug Des.*, 81(1), 136-147.
 
 *   **NMR Structure Validation & Chirality:**
     *   Montelione, G. T., et al. (2013). Recommendations of the wwPDB NMR Validation Task Force. *Structure*, 21(9), 1563-1570. (Defines standards for geometric validation).
@@ -1083,6 +1117,7 @@ This section provides definitions and seminal references for the biophysical and
 | **S²** | **Model-Free Order Parameter**. A value between 0 (random) and 1 (rigid) that describes the degree of spatial restriction of local backbone motion. | Lipari, G., & Szabo, A. (1982). *J. Am. Chem. Soc.* |
 | **OBC2** | **Onufriev-Bashford-Case**. A computationally efficient implicit solvent model (Generalized Born) used to simulate the screening effect of water. | Onufriev, A., et al. (2004). *Proteins.* |
 | **AMBER** | **Assisted Model Building with Energy Refinement**. A widely-used suite of molecular simulation programs and force fields for biomolecules. | Case, D. A., et al. (2005). *J. Comput. Chem.* |
+| **Macrocycle** | A cyclic macromolecule or a macromolecular network, such as a cyclic peptide or a crown ether. | IUPAC Gold Book. |
 
 ## License
 
