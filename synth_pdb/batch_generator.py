@@ -107,9 +107,27 @@ class BatchedGenerator:
     def __init__(self, sequence_str: str, n_batch: int = 1, full_atom: bool = False):
         # Resolve sequence
         if "-" in sequence_str:
-            self.sequence = [s.strip() for s in sequence_str.split("-")]
+            raw_parts = [s.strip().upper() for s in sequence_str.split("-") if s.strip()]
+            resolved = []
+            skip = False
+            for i, p in enumerate(raw_parts):
+                if skip:
+                    skip = False
+                    continue
+                if p == "D" and i + 1 < len(raw_parts):
+                    next_p = raw_parts[i+1]
+                    if len(next_p) == 1:
+                        next_p = ONE_TO_THREE_LETTER_CODE.get(next_p, next_p)
+                    resolved.append(f"D-{next_p}")
+                    skip = True
+                else:
+                    if len(p) == 1:
+                        resolved.append(ONE_TO_THREE_LETTER_CODE.get(p, p))
+                    else:
+                        resolved.append(p)
+            self.sequence = resolved
         else:
-            self.sequence = [ONE_TO_THREE_LETTER_CODE.get(c, "ALA") for c in sequence_str]
+            self.sequence = [ONE_TO_THREE_LETTER_CODE.get(c.upper(), "ALA") for c in sequence_str]
         
         self.n_batch = n_batch
         self.n_res = len(self.sequence)

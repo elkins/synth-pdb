@@ -431,7 +431,7 @@ def _resolve_sequence(
             # we should preserve them.
             
             # Simple fix: join them back if they were part of a D- moiety
-            raw_splits = user_sequence_str_upper.split("-")
+            raw_splits = [s.strip().upper() for s in user_sequence_str_upper.split("-") if s.strip()]
             amino_acids = []
             skip_next = False
             for j, part in enumerate(raw_splits):
@@ -439,10 +439,16 @@ def _resolve_sequence(
                     skip_next = False
                     continue
                 if part == "D" and j + 1 < len(raw_splits):
-                    amino_acids.append(f"D-{raw_splits[j+1]}")
+                    next_p = raw_splits[j+1]
+                    if len(next_p) == 1:
+                        next_p = ONE_TO_THREE_LETTER_CODE.get(next_p, next_p)
+                    amino_acids.append(f"D-{next_p}")
                     skip_next = True
                 else:
-                    amino_acids.append(part)
+                    if len(part) == 1:
+                        amino_acids.append(ONE_TO_THREE_LETTER_CODE.get(part, part))
+                    else:
+                        amino_acids.append(part)
 
             for aa in amino_acids:
                 base_aa = aa[2:] if aa.startswith("D-") else aa

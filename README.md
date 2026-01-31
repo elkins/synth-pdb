@@ -1,14 +1,18 @@
 # synth-pdb
 
-**The Virtual NMR Spectrometer:** [![Open In Colab: Relaxation](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/elkins/synth-pdb/blob/master/interactive_relaxation.ipynb)
-**AI Protein Data Factory:** [![Open In Colab: ML Integration](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/elkins/synth-pdb/blob/master/examples/ml_integration/ml_handover_demo.ipynb)
+A command-line tool to generate Protein Data Bank (PDB) files with full atomic representation for testing, benchmarking, and educational purposes.
 
 [![PyPI version](https://img.shields.io/badge/pypi-v1.14.0-blue)](https://pypi.org/project/synth-pdb/)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Tests](https://github.com/elkins/synth-pdb/actions/workflows/test.yml/badge.svg)](https://github.com/elkins/synth-pdb/actions/workflows/test.yml)
 
-A command-line tool to generate Protein Data Bank (PDB) files with full atomic representation for testing, benchmarking, and educational purposes.
+| Tutorial | Action |
+| :--- | :--- |
+| **The Virtual NMR Spectrometer** | [![Open In Colab: Relaxation](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/elkins/synth-pdb/blob/master/interactive_relaxation.ipynb) |
+| **AI Protein Data Factory** | [![Open In Colab: ML Integration](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/elkins/synth-pdb/blob/master/examples/ml_integration/ml_handover_demo.ipynb) |
+| **The Hard Decoy Challenge** | [![Open In Colab: Decoys](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/elkins/synth-pdb/blob/master/examples/ml_integration/hard_decoy_challenge.ipynb) |
+
 
 > ⚠️ **Important**: The generated structures use idealized geometries. For high-quality, physically realistic structures suitable for simulation, we strongly recommend using the **`--minimize`** flag, which relaxes the geometry using the OpenMM physics engine.
 
@@ -622,7 +626,7 @@ coords_tensor = torch.from_numpy(batch.coords).float()
 ```
 
 ### 🚀 Try it in the Cloud
-**AI Protein Data Factory:** [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/elkins/synth-pdb/blob/master/examples/ml_integration/ml_handover_demo.ipynb)
+- **AI Protein Data Factory:** [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/elkins/synth-pdb/blob/master/examples/ml_integration/ml_handover_demo.ipynb)
 
 See the full [ML Integration Demo](file:///Users/georgeelkins/nmr/synth-pdb/examples/ml_integration/ml_handover_demo.ipynb) for examples of Radius of Gyration prediction and JAX/MLX support.
 
