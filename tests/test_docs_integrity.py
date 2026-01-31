@@ -28,6 +28,8 @@ class TestDocumentationIntegrity(unittest.TestCase):
         self.packing_path = os.path.join(self.base_dir, 'synth_pdb', 'packing.py')
         self.scoring_path = os.path.join(self.base_dir, 'synth_pdb', 'scoring.py')
         self.nef_io_path = os.path.join(self.base_dir, 'synth_pdb', 'nef_io.py')
+        self.dataset_path = os.path.join(self.base_dir, 'synth_pdb', 'dataset.py')
+        self.batch_generator_path = os.path.join(self.base_dir, 'synth_pdb', 'batch_generator.py')
 
     def _check_file_contains(self, filepath, substrings):
         """Helper to assert file contains list of substrings."""
@@ -104,6 +106,8 @@ class TestDocumentationIntegrity(unittest.TestCase):
             "amplitude of internal motion",
             "EDUCATIONAL NOTE - Dipolar Integration Constant (d):",
             "EDUCATIONAL NOTE - Chemical Shift Anisotropy (CSA) Constant (c):",
+            "EDUCATIONAL NOTE - BPP Theory & Spectral Density:",
+            "Extreme Narrowing Limit",
         ]
         self._check_file_contains(self.relaxation_path, required_notes)
 
@@ -119,6 +123,8 @@ class TestDocumentationIntegrity(unittest.TestCase):
             "O(N^2)",
             "EDUCATIONAL NOTE - Topology Bridging",
             "EDUCATIONAL NOTE - Serialization:",
+            "EDUCATIONAL NOTE - Anatomy of a Forcefield:",
+            "Bonded Terms (Springs)",
         ]
         self._check_file_contains(self.physics_path, required_notes)
 
@@ -133,6 +139,8 @@ class TestDocumentationIntegrity(unittest.TestCase):
             "Educational Note - Side Chain Packing:",
             "Backbone-Dependent Library",
             "gauche+", "gauche-", "trans",
+            "EDUCATIONAL NOTE - Physics of the Ramachandran Plot:",
+            "HARD-SPHERE STERICS",
         ]
         self._check_file_contains(self.validator_path, required_notes)
 
@@ -161,6 +169,7 @@ class TestDocumentationIntegrity(unittest.TestCase):
             "EDUCATIONAL NOTE - NeRF Geometry",
             "Natural Extension Reference Frame",
             "mathematical precision",
+            "EDUCATIONAL NOTE - SIMD & Parallel Geometry:",
         ]
         self._check_file_contains(self.geometry_path, required_notes)
 
@@ -226,3 +235,13 @@ class TestDocumentationIntegrity(unittest.TestCase):
             "Atomic Records & B-Factors",
         ]
         self._check_file_contains(readme_path, required_notes)
+
+    def test_dataset_educational_notes(self):
+        """Ensure dataset.py retains key educational blocks."""
+        required_notes = [
+            "EDUCATIONAL NOTE - The Balanced Dataset Problem:",
+            "Alpha-Helix Trap",
+            "Halls of Mirrors",
+            "Data Factory Overview:",
+        ]
+        self._check_file_contains(self.dataset_path, required_notes)

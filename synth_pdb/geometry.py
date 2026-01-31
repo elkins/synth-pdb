@@ -88,6 +88,87 @@ def position_atom_3d_from_internal_coords(
     return p4
 
 
+# EDUCATIONAL NOTE - SIMD & Parallel Geometry:
+# -------------------------------------------
+# Traditional biology code uses "Serial Geometry" ($O(B \times L)$). 
+# To place atoms for $B$ structures of length $L$, it loops $B$ times.
+#
+# BatchedGenerator uses Single Instruction, Multiple Data (SIMD) logic:
+# 1. Broad Geometry: We treat the coordinates as a massive block of numbers
+#    rather than individual XYZ points.
+# 2. Vector Units: Hardware like the M4's AMX or a GPU's CUDA cores can execute
+#    one operation (e.g., a cross product) across thousands of data points at once.
+# 3. Efficiency: By avoiding the Python interpreter loop for each structure, we
+#    reach throughput levels required for "Foundation Model" training in proteomics.
+
+def position_atoms_batch(
+    p1: np.ndarray,
+    p2: np.ndarray,
+    p3: np.ndarray,
+    bond_lengths: np.ndarray,
+    bond_angles_deg: np.ndarray,
+    dihedral_angles_deg: np.ndarray,
+) -> np.ndarray:
+    """
+    Vectorized version of the NeRF algorithm for large batches of structures.
+    Operates on (B, 3) coordinate tensors and (B,) internal coordinate arrays.
+    
+    EDUCATIONAL NOTE - GPU-First Operations:
+    ---------------------------------------
+    On modern hardware (Apple M4 AMX, NVIDIA Tensor Cores), serial loops are 
+    extremely inefficient. By vectorizing the math into large matrix operations:
+    1. Memory bandwidth is maximized via contiguous array access.
+    2. SIMD units perform the same calculation across multiple samples simultaneously.
+    3. Hardware acceleration (Accelerate/MPS/Metal) can be leveraged automatically 
+       by numpy and high-level frameworks.
+    
+    Args:
+        p1, p2, p3: (B, 3) arrays of coordinates for the preceding atoms.
+        bond_lengths: (B,) array of bond lengths.
+        bond_angles_deg: (B,) array of bond angles in degrees.
+        dihedral_angles_deg: (B,) array of dihedral angles in degrees.
+        
+    Returns:
+        np.ndarray: (B, 3) array of coordinates for the placed atoms (p4).
+    """
+    # Convert angles to radians
+    angles_rad = np.deg2rad(bond_angles_deg)
+    dihedrals_rad = np.deg2rad(dihedral_angles_deg)
+    
+    # Calculate relative vectors
+    a = p2 - p1
+    b = p3 - p2
+    
+    # Batch cross products
+    c = np.cross(a, b, axis=-1)
+    d = np.cross(c, b, axis=-1)
+    
+    # Normalize vectors (Batch-wise)
+    # Using keepdims=True for proper broadcasting
+    def normalize(v):
+        norm = np.linalg.norm(v, axis=-1, keepdims=True)
+        # Avoid division by zero
+        norm = np.where(norm == 0, 1.0, norm)
+        return v / norm
+
+    b = normalize(b)
+    c = normalize(c)
+    d = normalize(d)
+    
+    # Reshape lengths for broadcasting (B, 1)
+    L = bond_lengths.reshape(-1, 1)
+    
+    # NeRF Coordinate Transformation
+    # Place P4 in the local reference frame and shift to P3
+    p4 = p3 + L * (
+        -b * np.cos(angles_rad).reshape(-1, 1)
+        + d * (np.sin(angles_rad) * np.cos(dihedrals_rad)).reshape(-1, 1)
+        + c * (np.sin(angles_rad) * np.sin(dihedrals_rad)).reshape(-1, 1)
+    )
+    
+    return p4
+
+
 @njit
 def calculate_angle(
     coord1: np.ndarray, coord2: np.ndarray, coord3: np.ndarray

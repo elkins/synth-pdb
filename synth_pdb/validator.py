@@ -58,6 +58,24 @@ class PDBValidator:
     def _parse_pdb_atoms(pdb_content: str) -> List[Dict[str, Any]]:
         """
         Parses the PDB content and extracts atom information, specifically coordinates.
+        
+        EDUCATIONAL NOTE - Physics of the Ramachandran Plot:
+        ---------------------------------------------------
+        The Ramachandran plot (Phi vs Psi) is the "map of allowed protein shapes". 
+        It is NOT based on complex quantum mechanics, but on simple HARD-SPHERE STERICS.
+        
+        1. The Clash: For most Phi/Psi angles, the Carbonyl Oxygen (O) of residue i
+           clashes with the amide Hydrogen (H) of residue i+1, or the sidechain 
+           C-beta atom clashes with the backbone.
+        2. The Exceptions:
+           - Glycine: Has no C-beta (just H), so it can access much more "illegal" 
+             territory. It is the "flexible hinge" of proteins.
+           - Proline: Its sidechain is cyclic and bonded back to the Nitrogen. This 
+             locks its Phi angle to ~ -65 deg, making it the "structural stiffener".
+        
+        This validator checks if your synthetic structure resides in these energetically 
+        favorable "Polygons of Life".
+
         Returns a list of dictionaries, each representing an atom with residue and chain info.
         """
         parsed_atoms = []

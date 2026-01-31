@@ -99,10 +99,26 @@ def _generate_single_sample_task(args):
 
 class DatasetGenerator:
     """
-    Generates large-scale synthetic protein datasets for AI model training.
+    Orchestrates the generation of large-scale synthetic protein datasets for AI model training.
     
-    educational_note:
-    -----------------
+    EDUCATIONAL NOTE - The Balanced Dataset Problem:
+    -----------------------------------------------
+    When training an AI model (like AlphaFold or a Forcefield predictor), the 
+    quality and BALANCE of the data are often more important than the quantity.
+    
+    1. The Alpha-Helix Trap: If you only generate structures using the 'alpha' 
+       preset, your AI will learn that *all* biology looks like a helix. This 
+       leads to "Halls of Mirrors" where the model fails on Beta sheets or 
+       intrinsically disordered regions (IDRs).
+    2. Mixed Conformations: This generator encourages specifying a mix of 
+       'alpha', 'beta', and 'random' conformations. A dataset that "covers" 
+       the Ramachandran plot uniformly ensures the AI learns both the rules 
+       and the exceptions of protein geometry.
+    3. Structural Diversity: By varying 'length' and 'conformation', we minimize 
+       "Selection Bias", making the resulting AI model more robust and generalizable.
+
+    Data Factory Overview:
+    ----------------------
     AI models for protein folding (like AlphaFold, RoseTTAFold) require massive datasets 
     of (Structure, Sequence) pairs to learn the patterns of protein physics.
     Real PDB data is limited (~200k structures). Synthetic data allows us to:

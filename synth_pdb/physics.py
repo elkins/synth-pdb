@@ -101,6 +101,26 @@ class EnergyMinimizer:
         """
         Minimizes the energy of a structure already containing correct atoms (including Hydrogens).
         
+        EDUCATIONAL NOTE - Anatomy of a Forcefield:
+        -------------------------------------------
+        A forcefield (like Amber14) approximates the potential energy (U) of a 
+        molecule as a sum of four main terms:
+        
+        U = U_bond + U_angle + U_torsion + [U_vdw + U_elec]
+        
+        1. Bonded Terms (Springs):
+           - U_bond/U_angle: Atoms behave like balls on springs. Pushing them 
+             away from ideal (equilibrium) lengths/angles costs energy.
+           - U_torsion: Rotation around bonds is restricted by periodic potential 
+             wells (e.g., the preference for trans vs cis).
+        2. Non-Bonded Terms (Distant Neighbors):
+           - U_vdw (Lennard-Jones): Models Steric Repulsion (don't overlap!) and 
+             London Dispersion (subtle attraction).
+           - U_elec (Coulomb): Attraction between opposite charges (e.g., a 
+             Salt Bridge) and repulsion between like charges.
+        
+        Minimization is the process of finding the coordinate set where $dU/dX = 0$.
+
         Args:
             pdb_file_path: Input PDB path.
             output_path: Output PDB path.

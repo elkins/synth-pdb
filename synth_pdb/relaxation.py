@@ -32,6 +32,23 @@ def spectral_density(omega: float, tau_m: float, s2: float, tau_f: float = 0.0) 
     """
     Calculate Spectral Density J(w) using Lipari-Szabo Model-Free formalism.
     
+    EDUCATIONAL NOTE - BPP Theory & Spectral Density:
+    -------------------------------------------------
+    In NMR, relaxation is caused by local magnetic fields that "flicker" due to 
+    molecular tumbling. Spectral Density J(w) is essentially a measure of the 
+    POWER of these fluctuations at a specific frequency (w).
+    
+    - BPP Theory (Bloembergen-Purcell-Pound) shows that relaxation is most 
+      efficient when the frequency of motion (1/tau_m) matches the Larmor 
+      frequency of the nuclei.
+    - If a protein tumbles too fast (small tau_m), the fluctuations are too 
+      high-frequency to cause efficient relaxation (Extreme Narrowing Limit).
+    - If it tumbles too slow (large tau_m), the energy is concentrated at 
+      low frequencies, leading to fast T2 relaxation and broad lines.
+    
+    Model-Free Analysis (Lipari-Szabo) separates this into Global Tumbling (tau_m) 
+    and fast Local Motion (tau_f), weighted by the Order Parameter (S^2).
+    
     Formula:
     J(w) = (2/5) * [ S^2 * tm / (1 + (w*tm)^2) + (1-S^2) * te / (1 + (w*te)^2) ]
     
