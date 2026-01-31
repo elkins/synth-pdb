@@ -6,6 +6,15 @@ from typing import Dict, List, Tuple
 
 logger = logging.getLogger(__name__)
 
+# --- Optional Numba JIT Support ---
+try:
+    from numba import njit
+except ImportError:
+    def njit(func=None, **kwargs):
+        if func is None:
+            return lambda f: f
+        return func
+
 # --- Physical Constants for NMR Relaxation ---
 # SI Units used for internal calculation
 MU_0 = 4 * np.pi * 1e-7      # Vacuum permeability derived (T*m/A)
@@ -18,6 +27,7 @@ GAMMA_N = -27.126e6          # Nitrogen-15 gyromagnetic ratio (rad s^-1 T^-1)
 R_NH = 1.02e-10              # NH Bond length (meters) - standard value
 CSA_N = -160e-6              # Polimorphic 15N CSA (unitless, ppm) -160 to -170 typical
 
+@njit
 def spectral_density(omega: float, tau_m: float, s2: float, tau_f: float = 0.0) -> float:
     """
     Calculate Spectral Density J(w) using Lipari-Szabo Model-Free formalism.

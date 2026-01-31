@@ -6,6 +6,15 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+# --- Optional Numba JIT Support ---
+try:
+    from numba import njit
+except ImportError:
+    def njit(func=None, **kwargs):
+        if func is None:
+            return lambda f: f
+        return func
+
 # --- Random Coil Chemical Shifts (Wishart et al.) ---
 # EDUCATIONAL NOTE - Random Coil Shifts:
 # ======================================
@@ -181,7 +190,7 @@ def predict_chemical_shifts(structure: struc.AtomArray) -> Dict[str, Dict[str, D
                 # 2. Add Tertiary Ring Current Effects
                 # Only affects protons (H, HA, HB...) and sometimes Carbon.
                 # Primarily Protons are interesting for NOESY/Structure.
-                if "H" in atom_type or atom_type == "H":
+                if rings and ("H" in atom_type or atom_type == "H"):
                     # Get atom coordinate
                     # We need to find the atom in the structure to get its coord
                     # This is slightly inefficient (O(N*M)) but fine for peptides.
@@ -294,6 +303,7 @@ def _get_aromatic_rings(structure):
                     
     return rings
 
+@njit
 def _calculate_ring_current_shift(proton_coord, rings):
     """
     Calculate total ring current shift for a proton from all rings.
