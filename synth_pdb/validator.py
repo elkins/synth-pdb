@@ -11,11 +11,13 @@ from .data import (
     ANGLE_C_N_CA,
     ANGLE_CA_C_O,
     VAN_DER_WAALS_RADII,
-    CHARGED_AMINO_ACIDS,
+    CHARGED_AMINO_ACIDS, # This was in the original, not explicitly in the diff, so keep it
     POSITIVE_AMINO_ACIDS,
     NEGATIVE_AMINO_ACIDS,
     HYDROPHOBIC_AMINO_ACIDS,
-    POLAR_UNCHARGED_AMINO_ACIDS,
+    POLAR_UNCHARGED_AMINO_ACIDS, # This was in the original, not explicitly in the diff, so keep it
+    HYDROPHILIC_AMINO_ACIDS, # Added from diff
+    L_TO_D_MAPPING, # Added from diff
     RAMACHANDRAN_POLYGONS,
     BACKBONE_DEPENDENT_ROTAMER_LIBRARY,
     AMINO_ACID_CHI_DEFINITIONS,
@@ -1217,7 +1219,7 @@ class PDBValidator:
                 # Calculate improper dihedral N-CA-C-CB
                 # For L-amino acids, this should be negative (~-120° to -60°)
                 # NOTE: Current generator produces positive values (~+60°) due to coordinate system
-                # This appears to be related to how biotite templates are transformed
+                # For D-amino acids, the sign will be inverted.
                 improper = self._calculate_dihedral_angle(
                     n_atom["coords"],
                     ca_atom["coords"],
@@ -1225,23 +1227,32 @@ class PDBValidator:
                     cb_atom["coords"]
                 )
                 
+                # Identify if this is a D-amino acid based on the residues list
+                # (e.g., DAL, DAR, DAN). 
+                is_d = res_name in L_TO_D_MAPPING.values()
+                
                 # Check for reasonable improper dihedral values
                 # Accept both negative (standard L-amino acids: -150° to -30°)
                 # and positive (current generator output: +30° to +150°)
                 # The key is that it should be in one of these ranges, not near 0° or ±180°
-                is_valid_l = -150.0 <= improper <= -30.0
-                is_valid_positive = 30.0 <= improper <= 150.0
                 
+                # For D-amino acids, we invert the value for comparison with L-ranges
+                check_val = -improper if is_d else improper
+                
+                is_valid_l = -150.0 <= check_val <= -30.0
+                is_valid_positive = 30.0 <= check_val <= 150.0
+                
+                expected_desc = "inverted" if is_d else "proper"
                 if not (is_valid_l or is_valid_positive):
                     self.violations.append(
                         f"Chirality violation: Chain {chain_id}, Residue {res_num} {res_name} "
                         f"has improper dihedral N-CA-C-CB = {improper:.1f}° "
-                        f"(expected ±60° to ±120° for proper chirality)"
+                        f"(expected {expected_desc} chirality)"
                     )
                 else:
                     logger.debug(
                         f"Chirality OK: Chain {chain_id}, Residue {res_num} {res_name} "
-                        f"improper dihedral = {improper:.1f}°"
+                        f"improper dihedral = {improper:.1f}° ({expected_desc})"
                     )
     
     def validate_all(self) -> None:

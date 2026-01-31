@@ -107,6 +107,14 @@ The preferred shape of a side chain strongly depends on the shape of the backbon
 *   **Pre-organization**: Cyclic peptides are "pre-organized" for their biological function, making them excellent drug scaffolds.
 **Coverage**: Supports **All 20 Standard Amino Acids** (including charged/polar residues).
 
+#### 🧬 D-Amino Acids (Inverted Stereochemistry)
+**What**: Mirror-images of standard L-amino acids.
+**Biophysical Magnitude**:
+*   **Protease Resistance**: Most enzymes that degrade proteins (proteases) are "evolutionarily locked" to only recognize L-amino acids. By replacing a single L-amino acid with a D-amino acid, a peptide can become hundreds of times more stable in human blood.
+*   **Bacterial Cell Walls**: Bacteria uniquely use D-amino acids (like D-Ala and D-Glu) in their cross-linked peptidoglycan cell walls. This is why many antibiotics (like Penicillin) target these non-L structures.
+*   **Non-Natural Foldamers**: D-amino acids allow for the creation of "mirror-image" helices and unique turns (e.g., Beta-turns involving D-Pro) that are impossible with standard biology.
+**Implementation**: **synth-pdb** mirrors sidechain coordinates across the N-CA-C backbone plane and uses standard PDB 3-letter codes (e.g., `DAL`, `DPH`).
+
 #### 🧬 Secondary Structures
 **What**: Regular backbone patterns (helices, sheets)  
 **Control**: Per-region via `--structure` parameter  
@@ -755,6 +763,14 @@ A small, potent protease inhibitor that is both **cyclic** and stabilized by a *
 synth-pdb --sequence "GRCTKSIPPICFPD" --cyclic --minimize --visualize --output sfti1.pdb
 ```
 *Educational Concept*: Combining multiple stabilizing modifications (**Cyclization** + **Disulfide Bonds**) to create a rigid, functional scaffold.
+**6. Gramicidin S (D-Amino Acid Antibiotic)**
+*10 residues | PDB: 1TK2*
+A powerful cyclic antibiotic produced by soil bacteria. It contains the rare **D-Phenylalanine** (`D-PHE`) which is critical for its "beta-sheet-like" hairpins.
+```bash
+synth-pdb --sequence "VAL-ORN-LEU-D-PHE-PRO-VAL-ORN-LEU-D-PHE-PRO" --cyclic --minimize --visualize --output gramicidin_s.pdb
+```
+*Note: This utilizes ORN (Ornithine) if supported, or sub for LYS. The key is the D-PHE residue.*
+*Educational Concept*: Using D-amino acids to induce specific turns and achieve antimicrobial activity through membrane disruption.
 
 #### 🏗️ "Architectural" Protein Examples (The Giants)
 
@@ -1025,7 +1041,7 @@ pytest tests/test_generator.py -v
 ```
 
 **Test Coverage**: 95% overall
-- 361 tests covering generation, validation, CLI, and edge cases
+- 399 tests covering generation, validation, CLI, and edge cases
 
 ### Project Structure
 

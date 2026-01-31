@@ -30,6 +30,35 @@ STANDARD_AMINO_ACIDS: List[str] = [
     "TYR",
 ]
 
+# --- D-Amino Acids ---
+# Mapping from 3-letter L-code to 3-letter D-code for PDB compatibility.
+# Glycine is achiral and therefore has no D-form.
+# 
+# EDUCATIONAL NOTE - The "Mirror Image" World:
+# -------------------------------------------
+# Amino acids (except Glycine) are chiral, meaning they have a "handedness."
+# In nature, almost all proteins are made of L-amino acids (Left-handed). 
+# However, D-amino acids (Right-handed) exist and are structurally fascinating:
+# 
+# 1. Protease Resistance: Because most proteases are evolved to bind L-peptides,
+#    incorporating D-amino acids can "camouflage" a peptide from degradation, 
+#    extending its half-life from minutes to hours in the bloodstream.
+# 2. Bacterial Signatures: D-Ala and D-Glu are key components of the bacterial 
+#    cell wall (peptidoglycan). This makes them a target for the immune system 
+#    and antibiotics like Vancomycin.
+# 3. Structural Induction: D-amino acids favor different backbone angles. 
+#    For example, a "D-Proline" can induce a different type of beta-turn 
+#    that is energetically impossible for L-Proline.
+#
+# These 3-letter codes are standardized in the PDB (e.g., DAL for D-Alanine).
+L_TO_D_MAPPING: Dict[str, str] = {
+    "ALA": "DAL", "ARG": "DAR", "ASN": "DAN", "ASP": "DAS", "CYS": "DCY",
+    "GLU": "DGL", "GLN": "DGN", "HIS": "DHI", "ILE": "DIL", "LEU": "DLE",
+    "LYS": "DLY", "MET": "DME", "PHE": "DPH", "PRO": "DPR", "SER": "DSE",
+    "THR": "DTH", "TRP": "DTR", "TYR": "DTY", "VAL": "DVA"
+}
+D_AMINO_ACIDS: List[str] = list(L_TO_D_MAPPING.values())
+
 # Post-Translational Modifications
 MODIFIED_AMINO_ACIDS: List[str] = [
     "SEP", # Phosphoserine
@@ -37,7 +66,7 @@ MODIFIED_AMINO_ACIDS: List[str] = [
     "PTR", # Phosphotyrosine
 ]
 
-ALL_VALID_AMINO_ACIDS: List[str] = STANDARD_AMINO_ACIDS + MODIFIED_AMINO_ACIDS
+ALL_VALID_AMINO_ACIDS: List[str] = STANDARD_AMINO_ACIDS + MODIFIED_AMINO_ACIDS + D_AMINO_ACIDS
 
 # --- Amino Acid Frequencies (Approximate percentages in proteins) ---
 # Source: Based on general protein composition data (e.g., from D. M. Smith, The Encyclopedia of Life Sciences, 2001)

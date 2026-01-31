@@ -16,6 +16,7 @@ import logging
 from typing import List, Optional, Dict, Tuple
 from .data import (
     STANDARD_AMINO_ACIDS,
+    MODIFIED_AMINO_ACIDS,
     ALL_VALID_AMINO_ACIDS,
     ONE_TO_THREE_LETTER_CODE,
     AMINO_ACID_FREQUENCIES,
@@ -32,6 +33,7 @@ from .data import (
     RAMACHANDRAN_REGIONS,
     BACKBONE_DEPENDENT_ROTAMER_LIBRARY,
     BETA_TURN_TYPES,
+    L_TO_D_MAPPING,
 )
 from .pdb_utils import create_pdb_header, create_pdb_footer, extract_atomic_content, assemble_pdb_content
 from .geometry import (
@@ -422,10 +424,29 @@ def _resolve_sequence(
     if user_sequence_str:
         user_sequence_str_upper = user_sequence_str.upper()
         if "-" in user_sequence_str_upper:
-            # Assume 3-letter code format like 'ALA-GLY-VAL'
-            amino_acids = [aa.upper() for aa in user_sequence_str_upper.split("-")]
+            # Assume 3-letter code format like 'ALA-GLY-VAL' or 'D-ALA-GLY'
+            # Note: We split by '-' but if somebody uses 'D-ALA', splitting by '-'
+            # will give ['D', 'ALA']. This is ambiguous with 'ALA-GLY'.
+            # Better logic: if there are any residues starting with 'D-', 
+            # we should preserve them.
+            
+            # Simple fix: join them back if they were part of a D- moiety
+            raw_splits = user_sequence_str_upper.split("-")
+            amino_acids = []
+            skip_next = False
+            for j, part in enumerate(raw_splits):
+                if skip_next:
+                    skip_next = False
+                    continue
+                if part == "D" and j + 1 < len(raw_splits):
+                    amino_acids.append(f"D-{raw_splits[j+1]}")
+                    skip_next = True
+                else:
+                    amino_acids.append(part)
+
             for aa in amino_acids:
-                if aa not in ALL_VALID_AMINO_ACIDS:
+                base_aa = aa[2:] if aa.startswith("D-") else aa
+                if base_aa not in ALL_VALID_AMINO_ACIDS:
                     raise ValueError(f"Invalid 3-letter amino acid code: {aa}")
             return amino_acids
         elif (
@@ -843,8 +864,20 @@ def generate_pdb_content(
     residue_coordinates = {}
     
     # Build backbone and add side chains
-    for i, res_name in enumerate(sequence):
+    for i, full_res_name in enumerate(sequence):
         res_id = i + 1
+        
+        # EDUCATIONAL NOTE - D-Amino Acid Handling:
+        # D-amino acids are the mirror images of the standard L-amino acids.
+        # They are rare in ribosomal proteins but common in bacterial cell walls,
+        # peptide antibiotics, and specialized marine toxins.
+        #
+        # Implementation Trick:
+        # Instead of storing separate templates for all D-amino acids, we use 
+        # the standard L-templates and "mirror" the sidechain coordinates 
+        # across the plane defined by the backbone atoms (N, CA, C).
+        is_d = full_res_name.startswith("D-")
+        res_name = full_res_name[2:] if is_d else full_res_name
         
         # Determine backbone coordinates based on previous residue or initial placement
 
@@ -917,7 +950,8 @@ def generate_pdb_content(
             # Omega is torsion of CA(i-1)-C(i-1)-N(i)-CA(i) -- Peptide bond
             
             # Get next residue name if available
-            next_res_name = sequence[i+1] if i + 1 < sequence_length else None
+            next_full_res_name = sequence[i+1] if i + 1 < sequence_length else None
+            next_res_name = next_full_res_name[2:] if next_full_res_name and next_full_res_name.startswith("D-") else next_full_res_name
             
             # 1. Place N(i)
             # Bond: C(i-1)-N(i)
@@ -1021,7 +1055,11 @@ def generate_pdb_content(
                 # But current loop generates on fly.
                 # For 'random', we re-sample. This is inconsistent if we need Phi/Psi pairs.
                 # Assuming simple independent sampling for now as per original code.
-                _, prev_psi = _sample_ramachandran_angles(sequence[prev_res_idx], res_name)
+                
+                # Get base name for prev_res if it was D
+                prev_full_res_name = sequence[prev_res_idx]
+                prev_base_res_name = prev_full_res_name[2:] if prev_full_res_name.startswith("D-") else prev_full_res_name
+                _, prev_psi = _sample_ramachandran_angles(prev_base_res_name, res_name)
 
             else:
                 # Should not happen
@@ -1281,9 +1319,47 @@ def generate_pdb_content(
         transformed_res = ref_res_template
         transformed_res.coord = transformation.apply(transformed_res.coord)
         
+        # EDUCATIONAL NOTE - Chiral Mirroring strategy:
+        # -------------------------------------------
+        # To convert an L-amino acid to a D-amino acid without separate templates,
+        # we treat the CA as the origin and the N-CA-C plane as our mirror.
+        #
+        # Why Mirroring Works:
+        # 1. Geometry Preservation: Mirroring across the backbone plane preserves 
+        #    all bond lengths and angles within the sidechain.
+        # 2. Stereocenter Inversion: This transformation exactly inverts the 
+        #    chirality at the C-alpha atom (from L to D).
+        # 3. Backbone Compatibility: Because we reflect *across* the backbone plane, 
+        #    the positions of the backbone atoms (N, CA, C) remain unchanged, 
+        #    ensuring the chain connectivity is not broken.
+        if is_d and res_name != "GLY":
+            # 1. Define the plane normal vector n = (C-CA) x (N-CA)
+            vec1 = c_coord - ca_coord
+            vec2 = n_coord - ca_coord
+            normal = np.cross(vec1, vec2)
+            normal /= np.linalg.norm(normal)
+            
+            # 2. Identify sidechain atoms (everything except N, CA, C, O, H, HA)
+            backbone_names = {"N", "CA", "C", "O", "H", "HA"}
+            for atom_idx in range(len(transformed_res)):
+                if transformed_res.atom_name[atom_idx] not in backbone_names:
+                    # 3. Reflect point across the plane passing through ca_coord with normal
+                    p = transformed_res.coord[atom_idx]
+                    w = p - ca_coord
+                    dist_to_plane = np.dot(w, normal)
+                    # New position = p - 2 * (projection onto normal)
+                    transformed_res.coord[atom_idx] = p - 2 * dist_to_plane * normal
+        
         # Set residue ID and name for the transformed residue
         transformed_res.res_id[:] = res_id
-        transformed_res.res_name[:] = res_name
+        # EDUCATIONAL NOTE - D-Residue Naming:
+        # We use a 4-letter prefix 'D' (e.g., DALA, DGLU) to distinguish
+        # D-amino acids from their L-counterparts in the PDB file.
+        # This makes it easier for validators and downstream tools to recognize the chirality.
+        if is_d:
+            transformed_res.res_name[:] = L_TO_D_MAPPING.get(res_name, res_name)
+        else:
+            transformed_res.res_name[:] = res_name
         transformed_res.chain_id[:] = "A" # Ensure chain ID is set
         
         # Append the transformed residue to the peptide

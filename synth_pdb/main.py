@@ -552,9 +552,7 @@ def main() -> None:
             three_to_one = {v: k for k, v in ONE_TO_THREE_LETTER_CODE.items()}
             
             if args.plausible_frequencies:
-                # Map frequencies to 1-letter codes
-                residues = list(time_to_one.values()) # No, map keys.
-                # Harder. Let's sample 3-letter and convert.
+                # Sample 3-letter and convert.
                 residues_3 = list(AMINO_ACID_FREQUENCIES.keys())
                 weights = list(AMINO_ACID_FREQUENCIES.values())
                 chosen_3 = rng.choices(residues_3, weights=weights, k=args.length)

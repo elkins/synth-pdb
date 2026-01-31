@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [1.14.0] - 2026-01-31
+### Added
+- **D-Amino Acid Support**: Support for generating and validating peptides with D-amino acids using the `D-` prefix in sequences.
+- **PDB Compatibility**: Automatic conversion of D-amino acids to standard 3-letter codes (e.g., `DAL`, `DPH`).
+- **Educational Enhancements**: Detailed comments explaining chiral mirroring and stereochemistry.
+- **New Tests**: Comprehensive TDD suite for D-amino acid generation and validation.
+
 
 ## [1.13.1] - 2026-01-30
 

@@ -78,8 +78,18 @@ def predict_order_parameters(structure: struc.AtomArray) -> Dict[int, float]:
     - Loops / Turns: S2 ~ 0.60 - 0.70 (Flexible)
     - Termini (N/C): S2 ~ 0.40 - 0.50 (Fraying)
     """
-    ss_list = get_secondary_structure(structure)
     res_starts = struc.get_residue_starts(structure)
+    res_ids = np.unique(structure.res_id)
+    if len(res_ids) == 0:
+        return {}
+        
+    ss_list = get_secondary_structure(structure)
+        
+    start_res = res_ids[0]
+    end_res = res_ids[-1]
+    
+    # Heuristic Max SASA per residue (Angstrom^2) for normalization
+    MAX_SASA = 150.0
     
     # Calculate SASA for "Packing Awareness"
     sasa_per_residue = {}
@@ -150,15 +160,6 @@ def predict_order_parameters(structure: struc.AtomArray) -> Dict[int, float]:
     s2_map = {}
     
     # Identify termini residues (by ID)
-    res_ids = np.unique(structure.res_id)
-    if len(res_ids) == 0:
-        return {}
-        
-    start_res = res_ids[0]
-    end_res = res_ids[-1]
-    
-    # Heuristic Max SASA per residue (Angstrom^2) for normalization
-    MAX_SASA = 150.0
     
     for i, start_idx in enumerate(res_starts):
         # Identify residue ID
