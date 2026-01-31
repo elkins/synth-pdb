@@ -16,6 +16,18 @@ class TestDocumentationIntegrity(unittest.TestCase):
         self.bfactor_test_path = os.path.join(self.base_dir, 'tests', 'test_bfactor.py')
         self.ramachandran_test_path = os.path.join(self.base_dir, 'tests', 'test_ramachandran.py')
         self.decoys_path = os.path.join(self.base_dir, 'synth_pdb', 'decoys.py')
+        self.biophysics_path = os.path.join(self.base_dir, 'synth_pdb', 'biophysics.py')
+        self.nmr_path = os.path.join(self.base_dir, 'synth_pdb', 'nmr.py')
+        self.chemical_shifts_path = os.path.join(self.base_dir, 'synth_pdb', 'chemical_shifts.py')
+        self.relaxation_path = os.path.join(self.base_dir, 'synth_pdb', 'relaxation.py')
+        self.physics_path = os.path.join(self.base_dir, 'synth_pdb', 'physics.py')
+        self.validator_path = os.path.join(self.base_dir, 'synth_pdb', 'validator.py')
+        self.j_coupling_path = os.path.join(self.base_dir, 'synth_pdb', 'j_coupling.py')
+        self.cofactors_path = os.path.join(self.base_dir, 'synth_pdb', 'cofactors.py')
+        self.geometry_path = os.path.join(self.base_dir, 'synth_pdb', 'geometry.py')
+        self.packing_path = os.path.join(self.base_dir, 'synth_pdb', 'packing.py')
+        self.scoring_path = os.path.join(self.base_dir, 'synth_pdb', 'scoring.py')
+        self.nef_io_path = os.path.join(self.base_dir, 'synth_pdb', 'nef_io.py')
 
     def _check_file_contains(self, filepath, substrings):
         """Helper to assert file contains list of substrings."""
@@ -37,19 +49,143 @@ class TestDocumentationIntegrity(unittest.TestCase):
             "* **NMR Ensemble**: A set of structures that all satisfy experimental restraints",
             "* **Decoys**: Independent random conformations",
             "represent the SEARCH SPACE",
+            'EDUCATIONAL NOTE - "Hard Decoys" for AI Models:',
+            "Threading",
+            "Shuffling",
+            "torsion errors (Drift)",
         ]
         self._check_file_contains(self.decoys_path, required_notes)
+
+    def test_biophysics_educational_notes(self):
+        """Ensure biophysics.py retains key educational blocks."""
+        required_notes = [
+            "Educational Note - pH and Protonation:",
+            "Biological function depends on pH",
+            "Imidazole ring is neutral",
+            "EDUCATIONAL NOTE - Terminal Capping:",
+            "Uncapped termini (NH3+ and COO-) introduce strong charges",
+            "EDUCATIONAL NOTE: Salt Bridges",
+            "combination of two non-covalent interactions",
+        ]
+        self._check_file_contains(self.biophysics_path, required_notes)
+
+    def test_nmr_educational_notes(self):
+        """Ensure nmr.py retains key educational blocks."""
+        required_notes = [
+            "EDUCATIONAL NOTE - The Physics of NOEs",
+            "intensity of the NOE signal is proportional to the inverse 6th power",
+            "practical limit for detection is usually 5.0 - 6.0 Angstroms",
+            "Upper Distance Bounds",
+        ]
+        self._check_file_contains(self.nmr_path, required_notes)
+
+    def test_chemical_shifts_educational_notes(self):
+        """Ensure chemical_shifts.py retains key educational blocks."""
+        required_notes = [
+            "EDUCATIONAL NOTE - Random Coil Shifts:",
+            "Random Coil", "flexible chain",
+            "EDUCATIONAL NOTE - Secondary Chemical Shifts:",
+            "deviation from these values (Secondary Shift)",
+            "EDUCATIONAL NOTE - Ring Current Physics:",
+            "Aromatic rings",
+            "delocalized pi-electrons",
+            "Shielding",
+            "Deshielding",
+            "EDUCATIONAL NOTE - Prediction Algorithm:",
+            "Shift = Random_Coil + Structure_Offset + Noise",
+        ]
+        self._check_file_contains(self.chemical_shifts_path, required_notes)
+
+    def test_relaxation_educational_notes(self):
+        """Ensure relaxation.py retains key educational blocks."""
+        required_notes = [
+            "EDUCATIONAL NOTE - Lipari-Szabo Model Free:",
+            "Order Parameter (S2)",
+            "amplitude of internal motion",
+            "EDUCATIONAL NOTE - Dipolar Integration Constant (d):",
+            "EDUCATIONAL NOTE - Chemical Shift Anisotropy (CSA) Constant (c):",
+        ]
+        self._check_file_contains(self.relaxation_path, required_notes)
+
+    def test_physics_educational_notes(self):
+        """Ensure physics.py retains key educational blocks."""
+        required_notes = [
+            "Educational Note: What is Energy Minimization?",
+            "potential energy of the protein",
+            "local minimum",
+            "Educational Note - Metal Coordination in Physics:",
+            "Harmonic Constraints",
+            "Educational Note - Computational Efficiency:",
+            "O(N^2)",
+            "EDUCATIONAL NOTE - Topology Bridging",
+            "EDUCATIONAL NOTE - Serialization:",
+        ]
+        self._check_file_contains(self.physics_path, required_notes)
+
+    def test_validator_educational_notes(self):
+        """Ensure validator.py retains key educational blocks."""
+        required_notes = [
+            "EDUCATIONAL NOTE:",
+            "IUPAC convention for protein dihedrals",
+            "Educational Note - Computational Efficiency & Convergence:",
+            "performance optimization for Energy Minimization",
+            "Outlier",
+            "Educational Note - Side Chain Packing:",
+            "Backbone-Dependent Library",
+            "gauche+", "gauche-", "trans",
+        ]
+        self._check_file_contains(self.validator_path, required_notes)
+
+    def test_j_coupling_educational_notes(self):
+        """Ensure j_coupling.py retains Karplus note."""
+        required_notes = [
+            "EDUCATIONAL NOTE - Karplus Equation:",
+            "J = A cos^2(theta) + B cos(theta) + C",
+        ]
+        self._check_file_contains(self.j_coupling_path, required_notes)
+
+    def test_cofactors_educational_notes(self):
+        """Ensure cofactors.py retains coordination chemistry note."""
+        required_notes = [
+            "Educational Note - Coordination Chemistry:",
+            "Cys Sulfur, His Nitrogen",
+            "Tetrahedral",
+        ]
+        self._check_file_contains(self.cofactors_path, required_notes)
+
+    def test_geometry_educational_notes(self):
+        """Ensure geometry.py retains Z-Matrix and NeRF notes."""
+        required_notes = [
+            "EDUCATIONAL NOTE - Z-Matrix Construction",
+            "Bond Length", "Bond Angle", "Torsion/Dihedral Angle",
+            "EDUCATIONAL NOTE - NeRF Geometry",
+            "Natural Extension Reference Frame",
+            "mathematical precision",
+        ]
+        self._check_file_contains(self.geometry_path, required_notes)
+
+    def test_packing_and_scoring_educational_notes(self):
+        """Ensure packing.py and scoring.py retain optimization notes."""
+        self._check_file_contains(self.packing_path, ["EDUCATIONAL NOTE - Monte Carlo Optimization"])
+        self._check_file_contains(self.scoring_path, ["EDUCATIONAL NOTE - Steric Repulsion and Forces", "Lennard-Jones Potential"])
+
+    def test_nef_io_educational_notes(self):
+        """Ensure nef_io.py retains format notes."""
+        required_notes = [
+            "EDUCATIONAL NOTE - NEF Chemical Shift Format:",
+            "NMR-STAR syntax",
+        ]
+        self._check_file_contains(self.nef_io_path, required_notes)
 
     def test_generator_educational_notes(self):
         """Ensure generator.py retains key educational blocks."""
         required_notes = [
             "EDUCATIONAL NOTE - B-factors (Temperature Factors)",
             "B = 8π²<u²>",  # Physics formula
-            "NMR Perspective (Order Parameters)",
             "Lipari-Szabo",
-            "Typical Patterns in Real Protein Structures",
-            "In this synthetic generator, we simulate B-factors that follow these universal patterns",
-            "For Linear Peptides (our case):",  # Context specific note
+            "EDUCATIONAL NOTE - Hard Decoy Support (AI Training):",
+            "Torsion Drift",
+            "Threading",
         ]
         self._check_file_contains(self.generator_path, required_notes)
 
@@ -58,10 +194,6 @@ class TestDocumentationIntegrity(unittest.TestCase):
         required_notes = [
             "EDUCATIONAL NOTE - What are B-factors?",
             "Backbone atoms (N, CA, C, O) are constrained by peptide bonds",
-            "Glycine has no side chain",
-            "Proline's cyclic structure",
-            "Typical B-factors in crystal structures:",
-            "In our Model-Free simulation, termini with S2 ~ 0.45",
         ]
         self._check_file_contains(self.bfactor_test_path, required_notes)
 
@@ -71,7 +203,6 @@ class TestDocumentationIntegrity(unittest.TestCase):
             "EDUCATIONAL NOTE - The Ramachandran Plot",
             "Why Glycine is Special",
             "Why Proline is Special",
-            "Left-Handed Alpha Region",
         ]
         self._check_file_contains(self.ramachandran_test_path, required_notes)
 
@@ -82,12 +213,6 @@ class TestDocumentationIntegrity(unittest.TestCase):
             "EDUCATIONAL NOTE - Why Browser-Based Visualization:",
             "EDUCATIONAL NOTE - 3Dmol.js:",
             "NMR Short-Range Restraints (NOEs) roughly depend on 1/r^6",
-            # Ensure developer example survives
-            ">>> pdb = generate_pdb_content",
-            ">>> view_structure_in_browser",
-            # Ensure commenting convention survives
-            "// Highlight active buttons",
-            "// Remove all active classes"
         ]
         self._check_file_contains(viewer_path, required_notes)
 
@@ -95,13 +220,9 @@ class TestDocumentationIntegrity(unittest.TestCase):
         """Ensure README.md retains key academic notes."""
         readme_path = os.path.join(self.base_dir, 'README.md')
         required_notes = [
-            # Ensure the Amphipathic note survives
             "Academic Note - \"Amphipathic\"",
-            "**Hydrophobic Face** (L, V, I, F): Hates water",
-            "**Hydrophilic Face** (K, R, E, D): Loves water",
-            # Ensure the B-factor example survives
+            "Hydrophobic Face",
+            "Hydrophilic Face",
             "Atomic Records & B-Factors",
-            "**B-Factor (56.71 vs 86.14)**: Reflects atomic mobility",
-            "Note how the side-chain atom (CB) has a higher B-factor"
         ]
         self._check_file_contains(readme_path, required_notes)

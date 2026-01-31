@@ -26,7 +26,12 @@ class DecoyGenerator:
         rmsd_max: float = 999.0,
         optimize: bool = False,
         minimize: bool = False,
-        forcefield: str = 'amber14-all.xml'
+        forcefield: str = 'amber14-all.xml',
+        hard_mode: bool = False,
+        template_sequence: str = None,
+        shuffle_sequence: bool = False,
+        drift: float = 0.0,
+        seed: int = None
     ):
         """
         Generates N unique decoys for a given sequence within a target RMSD range.
@@ -55,6 +60,26 @@ class DecoyGenerator:
             
         This generator produces *Decoys* (independent samples). To mimic an NMR ensemble,
         one would need to filter these by RMSD or use simulated annealing refinement.
+
+        EDUCATIONAL NOTE - "Hard Decoys" for AI Models:
+        ----------------------------------------------
+        In AI protein scoring (e.g., training AlphaFold or Rosetta), "Hard Decoys" 
+        are negative samples that look physically realistic but are biologically 
+        impossible or topologically incorrect.
+        
+        Why they matter:
+        *   **Contrastive Learning**: AI models need to learn why one structure is 
+            "better" than another. Simple random noise (Soft Decoys) is too easy 
+            for modern models to distinguish. 
+        *   **The Mismatch Problem**: Hard decoys test if a model can detect:
+            - **Threading Mismatch**: A sequence forced into a fold it shouldn't adopt.
+            - **Label Shuffling**: A valid backbone where the sidechain identities 
+              don't match the chemical environment.
+            - **Near-Native Noise**: Structures that are *almost* right but have 
+              subtle torsion errors (Drift).
+        
+        These decoys help AI avoid "memorizing" what a protein looks like and 
+        force it to learn the underlying physics of fold-sequence compatibility.
         
         Args:
             sequence: Amino acid sequence.
@@ -62,9 +87,13 @@ class DecoyGenerator:
             out_dir: Output directory.
             rmsd_min: Minimum RMSD from reference.
             rmsd_max: Maximum RMSD from reference.
-            optimize: Side-chain optimization flag.
             minimize: Energy minimization flag.
             forcefield: Forcefield for minimization.
+            hard_mode: Enable hard decoy mechanisms.
+            template_sequence: Sequence to use for backbone folding (threading).
+            shuffle_sequence: If True, shuffles the final residue labels.
+            drift: Torsion angle perturbation in degrees.
+            seed: Random seed for reproducibility.
         """
         import os
         os.makedirs(out_dir, exist_ok=True)
@@ -85,13 +114,38 @@ class DecoyGenerator:
             # Ideally generator should support 'random' seeding or 'random' conformation
             # Currently 'random' conformation does random sampling of Ramachandran
             try:
+                # 1. Determine local generation parameters
+                gen_sequence = sequence
+                phi_list, psi_list, omega_list = None, None, None
+                
+                # Handling Threading (Hard Decoy)
+                if hard_mode and template_sequence:
+                    # Generate a template-fold structure first
+                    template_pdb = generate_pdb_content(
+                        sequence_str=template_sequence,
+                        conformation='random',
+                        seed=attempts + (seed if seed else 0)
+                    )
+                    phi_list, psi_list, omega_list = self._extract_backbone_dihedrals(template_pdb)
+                    # We thread 'sequence' on this fold
+                    gen_sequence = sequence
+                
                 pdb_content = generate_pdb_content(
-                    sequence_str=sequence,
-                    conformation='random', # Force random for diversity
+                    sequence_str=gen_sequence,
+                    conformation='random',
                     optimize_sidechains=optimize,
                     minimize_energy=minimize,
-                    forcefield=forcefield
+                    forcefield=forcefield,
+                    seed=attempts + (seed if seed else 0),
+                    drift=drift,
+                    phi_list=phi_list,
+                    psi_list=psi_list,
+                    omega_list=omega_list
                 )
+
+                # Handling Shuffling (Hard Decoy)
+                if hard_mode and shuffle_sequence:
+                    pdb_content = self._shuffle_pdb_sequence(pdb_content)
                 
                 # Parse to AtomArray for RMSD calc
                 pdb_file = pdb.PDBFile.read(io.StringIO(pdb_content))
@@ -135,3 +189,46 @@ class DecoyGenerator:
                 
         logger.info(f"Finished. Generated {len(generated_decoys)} decoys.")
         return generated_decoys
+
+    def _extract_backbone_dihedrals(self, pdb_content: str):
+        """Extracts phi, psi, omega lists from PDB content."""
+        pdb_file = pdb.PDBFile.read(io.StringIO(pdb_content))
+        structure = pdb_file.get_structure(model=1)
+        # Handle cases where structure might be multiple chains
+        if len(struc.get_chains(structure)) > 1:
+            structure = structure[structure.chain_id == struc.get_chains(structure)[0]]
+            
+        phi, psi, omega = struc.dihedral_backbone(structure)
+        # Convert to degrees and lists
+        # Biotite returns radians or already degrees? Checks docs... usually radians.
+        # dihedral_backbone returns radians.
+        return np.rad2deg(phi).tolist(), np.rad2deg(psi).tolist(), np.rad2deg(omega).tolist()
+
+    def _shuffle_pdb_sequence(self, pdb_content: str):
+        """Shuffles residue names in PDB content while keeping backbone intact."""
+        pdb_file = pdb.PDBFile.read(io.StringIO(pdb_content))
+        structure = pdb_file.get_structure(model=1)
+        
+        res_ids = np.unique(structure.res_id)
+        if len(res_ids) == 0:
+            return pdb_content
+            
+        res_names = []
+        for rid in res_ids:
+             res_names.append(structure[structure.res_id == rid].res_name[0])
+        
+        # Shuffle labels
+        shuffled_names = res_names.copy()
+        import random
+        random.shuffle(shuffled_names)
+        
+        # Map back
+        name_map = dict(zip(res_ids, shuffled_names))
+        for i in range(len(structure)):
+             structure.res_name[i] = name_map[structure.res_id[i]]
+             
+        out_f = pdb.PDBFile()
+        out_f.set_structure(structure)
+        out = io.StringIO()
+        out_f.write(out)
+        return out.getvalue()

@@ -220,6 +220,34 @@ Generate the best of 10 attempts with clash refinement:
 synth-pdb --length 20 --best-of-N 10 --refine-clashes 5 --output refined_peptide.pdb
 ```
 
+## 🤖 Feature Spotlight: AI Model Support & Hard Decoys
+
+Generating "good" structures is only half the battle. To train robust AI models (like AlphaFold-3 or RosettaFold), researchers need **High-Quality Negative Samples**—structures that look physically plausible but are biologically or topologically incorrect.
+
+**Synth-PDB** provides three powerful mechanisms for generating these "Hard Decoys":
+
+### 1. Sequence Threading (Fold Mismatch)
+Force a specific sequence onto the backbone "fold" of a completely different sequence. This creates a realistic-looking structure where the side-chain packing is fundamentally incompatible with the backbone.
+```bash
+# Thread Poly-Ala sequence onto a backbone generated for Poly-Pro
+synth-pdb --mode decoys --sequence AAAAA --template-sequence PPPPP --hard
+```
+
+### 2. Torsion Angle Drift (Conformational Noise)
+Add controlled, random noise to ideal Ramachandran angles. This creates "near-native" decoys—structures that are *almost* correct but have subtle, realistic errors.
+```bash
+# Add 5 degrees of maximum drift to all phi/psi angles
+synth-pdb --mode decoys --drift 5.0
+```
+
+### 3. Label Shuffling (Sequence Mismatch)
+Generate a perfectly valid structure for a sequence, then randomly shuffle the identity of the residues in the final PDB. This tests if an AI model can detect that a residue (e.g., Trp) is in an environment meant for another (e.g., Gly).
+```bash
+synth-pdb --mode decoys --sequence ACDEF --hard --shuffle-sequence
+```
+
+---
+
 ## 🌟 Feature Spotlight: "Spectroscopically Realistic" Dynamics
 
 Most synthetic PDB generators create static bricks. They might create reasonable geometry, but the "B-factor" column (Column 11) is often just zero or random noise.
@@ -1041,7 +1069,7 @@ pytest tests/test_generator.py -v
 ```
 
 **Test Coverage**: 95% overall
-- 399 tests covering generation, validation, CLI, and edge cases
+- 423 tests covering generation, validation, CLI, and edge cases
 
 ### Project Structure
 

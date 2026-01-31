@@ -707,6 +707,10 @@ def generate_pdb_content(
     cis_proline_frequency: float = 0.05, # Probability of Cis-Proline (0.05 = 5%)
     phosphorylation_rate: float = 0.0, # Probability of S/T/Y phosphorylation
     cyclic: bool = False, # Head-to-Tail cyclization
+    drift: float = 0.0, # Torsion angle perturbation in degrees
+    phi_list: Optional[List[float]] = None, # Explicit Phi angles
+    psi_list: Optional[List[float]] = None, # Explicit Psi angles
+    omega_list: Optional[List[float]] = None, # Explicit Omega angles
 ) -> str:
     """
     Generates PDB content for a linear or cyclic peptide chain.
@@ -730,6 +734,8 @@ def generate_pdb_content(
                   Example: "1-10:alpha,11-15:random,16-30:beta"
                   If provided, overrides conformation for specified regions.
                   Unspecified residues use the default conformation parameter.
+        drift: Maximum random perturbation applied to phi/psi angles (degrees).
+               Used for "hard decoy" generation to create near-native conformations.
         optimize_sidechains: Run Monte Carlo side-chain optimization
         minimize_energy: Run OpenMM energy minimization (REQUIRED for cyclic closure)
         forcefield: Forcefield to use for minimization
@@ -766,11 +772,24 @@ def generate_pdb_content(
     2. Binding Affinity: By "locking" the molecule into a specific shape, 
        the entropic penalty of binding to a target is greatly reduced.
     3. Bioavailability: Many legendary drugs (like Cyclosporine A) are macrocycles.
+
+    EDUCATIONAL NOTE - Hard Decoy Support (AI Training):
+    ---------------------------------------------------
+    This generator includes specialized parameters for "Hard Decoy" generation:
+    1. **Torsion Drift (`drift`)**: Adds controlled Gaussian noise to ideal $\\phi/\\psi$
+       angles. This simulates "near-native" local structural errors that 
+       challenge the resolution of AI scoring functions.
+    2. **Threading (`phi_list`, `psi_list`, `omega_list`)**: Allows constructing 
+       one sequence using the backbone torsion angles of another. This maps a 
+       "wrong" sequence to a "right" fold, a key test for discriminative models.
     """
     if seed is not None:
          logger.info(f"Setting random seed to {seed} for reproducibility.")
          random.seed(seed)
          np.random.seed(seed)
+    
+    # Use localized random generator for better control and thread-safety
+    rng = random.Random(seed)
          
     sequence = _resolve_sequence(
         length=length,
@@ -1091,7 +1110,10 @@ def generate_pdb_content(
                 omega_mean = 0.0 # Cis
             
             # Sample with variation
-            omega = np.random.normal(omega_mean, OMEGA_VARIATION)
+            if omega_list is not None and i > 0 and (i-1) < len(omega_list):
+                omega = omega_list[i-1]
+            else:
+                omega = np.random.normal(omega_mean, OMEGA_VARIATION)
             
             ca_coord = _place_atom_with_dihedral(
                 prev_ca_coord, prev_c_coord, n_coord,
@@ -1105,7 +1127,11 @@ def generate_pdb_content(
             # Angle: N(i)-CA(i)-C(i)
             # Dihedral: C(prev)-N(i)-CA(i)-C(i) -> This is PHI(i)
             
-            if res_conformation in RAMACHANDRAN_PRESETS:
+            # 3a. Determine Phi/Psi for this residue
+            if phi_list is not None and i < len(phi_list) and psi_list is not None and i < len(psi_list):
+                current_phi = phi_list[i]
+                current_psi = psi_list[i]
+            elif res_conformation in RAMACHANDRAN_PRESETS:
                 current_phi = RAMACHANDRAN_PRESETS[res_conformation]['phi']
                 current_psi = RAMACHANDRAN_PRESETS[res_conformation]['psi']
             elif res_conformation in BETA_TURN_TYPES:
@@ -1141,6 +1167,14 @@ def generate_pdb_content(
             else:
                 current_phi = RAMACHANDRAN_PRESETS['alpha']['phi']
                 current_psi = RAMACHANDRAN_PRESETS['alpha']['psi']
+
+            # Apply hard decoy drift (if specified)
+            if drift > 0:
+                current_phi += rng.uniform(-drift, drift)
+                current_psi += rng.uniform(-drift, drift)
+                # Keep within standard PDB dihedral range [-180, 180]
+                current_phi = ((current_phi + 180) % 360) - 180
+                current_psi = ((current_psi + 180) % 360) - 180
                  
             c_coord = _place_atom_with_dihedral(
                 prev_c_coord, n_coord, ca_coord,

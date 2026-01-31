@@ -212,6 +212,27 @@ def main() -> None:
         help="Target RMSD range in Angstroms 'min-max' (for --mode decoys).",
     )
     parser.add_argument(
+        "--hard",
+        action="store_true",
+        help="Enable 'hard decoy' mode (threading, shuffling, drift) for AI support.",
+    )
+    parser.add_argument(
+        "--template-sequence",
+        type=str,
+        help="Sequence to use for backbone folding when threading (for --mode decoys).",
+    )
+    parser.add_argument(
+        "--shuffle-sequence",
+        action="store_true",
+        help="Shuffle residue labels in the final decoy (for --mode decoys).",
+    )
+    parser.add_argument(
+        "--drift",
+        type=float,
+        default=0.0,
+        help="Maximum torsion angle drift in degrees to apply for conformational noise.",
+    )
+    parser.add_argument(
         "--input-pdb",
         type=str,
         help="Input PDB file path (required for --mode docking and --mode pymol).",
@@ -583,7 +604,12 @@ def main() -> None:
             rmsd_max=rmsd_max,
             optimize=args.optimize,
             minimize=args.minimize,
-            forcefield=args.forcefield
+            forcefield=args.forcefield,
+            hard_mode=args.hard,
+            template_sequence=args.template_sequence,
+            shuffle_sequence=args.shuffle_sequence,
+            drift=args.drift,
+            seed=args.seed
         )
         return
 
