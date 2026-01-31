@@ -78,15 +78,18 @@ class BatchedPeptide:
             name = self.atom_names[i]
             res_idx = self.residue_indices[i]
             res_name = self.sequence[res_idx - 1]
-            element = name[0] if not name[0].isdigit() else name[1]
             
             # Atom names with 4 chars start at col 13, others at col 14
-            # We simplify here for the generator tool compatibility
             clean_name = name.strip()
-            if len(clean_name) < 4:
-                atom_field = " " + clean_name.ljust(3)
-            else:
+            if len(clean_name) == 4:
                 atom_field = clean_name
+            else:
+                atom_field = " " + clean_name.ljust(3)
+                
+            # Element is the first non-numeric char of the stripped name
+            import re
+            match = re.search(r"[A-Z]", clean_name)
+            element = match.group(0) if match else "C"
                 
             lines.append(fmt.format(
                 i + 1, atom_field, res_name, res_idx, 

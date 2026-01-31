@@ -1,6 +1,7 @@
 # synth-pdb
 
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/elkins/synth-pdb/blob/master/interactive_relaxation.ipynb)
+[![Open In Colab: Relaxation](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/elkins/synth-pdb/blob/master/interactive_relaxation.ipynb)
+[![Open In Colab: ML Integration](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/elkins/synth-pdb/blob/master/examples/ml_integration/ml_handover_demo.ipynb)
 
 [![PyPI version](https://img.shields.io/badge/pypi-v1.13.1-blue)](https://pypi.org/project/synth-pdb/)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
@@ -18,6 +19,7 @@ A command-line tool to generate Protein Data Bank (PDB) files with full atomic r
 - [Usage](#usage)
   - [Command-Line Arguments](#command-line-arguments)
   - [Examples](#examples)
+  - [ML Integration (AI Research)](#ml-integration-ai-research)
 - [Validation & Refinement](#validation--refinement)
 - [Output PDB Format](#output-pdb-format)
 - [Scientific Context](#scientific-context)
@@ -595,7 +597,38 @@ synth-pdb --length 15 --guarantee-valid --max-attempts 200 --output valid.pdb
 
 # Best of 50 attempts
 synth-pdb --length 20 --best-of-N 50 --output best_structure.pdb
+```
 
+## ML Integration (AI Research)
+
+**synth-pdb** is designed to be a high-performance "Data Factory" for Training Protein AI models. It can generate thousands of unique, physically plausible protein structures in seconds—bypassing the bottleneck of parsing millions of PDB files from disk.
+
+### 🤖 The Batch Walk (Vectorized Performance)
+Using the `BatchedGenerator` module, the tool uses SIMD/Vectorized math (NeRF algorithm) to build peptide backbones in parallel.
+
+### ⚡ Zero-Copy Handover
+Transition from biological coordinates to Deep Learning tensors instantly. Our `BatchedPeptide` output is **C-Contiguous**, allowing tools like PyTorch and JAX to map the memory without copying data.
+
+```python
+from synth_pdb.batch_generator import BatchedGenerator
+import torch
+
+# Generate 1,000 structures in milliseconds
+bg = BatchedGenerator("ALA-GLY-SER-TRP", n_batch=1000)
+batch = bg.generate_batch()
+
+# Instant PyTorch Handover (Shared RAM)
+coords_tensor = torch.from_numpy(batch.coords).float()
+```
+
+### 🚀 Try it in the Cloud
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/elkins/synth-pdb/blob/master/examples/ml_integration/ml_handover_demo.ipynb)
+
+See the full [ML Integration Demo](file:///Users/georgeelkins/nmr/synth-pdb/examples/ml_integration/ml_handover_demo.ipynb) for examples of Radius of Gyration prediction and JAX/MLX support.
+
+#### Quality Control (Continued)
+
+```bash
 # Refine steric clashes (5 iterations)
 synth-pdb --length 30 --refine-clashes 5 --output refined.pdb
 
