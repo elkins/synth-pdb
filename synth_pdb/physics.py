@@ -238,90 +238,94 @@ class EnergyMinimizer:
                             if atom.name in ptm_atom_names: atoms_to_delete.append(atom)
             if atoms_to_delete: modeller.delete(atoms_to_delete)
             
-            # 4. HYDROGEN ADDITION / STRIPPING
-            # OpenMM's Modeller can add missing hydrogens for standard residues at a chosen pH.
-            # For cyclic peptides, we bypass this to prevent terminal proton conflicts.
+            # 4. HYDROGEN STRIPPING (Conditional)
+            # For linear peptides, we strip H to let modeller re-add them at pH 7.0.
+            # For cyclic peptides, we prefer to keep them if they exist to avoid terminal issues.
             added_bonds = []
-            non_protein_data = [] 
             if not cyclic and add_hydrogens:
                 try:
                     modeller.delete([a for a in modeller.topology.atoms() if a.element is not None and a.element.symbol == "H"])
                 except Exception as e: logger.debug(f"H deletion failed: {e}")
+
+            # 5. BIOPHYSICAL CONSTRAINT DETECTION
+            # ------------------------------------
+            
+            # SSBOND Detection (Internal OpenMM Topology)
+            try:
+                cys_residues = [r for r in modeller.topology.residues() if r.name == 'CYS']
+                res_to_sg = {r.index: [a for a in r.atoms() if a.name == 'SG'][0] for r in cys_residues if any(a.name == 'SG' for a in r.atoms())}
+                potential_bonds = []
+                for i in range(len(cys_residues)):
+                    r1 = cys_residues[i]; s1 = res_to_sg.get(r1.index)
+                    if not s1: continue
+                    for j in range(i + 1, len(cys_residues)):
+                        r2 = cys_residues[j]; s2 = res_to_sg.get(r2.index)
+                        if not s2: continue
+                        d_a = np.linalg.norm(modeller.positions[s1.index].value_in_unit(unit.angstroms) - modeller.positions[s2.index].value_in_unit(unit.angstroms))
+                        if d_a < SSBOND_CAPTURE_RADIUS: potential_bonds.append((d_a, r1, r2, s1, s2))
+                potential_bonds.sort(key=lambda x: x[0])
+                bonded_indices = set()
+                for d, r1, r2, s1, s2 in potential_bonds:
+                    if r1.index in bonded_indices or r2.index in bonded_indices: continue
+                    modeller.topology.addBond(s1, s2); added_bonds.append((r1, r2))
+                    bonded_indices.add(r1.index); bonded_indices.add(r2.index)
+            except Exception as e: logger.warning(f"SSBOND failed: {e}")
+
+            # Meta/Salt Bridge Detection (Requires Biotite helper)
+            try:
+                from .cofactors import find_metal_binding_sites
+                from .biophysics import find_salt_bridges
+                import io; import biotite.structure.io.pdb as biotite_pdb
+                tmp_io = io.StringIO(); app.PDBFile.writeFile(modeller.topology, modeller.positions, tmp_io); tmp_io.seek(0)
+                b_struc = biotite_pdb.PDBFile.read(tmp_io).get_structure(model=1)
                 
-                # SSBOND Detection
-                try:
-                    cys_residues = [r for r in modeller.topology.residues() if r.name == 'CYS']
-                    res_to_sg = {r.index: [a for a in r.atoms() if a.name == 'SG'][0] for r in cys_residues if any(a.name == 'SG' for a in r.atoms())}
-                    potential_bonds = []
-                    for i in range(len(cys_residues)):
-                        r1 = cys_residues[i]; s1 = res_to_sg.get(r1.index)
-                        if not s1: continue
-                        for j in range(i + 1, len(cys_residues)):
-                            r2 = cys_residues[j]; s2 = res_to_sg.get(r2.index)
-                            if not s2: continue
-                            d_a = np.linalg.norm(modeller.positions[s1.index].value_in_unit(unit.angstroms) - modeller.positions[s2.index].value_in_unit(unit.angstroms))
-                            if d_a < SSBOND_CAPTURE_RADIUS: potential_bonds.append((d_a, r1, r2, s1, s2))
-                    potential_bonds.sort(key=lambda x: x[0])
-                    bonded_indices = set()
-                    for d, r1, r2, s1, s2 in potential_bonds:
-                        if r1.index in bonded_indices or r2.index in bonded_indices: continue
-                        modeller.topology.addBond(s1, s2); added_bonds.append((r1, r2))
-                        bonded_indices.add(r1.index); bonded_indices.add(r2.index)
-                except Exception as e: logger.warning(f"SSBOND failed: {e}")
+                sites = find_metal_binding_sites(b_struc)
+                for site in sites:
+                    i_idx = -1
+                    for atom in atom_list:
+                        if atom.residue.name == site["type"]: i_idx = atom.index; break
+                    if i_idx != -1:
+                        for l_idx in site["ligand_indices"]:
+                            l_at = b_struc[l_idx]
+                            for atom in atom_list:
+                                if (atom.residue.id == str(l_at.res_id) and atom.name == l_at.atom_name): coordination_restraints.append((i_idx, atom.index)); break
                 
-                # Metadata (Metals/Salt Bridges)
-                try:
-                    from .cofactors import find_metal_binding_sites
-                    from .biophysics import find_salt_bridges
-                    import io; import biotite.structure.io.pdb as biotite_pdb
-                    tmp_io = io.StringIO(); app.PDBFile.writeFile(modeller.topology, modeller.positions, tmp_io); tmp_io.seek(0)
-                    b_struc = biotite_pdb.PDBFile.read(tmp_io).get_structure(model=1)
-                    sites = find_metal_binding_sites(b_struc)
-                    logger.debug(f"DEBUG: Found {len(sites)} metal binding sites.")
-                    for site in sites:
-                        i_idx = -1
-                        for atom in atom_list:
-                            if atom.residue.name == site["type"]: i_idx = atom.index; break
-                        if i_idx != -1:
-                            for l_idx in site["ligand_indices"]:
-                                l_at = b_struc[l_idx]
-                                for atom in atom_list:
-                                    if (atom.residue.id == str(l_at.res_id) and atom.name == l_at.atom_name): coordination_restraints.append((i_idx, atom.index)); break
-                    bridges = find_salt_bridges(b_struc, cutoff=6.0)
-                    logger.debug(f"DEBUG: Found {len(bridges)} salt bridges.")
-                    for br in bridges:
-                        ia, ib = -1, -1
-                        for atom in atom_list:
-                            if (atom.residue.id == str(br["res_ia"]) and atom.name == br["atom_a"]): ia = atom.index
-                            if (atom.residue.id == str(br["res_ib"]) and atom.name == br["atom_b"]): ib = atom.index
-                        if ia != -1 and ib != -1: salt_bridge_restraints.append((ia, ib, br["distance"] / 10.0))
-                except Exception as e: logger.warning(f"Meta failed: {e}")
-                
-                # HETATM preservation
+                bridges = find_salt_bridges(b_struc, cutoff=6.0)
+                for br in bridges:
+                    ia, ib = -1, -1
+                    for atom in atom_list:
+                        if (atom.residue.id == str(br["res_ia"]) and atom.name == br["atom_a"]): ia = atom.index
+                        if (atom.residue.id == str(br["res_ib"]) and atom.name == br["atom_b"]): ib = atom.index
+                    if ia != -1 and ib != -1: salt_bridge_restraints.append((ia, ib, br["distance"] / 10.0))
+            except Exception as e: logger.warning(f"Metadata/SaltBridge detection failed: {e}")
+
+            # 6. HYDROGEN ADDITION / HETATM RESTORATION (Linear only)
+            if not cyclic and add_hydrogens:
+                non_protein_data = [] 
                 for r in modeller.topology.residues():
                     if r.name.strip().upper() in ["ZN", "FE", "MG", "CA", "NA", "CL"]:
                         for a in r.atoms(): non_protein_data.append({"res_name": r.name, "atom_name": a.name, "element": a.element, "pos": modeller.positions[a.index]})
                 
                 modeller.addHydrogens(self.forcefield, pH=7.0)
                 
-                # CYX rename
-                for r1, r2 in added_bonds:
-                    if r1.name == 'CYS': r1.name = 'CYX'
-                    if r2.name == 'CYS': r2.name = 'CYX'
-                
-                # Restore lost HETATMs
+                # Restore lost HETATMs (Modeller.addHydrogens sometimes deletes them)
                 new_names = [res.name.strip().upper() for res in modeller.topology.residues()]
                 for d in non_protein_data:
                     if d["res_name"].strip().upper() not in new_names:
-                        logger.info(f"Restoring lost HETATM: {d['res_name']}")
                         nc = modeller.topology.addChain(); nr = modeller.topology.addResidue(d["res_name"], nc)
                         modeller.topology.addAtom(d["atom_name"], d["element"], nr)
                         modeller.positions = list(modeller.positions) + [d["pos"]]
-                
-                topology, positions = modeller.topology, modeller.positions
-            else:
-                if cyclic: logger.info("Using pre-existing hydrogens for cyclic peptide.")
-                topology, positions = modeller.topology, modeller.positions
+            
+            # 7. CYX RENAME (Always for disulfides)
+            # ------------------------------------
+            # OpenMM's ForceField requires disulfide-bonded cysteines to be named 'CYX'
+            # to match the covalent-bonded template (instead of standard 'CYS').
+            for r1, r2 in added_bonds:
+                if r1.name == 'CYS': r1.name = 'CYX'
+                if r2.name == 'CYS': r2.name = 'CYX'
+            
+            topology, positions = modeller.topology, modeller.positions
+            if cyclic: logger.info("Using pre-existing hydrogens for cyclic peptide.")
 
             # 5. SYSTEM CREATION
             try:

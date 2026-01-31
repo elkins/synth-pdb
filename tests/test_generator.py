@@ -155,8 +155,34 @@ class TestGenerator(unittest.TestCase):
         # Run 3 (different seed)
         pdb3 = generate_pdb_content(sequence_str=sequence, conformation="random", seed=seed+1)
         
-        assert pdb1 == pdb2, "Same seed should produce identical PDB content"
-        assert pdb1 != pdb3, "Different seeds should produce different PDB content (for random conformer)"
+        self.assertEqual(pdb1, pdb2, "Same seed should produce identical PDB content")
+        self.assertNotEqual(pdb1, pdb3, "Different seeds should produce different PDB content (for random conformer)")
+
+    def test_generate_pdb_content_large_scale_stress_test(self):
+        """Verify that the generator handles very large proteins without JIT/Memory issues."""
+        sequence = "A" * 500
+        try:
+            pdb_content = generate_pdb_content(sequence_str=sequence)
+            self.assertIn("ATOM   4000", pdb_content) # Should have > 4000 atoms
+            self.assertIn("TER", pdb_content)
+        except Exception as e:
+            self.fail(f"Large scale generation failed: {e}")
+
+    def test_numba_precision_consistency(self):
+        """Verify that JITted geometry results match basic stability requirements."""
+        from synth_pdb.geometry import position_atom_3d_from_internal_coords
+        import numpy as np
+        
+        p1 = np.array([0.0, 0.0, 0.0], dtype=np.float64)
+        p2 = np.array([1.5, 0.0, 0.0], dtype=np.float64)
+        p3 = np.array([2.5, 1.2, 0.0], dtype=np.float64)
+        
+        # Get JIT result
+        jit_res = position_atom_3d_from_internal_coords(p1, p2, p3, 1.5, 110.0, 180.0)
+        
+        # Verify basic properties (dtype, stability)
+        self.assertFalse(np.any(np.isnan(jit_res)))
+        self.assertEqual(jit_res.dtype, np.float64)
 
     
     def test_get_sequence_from_mixed_case(self):

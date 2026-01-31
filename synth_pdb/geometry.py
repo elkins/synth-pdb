@@ -75,10 +75,10 @@ def position_atom_3d_from_internal_coords(
     b = p3 - p2
     c = np.cross(a, b)
     d = np.cross(c, b)
-    a /= np.linalg.norm(a)
-    b /= np.linalg.norm(b)
-    c /= np.linalg.norm(c)
-    d /= np.linalg.norm(d)
+    a /= np.sqrt(np.sum(a**2))
+    b /= np.sqrt(np.sum(b**2))
+    c /= np.sqrt(np.sum(c**2))
+    d /= np.sqrt(np.sum(d**2))
 
     p4 = p3 + bond_length * (
         -b * np.cos(bond_angle_rad)
@@ -98,8 +98,8 @@ def calculate_angle(
     vec1 = coord1 - coord2
     vec2 = coord3 - coord2
 
-    norm_vec1 = np.linalg.norm(vec1)
-    norm_vec2 = np.linalg.norm(vec2)
+    norm_vec1 = np.sqrt(np.sum(vec1**2))
+    norm_vec2 = np.sqrt(np.sum(vec2**2))
 
     denominator = norm_vec1 * norm_vec2
     
@@ -130,8 +130,8 @@ def calculate_dihedral_angle(
     n2 = np.cross(v2, v3)
     
     # Normalize normals
-    n1_norm = np.linalg.norm(n1)
-    n2_norm = np.linalg.norm(n2)
+    n1_norm = np.sqrt(np.sum(n1**2))
+    n2_norm = np.sqrt(np.sum(n2**2))
     
     # Safe normalization
     if n1_norm > 0:
@@ -146,7 +146,7 @@ def calculate_dihedral_angle(
         n2 = n2.astype(np.float64) * 0.0
     
     # Unit vector along the second bond
-    v2_norm = np.linalg.norm(v2)
+    v2_norm = np.sqrt(np.sum(v2**2))
     if v2_norm > 0:
         u2 = v2.astype(np.float64) / v2_norm
     else:
@@ -309,7 +309,7 @@ def reconstruct_sidechain(
     def rotate_points(points, axis_p1, axis_p2, angle_deg):
         # Translate to origin
         v = (axis_p2 - axis_p1).astype(np.float64)
-        v_norm = np.linalg.norm(v)
+        v_norm = np.sqrt(np.sum(v**2))
         if v_norm > 0:
             v = v / v_norm
         

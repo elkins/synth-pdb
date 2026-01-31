@@ -153,6 +153,14 @@ def predict_chemical_shifts(structure: struc.AtomArray) -> Dict[str, Dict[str, D
     rings = _get_aromatic_rings(structure)
     if rings:
         logger.info(f"Found {len(rings)} aromatic rings for tertiary shift calculation.")
+        # Convert to numpy array for JIT efficiency and to avoid 'reflected list' deprecation warnings
+        # Shape: (N, 7) -> [center_x, y, z, normal_x, y, z, intensity]
+        rings_arr = np.zeros((len(rings), 7), dtype=np.float64)
+        for j, (c, n, i) in enumerate(rings):
+            rings_arr[j, 0:3] = c
+            rings_arr[j, 3:6] = n
+            rings_arr[j, 6] = i
+        rings = rings_arr
     
     # We need to iterate over residues
     res_starts = struc.get_residue_starts(structure)
@@ -190,18 +198,16 @@ def predict_chemical_shifts(structure: struc.AtomArray) -> Dict[str, Dict[str, D
                 # 2. Add Tertiary Ring Current Effects
                 # Only affects protons (H, HA, HB...) and sometimes Carbon.
                 # Primarily Protons are interesting for NOESY/Structure.
-                if rings and ("H" in atom_type or atom_type == "H"):
+                # Use len() check for rings which works for both list and array
+                if len(rings) > 0 and ("H" in atom_type or atom_type == "H"):
                     # Get atom coordinate
-                    # We need to find the atom in the structure to get its coord
-                    # This is slightly inefficient (O(N*M)) but fine for peptides.
-                    # Optimization: Iterate atoms directly instead? 
-                    # Structure structure here is the whole array, res_atoms is the residue slice.
                     try:
                         target_atom = res_atoms[res_atoms.atom_name == atom_type][0]
                         rc_shift = _calculate_ring_current_shift(target_atom.coord, rings)
                         val += rc_shift
                     except IndexError:
-                        pass # Atom not found in structure (e.g. sometimes amide H is missing)
+                        pass 
+# Atom not found in structure (e.g. sometimes amide H is missing)
                 
                 atom_shifts[atom_type] = round(val, 3)
         
@@ -307,15 +313,20 @@ def _get_aromatic_rings(structure):
 def _calculate_ring_current_shift(proton_coord, rings):
     """
     Calculate total ring current shift for a proton from all rings.
+    'rings' is a numpy array of shape (N, 7): [cx, cy, cz, nx, ny, nz, intensity]
     Formula: delta = Intensity * B_factor * (1 - 3*cos^2(theta)) / r^3
     """
     total_shift = 0.0
     B_FACTOR = 11.0 # Empirical scaling factor (ppm * A^3)
     
-    for center, normal, intensity in rings:
+    for j in range(rings.shape[0]):
+        center = rings[j, 0:3]
+        normal = rings[j, 3:6]
+        intensity = rings[j, 6]
+        
         # Vector from ring center to proton
-        v = proton_coord - center
-        r = np.linalg.norm(v)
+        v = (proton_coord - center).astype(np.float64)
+        r = np.sqrt(np.sum(v**2))
         
         if r < 1.0: 
             continue # Too close/clashing, ignore singularity
