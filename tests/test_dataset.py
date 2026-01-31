@@ -176,3 +176,85 @@ class TestDatasetGenerator:
                                 generator.generate()
                                 
         assert "Generated 100/100 samples" in caplog.text
+
+    def test_npz_generation(self, output_dir):
+        """Test generating samples in AI-ready NPZ format."""
+        from synth_pdb.dataset import _generate_single_sample_npz_task
+        
+        # Create output dir
+        (Path(output_dir) / "train").mkdir(parents=True, exist_ok=True)
+        
+        # Args: sample_id, length, conf_type, split, output_dir, fmt
+        args = ("npz_001", 15, "alpha", "train", str(output_dir), "npz")
+        
+        # We need a real-ish structurally valid PDB for the parser to work
+        result = _generate_single_sample_npz_task(args)
+        
+        assert result["success"] is True
+        npz_path = Path(output_dir) / result["npz_path"]
+        assert npz_path.exists()
+        
+        # Load and verify content
+        data = np.load(npz_path)
+        assert "coords" in data
+        assert "sequence" in data
+        assert "contact_map" in data
+        
+        # L=15
+        assert data["coords"].shape == (15, 5, 3)
+        assert data["sequence"].shape == (15, 20)
+        assert data["contact_map"].shape == (15, 15)
+        
+        # Verify one-hot (each row sums to 1.0)
+        assert np.allclose(data["sequence"].sum(axis=1), 1.0)
+
+    def test_dataset_generator_npz_flow(self, output_dir):
+        """Test full generator flow with NPZ format."""
+        with patch("concurrent.futures.ProcessPoolExecutor", side_effect=SynchronousExecutor):
+            generator = DatasetGenerator(
+                output_dir=output_dir, 
+                num_samples=2,
+                dataset_format='npz'
+            )
+            generator.generate()
+            
+            manifest_path = Path(output_dir) / "dataset_manifest.csv"
+            with open(manifest_path, "r") as f:
+                content = f.read()
+                assert "npz_path" in content
+                assert ".npz" in content
+
+    def test_npz_generation_unknown_residue(self, output_dir):
+        """Test NPZ generation with an unknown residue."""
+        from synth_pdb.dataset import _generate_single_sample_npz_task
+        (Path(output_dir) / "train").mkdir(parents=True, exist_ok=True)
+        
+        # We need to mock generate_pdb_content to return a PDB with XXX
+        with patch("synth_pdb.dataset.generate_pdb_content") as mock_gen:
+             # Minimal PDB with XXX
+             mock_gen.return_value = "ATOM      1  CA  XXX A   1       0.000   0.000   0.000  1.00  0.00           C"
+             args = ("npz_unk", 1, "alpha", "train", str(output_dir), "npz")
+             result = _generate_single_sample_npz_task(args)
+             assert result["success"] is True
+             
+             data = np.load(Path(output_dir) / result["npz_path"])
+             # Sequence should be all zeros since XXX is unknown
+             assert np.sum(data["sequence"]) == 0
+
+    def test_npz_generation_error(self, output_dir):
+        """Test NPZ generation error handling."""
+        from synth_pdb.dataset import _generate_single_sample_npz_task
+        # Pass a non-existent directory to cause an error
+        args = ("npz_err", 10, "alpha", "nonexistent", "/tmp/nonexistent_path/extra", "npz")
+        result = _generate_single_sample_npz_task(args)
+        assert result["success"] is False
+        assert "error" in result
+
+    def test_generate_exception_handling(self, output_dir):
+        """Test the main generate loop handling task exceptions."""
+        with patch("concurrent.futures.ProcessPoolExecutor", side_effect=SynchronousExecutor):
+             # Force task_func (which is _generate_single_sample_task by default) to raise
+             with patch("synth_pdb.dataset._generate_single_sample_task", side_effect=Exception("HARD_FAIL")):
+                 generator = DatasetGenerator(output_dir=output_dir, num_samples=1)
+                 generator.generate()
+                 # Should complete without raising (line 240-241)

@@ -106,7 +106,7 @@ def calculate_angle(
     if denominator == 0:
         return 0.0
         
-    dot_prod = np.dot(vec1, vec2)
+    dot_prod = np.sum(vec1 * vec2)
     cosine_angle = dot_prod / denominator
     cosine_angle = max(-1.0, min(1.0, cosine_angle))
     angle_rad = np.arccos(cosine_angle)
@@ -155,8 +155,8 @@ def calculate_dihedral_angle(
     # Orthonormal basis in the plane perpendicular to b2
     m1 = np.cross(n1, u2)
     
-    x = np.dot(n1, n2)
-    y = np.dot(m1, n2)
+    x = np.sum(n1 * n2)
+    y = np.sum(m1 * n2)
     
     return np.degrees(np.arctan2(y, x))
 
@@ -326,7 +326,7 @@ def reconstruct_sidechain(
             px = p.astype(np.float64) - axis_p1.astype(np.float64)
             
             # Project px onto v
-            proj = np.dot(px, v) * v
+            proj = np.sum(px * v) * v
             perp = px - proj
             
             # Rotate perp component

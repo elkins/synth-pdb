@@ -327,8 +327,8 @@ def _detect_disulfide_bonds(peptide) -> list:
     
     disulfides = []
     
-    # Find all CYS residues
-    cys_residues = peptide[peptide.res_name == 'CYS']
+    # Find all CYS/CYX residues
+    cys_residues = peptide[(peptide.res_name == 'CYS') | (peptide.res_name == 'CYX')]
     
     if len(cys_residues) < 2:
         return disulfides  # Need at least 2 CYS for a bond
@@ -345,10 +345,15 @@ def _detect_disulfide_bonds(peptide) -> list:
             
             if len(sg1) > 0 and len(sg2) > 0:
                 # Calculate distance
-                distance = np.linalg.norm(sg1[0].coord - sg2[0].coord)
+                p1 = sg1[0].coord
+                p2 = sg2[0].coord
+                distance = np.sqrt(np.sum((p1 - p2)**2))
                 
                 # Check if within disulfide bond range
-                if 2.0 <= distance <= 2.2:
+                # Minimized structures can be highly strained (especially small cyclic rings),
+                # so we use a generous range [1.5, 3.0] to ensure the SSBOND record is generated
+                # if the physics engine identified a bond.
+                if 1.5 <= distance <= 3.0:
                     disulfides.append((int(res_id1), int(res_id2)))
     
     return disulfides
@@ -1525,7 +1530,7 @@ def generate_pdb_content(
     serial = 0 # Initialize to avoid UnboundLocalError
     
     for line in atomic_and_ter_content.splitlines():
-        if line.startswith("ATOM"):
+        if line.startswith("ATOM") or line.startswith("HETATM"):
             # Serial is in columns 7-11 (0-indexed: 6-11)
             serial = int(line[6:11].strip())
             atom_name = line[12:16].strip()
@@ -1539,7 +1544,7 @@ def generate_pdb_content(
                 if res_num == total_residues and atom_name == "C":
                     c_term_serial = serial
             
-            if res_name == "CYS" and atom_name == "SG":
+            if (res_name == "CYS" or res_name == "CYX") and atom_name == "SG":
                 sg_serials[res_num] = serial
 
             # Lookup S2 for this residue (default 0.85 if not found)

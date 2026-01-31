@@ -35,11 +35,15 @@ RANDOM_COIL_SHIFTS: Dict[str, Dict[str, float]] = {
     "ARG": {"HA": 4.34, "CA": 56.0, "CB": 30.9, "C": 176.3, "N": 121.3, "H": 8.23},
     "ASN": {"HA": 4.75, "CA": 53.1, "CB": 38.9, "C": 175.2, "N": 118.7, "H": 8.75},
     "ASP": {"HA": 4.66, "CA": 54.2, "CB": 41.1, "C": 176.3, "N": 120.4, "H": 8.34},
-    "CYS": {"HA": 4.69, "CA": 58.2, "CB": 28.0, "C": 174.6, "N": 118.8, "H": 8.32}, # Reduced
+    "CYS": {"HA": 4.69, "CA": 58.2, "CB": 28.0, "C": 174.6, "N": 118.8, "H": 8.32},
+    "CYX": {"HA": 4.69, "CA": 58.2, "CB": 28.0, "C": 174.6, "N": 118.8, "H": 8.32},
     "GLN": {"HA": 4.32, "CA": 56.0, "CB": 29.4, "C": 176.0, "N": 120.4, "H": 8.25},
     "GLU": {"HA": 4.29, "CA": 56.6, "CB": 29.9, "C": 176.6, "N": 120.2, "H": 8.35},
-    "GLY": {"HA": 3.96, "CA": 45.1, "CB": 0.0,  "C": 174.9, "N": 108.8, "H": 8.33}, # HA2/HA3 split usually, simplified here
+    "GLY": {"HA": 3.96, "CA": 45.1, "CB": 0.0,  "C": 174.9, "N": 108.8, "H": 8.33},
     "HIS": {"HA": 4.63, "CA": 55.0, "CB": 29.0, "C": 174.1, "N": 118.2, "H": 8.42},
+    "HID": {"HA": 4.63, "CA": 55.0, "CB": 29.0, "C": 174.1, "N": 118.2, "H": 8.42},
+    "HIE": {"HA": 4.63, "CA": 55.0, "CB": 29.0, "C": 174.1, "N": 118.2, "H": 8.42},
+    "HIP": {"HA": 4.63, "CA": 55.0, "CB": 29.0, "C": 174.1, "N": 118.2, "H": 8.42},
     "ILE": {"HA": 4.17, "CA": 61.1, "CB": 38.8, "C": 176.4, "N": 121.4, "H": 8.00},
     "LEU": {"HA": 4.34, "CA": 55.1, "CB": 42.4, "C": 177.6, "N": 121.8, "H": 8.16},
     "LYS": {"HA": 4.32, "CA": 56.2, "CB": 33.1, "C": 176.6, "N": 120.4, "H": 8.29},
@@ -113,6 +117,9 @@ RING_INTENSITIES = {
     "TYR": 1.2,  # Phenol ring (Similar to Benzene)
     "TRP": 1.3,  # Indole (Stronger system)
     "HIS": 0.5,  # Imidazole (Weaker, depends on protonation)
+    "HID": 0.5,
+    "HIE": 0.5,
+    "HIP": 0.5,
 }
 
 
@@ -149,18 +156,10 @@ def predict_chemical_shifts(structure: struc.AtomArray) -> Dict[str, Dict[str, D
     # Use shared utility for SS classification
     ss_list = get_secondary_structure(structure)
     
-    # Pre-calculate Ring Centers and Normals for Tertiary Effects
+    # Identify aromatic rings once for the whole structure
     rings = _get_aromatic_rings(structure)
-    if rings:
-        logger.info(f"Found {len(rings)} aromatic rings for tertiary shift calculation.")
-        # Convert to numpy array for JIT efficiency and to avoid 'reflected list' deprecation warnings
-        # Shape: (N, 7) -> [center_x, y, z, normal_x, y, z, intensity]
-        rings_arr = np.zeros((len(rings), 7), dtype=np.float64)
-        for j, (c, n, i) in enumerate(rings):
-            rings_arr[j, 0:3] = c
-            rings_arr[j, 3:6] = n
-            rings_arr[j, 6] = i
-        rings = rings_arr
+    if rings.size > 0:
+        logger.debug(f"DEBUG: Found {rings.shape[0]} aromatic rings for shift calculation.")
     
     # We need to iterate over residues
     res_starts = struc.get_residue_starts(structure)
@@ -198,8 +197,8 @@ def predict_chemical_shifts(structure: struc.AtomArray) -> Dict[str, Dict[str, D
                 # 2. Add Tertiary Ring Current Effects
                 # Only affects protons (H, HA, HB...) and sometimes Carbon.
                 # Primarily Protons are interesting for NOESY/Structure.
-                # Use len() check for rings which works for both list and array
-                if len(rings) > 0 and ("H" in atom_type or atom_type == "H"):
+                # Use .size check for numpy array
+                if rings.size > 0 and ("H" in atom_type or atom_type == "H"):
                     # Get atom coordinate
                     try:
                         target_atom = res_atoms[res_atoms.atom_name == atom_type][0]
@@ -284,7 +283,7 @@ def _get_aromatic_rings(structure):
                 # Simplified: averaging all ring atoms
                 ring_names = ["CG", "CD1", "CD2", "NE1", "CE2", "CE3", "CZ2", "CZ3", "CH2"]
                 ring_atoms = res_slice[np.isin(res_slice.atom_name, ring_names)]
-            elif res_name == "HIS":
+            elif res_name in ["HIS", "HID", "HIE", "HIP"]:
                 # 5-membered ring: CG, ND1, CD2, CE1, NE2
                 ring_atoms = res_slice[np.isin(res_slice.atom_name, ["CG", "ND1", "CD2", "CE1", "NE2"])]
             else:
@@ -307,7 +306,17 @@ def _get_aromatic_rings(structure):
                     intensity = RING_INTENSITIES[res_name]
                     rings.append((center, normal, intensity))
                     
-    return rings
+    if not rings:
+        return np.empty((0, 7), dtype=np.float64)
+        
+    # Convert list of tuples (center, normal, intensity) to (N, 7) array
+    ring_array = np.zeros((len(rings), 7), dtype=np.float64)
+    for i, (c, n, intensity) in enumerate(rings):
+        ring_array[i, 0:3] = c
+        ring_array[i, 3:6] = n
+        ring_array[i, 6] = intensity
+        
+    return ring_array
 
 @njit
 def _calculate_ring_current_shift(proton_coord, rings):
@@ -332,7 +341,7 @@ def _calculate_ring_current_shift(proton_coord, rings):
             continue # Too close/clashing, ignore singularity
             
         # Cos(theta) = dot(v, n) / (|v|*|n|) -> |n|=1
-        costheta = np.dot(v, normal) / r
+        costheta = np.sum(v * normal) / r
         
         # Geometric Factor G(r, theta) = (1 - 3*cos^2(theta)) / r^3
         # If theta = 0 (above ring), cos=1 -> (1-3)/r^3 = -2/r^3 (Shielding)

@@ -133,3 +133,84 @@ class TestMolecularViewer:
         
         with pytest.raises(ValueError, match="Test Error"):
             view_structure_in_browser("pdb", "test.pdb")
+
+    def test_ssbond_parsing(self):
+        """Test parsing of SSBOND records from PDB."""
+        from synth_pdb.viewer import _find_ssbonds
+        pdb_data = "SSBOND   1 CYS A    3    CYS A   10\n"
+        ssbonds = _find_ssbonds(pdb_data)
+        assert len(ssbonds) == 1
+        assert ssbonds[0]['r1'] == 3
+        assert ssbonds[0]['r2'] == 10
+        
+        # Test malformed
+        bad_pdb = "SSBOND   1 CYS A  XXXX   CYS A   10\n"
+        assert _find_ssbonds(bad_pdb) == []
+
+    def test_conect_parsing(self):
+        """Test parsing of CONECT records from PDB."""
+        from synth_pdb.viewer import _find_conects
+        pdb_data = "CONECT    1    5\nCONECT    5    1\n"
+        conects = _find_conects(pdb_data)
+        # Should avoid duplicates
+        assert len(conects) == 1
+        assert (1, 5) in conects or (5, 1) in conects
+
+    def test_hbond_fallback(self):
+        """Test H-bond detection fallback when Biotite strict mode fails or finds nothing."""
+        # Simple Ala-Ala-Ala-Ala-Ala (not a helix but we want to trigger geometric fallback)
+        # We need N and O atoms
+        pdb_data = """
+ATOM      1  N   ALA A   1       0.000   0.000   0.000  1.00  0.00           N
+ATOM      2  CA  ALA A   1       1.458   0.000   0.000  1.00  0.00           C
+ATOM      3  C   ALA A   1       2.000   1.400   0.000  1.00  0.00           C
+ATOM      4  O   ALA A   1       1.200   2.300   0.000  1.00  0.00           O
+ATOM      5  N   ALA A   5       2.000   1.400   3.000  1.00  0.00           N
+"""
+        from synth_pdb.viewer import _find_hbonds
+        hbonds = _find_hbonds(pdb_data)
+        # N at (2, 1.4, 3) and O at (1.2, 2.3, 0) -> dist approx 3.1
+        assert len(hbonds) >= 1
+
+    def test_highlight_styles_and_labels(self):
+        """Test different highlight styles and label generation."""
+        pdb_data = "ATOM      1  N   ALA A   1       0.000   0.000   0.000  1.00  0.00           N"
+        highlights = [
+            {'start': 1, 'end': 1, 'color': 'red', 'style': 'cartoon', 'label': 'HOTSPOT'},
+            {'start': 2, 'end': 2, 'color': 'blue', 'style': 'stick'}
+        ]
+        html = _create_3dmol_html(pdb_data, "test.pdb", "cartoon", "spectrum", highlights=highlights)
+        
+        # Cartoon highlight
+        assert "{cartoon:{color:'red'}}" in html
+        # Stick highlight
+        assert "stick:{colorscheme:'blue'" in html
+        # Label
+        assert "addLabel('HOTSPOT'" in html
+
+    def test_ptm_labels(self):
+        """Test detection and labeling of PTM residues."""
+        pdb_data = "ATOM      1  N   SEP A   5       0.000   0.000   0.000  1.00  0.00           N"
+        html = _create_3dmol_html(pdb_data, "test.pdb", "cartoon", "spectrum")
+        assert 'viewer.addLabel("SEP"' in html
+
+    def test_integration_ssbond_and_conect(self):
+        """Test that SSBOND and CONECT records influence the HTML."""
+        pdb_data = "SSBOND   1 CYS A    3    CYS A   10\nCONECT    1    5\n"
+        html = _create_3dmol_html(pdb_data, "test.pdb", "cartoon", "spectrum")
+        
+        assert "Detected Disulfide Bonds" in html
+        assert "Detected CONECT Records" in html
+        assert "resi:3" in html
+        assert "resi:10" in html
+
+    def test_integration_hbonds(self):
+        """Test that H-bond visualization is triggered."""
+        pdb_data = """
+ATOM      1  N   ALA A   1       0.000   0.000   0.000  1.00  0.00           N
+ATOM      4  O   ALA A   1       1.200   2.300   0.000  1.00  0.00           O
+ATOM      5  N   ALA A   5       2.000   1.400   3.000  1.00  0.00           N
+"""
+        html = _create_3dmol_html(pdb_data, "test.pdb", "cartoon", "spectrum", show_hbonds=True)
+        assert "Detected Backbone H-Bonds" in html
+        assert "viewer.addCylinder" in html

@@ -17,7 +17,8 @@ import numpy as np
 # Constants
 # SSBOND_CAPTURE_RADIUS determines the maximum distance (in Angstroms) between two Sulfur atoms
 # for them to be considered as a potential disulfide bond.
-SSBOND_CAPTURE_RADIUS = 8.0
+# Linear chains being cyclized can have terminals > 15A apart initially.
+SSBOND_CAPTURE_RADIUS = 18.0
 
 logger = logging.getLogger(__name__)
 
@@ -208,7 +209,9 @@ class EnergyMinimizer:
                     for a in res2.atoms(): 
                         if a.name == 'N': n_s = a; break
                     if c_s and n_s and frozenset([c_s.index, n_s.index]) not in existing_bonds:
-                        dist = np.linalg.norm(np.array(modeller.positions[c_s.index].value_in_unit(unit.angstroms)) - np.array(modeller.positions[n_s.index].value_in_unit(unit.angstroms)))
+                        p1 = np.array(modeller.positions[c_s.index].value_in_unit(unit.angstroms))
+                        p2 = np.array(modeller.positions[n_s.index].value_in_unit(unit.angstroms))
+                        dist = np.sqrt(np.sum((p1 - p2)**2))
                         if dist < 1.6: modeller.topology.addBond(c_s, n_s)
             except Exception as e: logger.warning(f"Backbone stitching failed: {e}")
 
@@ -261,7 +264,9 @@ class EnergyMinimizer:
                     for j in range(i + 1, len(cys_residues)):
                         r2 = cys_residues[j]; s2 = res_to_sg.get(r2.index)
                         if not s2: continue
-                        d_a = np.linalg.norm(modeller.positions[s1.index].value_in_unit(unit.angstroms) - modeller.positions[s2.index].value_in_unit(unit.angstroms))
+                        p1 = np.array(modeller.positions[s1.index].value_in_unit(unit.angstroms))
+                        p2 = np.array(modeller.positions[s2.index].value_in_unit(unit.angstroms))
+                        d_a = np.sqrt(np.sum((p1 - p2)**2))
                         if d_a < SSBOND_CAPTURE_RADIUS: potential_bonds.append((d_a, r1, r2, s1, s2))
                 potential_bonds.sort(key=lambda x: x[0])
                 bonded_indices = set()
@@ -280,6 +285,7 @@ class EnergyMinimizer:
                 b_struc = biotite_pdb.PDBFile.read(tmp_io).get_structure(model=1)
                 
                 sites = find_metal_binding_sites(b_struc)
+                logger.debug(f"DEBUG: Found {len(sites)} metal binding sites.")
                 for site in sites:
                     i_idx = -1
                     for atom in atom_list:
@@ -291,6 +297,7 @@ class EnergyMinimizer:
                                 if (atom.residue.id == str(l_at.res_id) and atom.name == l_at.atom_name): coordination_restraints.append((i_idx, atom.index)); break
                 
                 bridges = find_salt_bridges(b_struc, cutoff=6.0)
+                logger.debug(f"DEBUG: Found {len(bridges)} salt bridges.")
                 for br in bridges:
                     ia, ib = -1, -1
                     for atom in atom_list:
@@ -312,6 +319,7 @@ class EnergyMinimizer:
                 new_names = [res.name.strip().upper() for res in modeller.topology.residues()]
                 for d in non_protein_data:
                     if d["res_name"].strip().upper() not in new_names:
+                        logger.info(f"Restoring lost HETATM: {d['res_name']}")
                         nc = modeller.topology.addChain(); nr = modeller.topology.addResidue(d["res_name"], nc)
                         modeller.topology.addAtom(d["atom_name"], d["element"], nr)
                         modeller.positions = list(modeller.positions) + [d["pos"]]
@@ -320,9 +328,16 @@ class EnergyMinimizer:
             # ------------------------------------
             # OpenMM's ForceField requires disulfide-bonded cysteines to be named 'CYX'
             # to match the covalent-bonded template (instead of standard 'CYS').
-            for r1, r2 in added_bonds:
-                if r1.name == 'CYS': r1.name = 'CYX'
-                if r2.name == 'CYS': r2.name = 'CYX'
+            # We also MUST delete the thiol hydrogen (HG) for the template to match.
+            if added_bonds:
+                hg_to_delete = []
+                for r1, r2 in added_bonds:
+                    for res in [r1, r2]:
+                        if res.name == 'CYS':
+                            res.name = 'CYX'
+                            hg_to_delete.extend([a for a in res.atoms() if a.name == 'HG'])
+                if hg_to_delete:
+                    modeller.delete(hg_to_delete)
             
             topology, positions = modeller.topology, modeller.positions
             if cyclic: logger.info("Using pre-existing hydrogens for cyclic peptide.")
