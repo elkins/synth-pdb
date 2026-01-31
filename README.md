@@ -1,7 +1,7 @@
 # synth-pdb
 
-[![Open In Colab: Relaxation](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/elkins/synth-pdb/blob/master/interactive_relaxation.ipynb)
-[![Open In Colab: ML Integration](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/elkins/synth-pdb/blob/master/examples/ml_integration/ml_handover_demo.ipynb)
+**The Virtual NMR Spectrometer:** [![Open In Colab: Relaxation](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/elkins/synth-pdb/blob/master/interactive_relaxation.ipynb)
+**AI Protein Data Factory:** [![Open In Colab: ML Integration](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/elkins/synth-pdb/blob/master/examples/ml_integration/ml_handover_demo.ipynb)
 
 [![PyPI version](https://img.shields.io/badge/pypi-v1.14.0-blue)](https://pypi.org/project/synth-pdb/)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
@@ -622,7 +622,7 @@ coords_tensor = torch.from_numpy(batch.coords).float()
 ```
 
 ### 🚀 Try it in the Cloud
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/elkins/synth-pdb/blob/master/examples/ml_integration/ml_handover_demo.ipynb)
+**AI Protein Data Factory:** [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/elkins/synth-pdb/blob/master/examples/ml_integration/ml_handover_demo.ipynb)
 
 See the full [ML Integration Demo](file:///Users/georgeelkins/nmr/synth-pdb/examples/ml_integration/ml_handover_demo.ipynb) for examples of Radius of Gyration prediction and JAX/MLX support.
 
