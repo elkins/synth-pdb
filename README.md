@@ -14,8 +14,6 @@ A command-line tool to generate Protein Data Bank (PDB) files with full atomic r
 | **The Hard Decoy Challenge** | [![Open In Colab: Decoys](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/elkins/synth-pdb/blob/master/examples/ml_integration/hard_decoy_challenge.ipynb) |
 
 
-> ⚠️ **Important**: The generated structures use idealized geometries. For high-quality, physically realistic structures suitable for simulation, we strongly recommend using the **`--minimize`** flag, which relaxes the geometry using the OpenMM physics engine.
-
 ## Table of Contents
 - [Features](#features)
 - [Installation](#installation)

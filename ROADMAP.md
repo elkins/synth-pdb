@@ -41,6 +41,11 @@ Sorted by **High-Value / Low-Risk** first.
 *   **Use Case**: Capturing "water-bridging" interactions that stabilize specific conformations.
 *   **Risk**: Medium. Increases minimization time significantly.
 
+### 2. 💍 Macrocycle Design Lab (Cyclic Peptides)
+*   **Objective**: Explore the generation of random cyclic peptides and visualize the "closure" of the macrocycle via physics-based minimization.
+*   **Key Features**: `--cyclic`, `--minimize`, and `--refine-clashes`.
+*   **Value**: Macrocycles are at the forefront of drug discovery. An AI model that can design cyclic peptides needs a training set of realistic closed loops, which standard PDBs lack in sufficient quantity.
+
 ---
 
 ## 🤖 Section 2: AI Research Support
@@ -53,6 +58,21 @@ Sorted by **High-Value / Low-Risk** first.
 ### 2. Full Orientogram Export ($\omega, \theta, \phi$ angles) 📐
 *   **Concept**: Export the full 6D inter-residue orientations used by models like trRosetta/RoseTTAFold.
 *   **Changes**: `synth_pdb/processing.py`.
+
+### 3. 📁 Bulk Dataset Factory (NPZ Pipeline)
+*   **Objective**: Show the end-to-end workflow of generating a 10,000-sample dataset and loading it directly into a PyTorch DataLoader.
+*   **Key Features**: `--mode dataset`, `--dataset-format npz`, and `dataset_manifest.csv`.
+*   **Value**: Highlights the scalability. Instead of parsing thousands of individual PDB files (which is slow), it treats the generator as a streaming tensor source.
+
+### 4. 🧠 Multi-Modal Transformer Training (Structure + NMR)
+*   **Objective**: Generate synchronized structural coordinates (PDB) and synthetic experimental data (NEF Chemical Shifts) for multi-modal AI training.
+*   **Key Features**: `--gen-nef`, `predict_chemical_shifts`, and `predict_order_parameters`.
+*   **Value**: Demonstrates how synth-pdb can train models to predict experimental observables (like NMR shifts) directly from sequence or 3D geometry.
+
+### 5. 📉 Torsion Angle Drift & Distribution Analysis
+*   **Objective**: Statistically analyze how adding "Drift" to Ramachandran angles affects the overall fold and the radius of gyration.
+*   **Key Features**: `--drift`, `dihedral_backbone`, and `BatchedGenerator`.
+*   **Value**: Useful for researchers testing the robustness of their GNNs (Graph Neural Networks) to small backbone perturbations.
 
 ---
 
