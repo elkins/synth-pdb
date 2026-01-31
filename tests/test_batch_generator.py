@@ -68,5 +68,34 @@ class TestBatchedGenerator(unittest.TestCase):
         # 2 residues * 4 backbone atoms = 8 atoms
         self.assertEqual(batch.coords.shape, (n_batch, 8, 3))
 
+    @unittest.skipIf(BatchedGenerator is None, "BatchedGenerator not yet implemented")
+    def test_full_atom_batch(self):
+        """Verify full-atom generation produces more atoms and correct labels."""
+        sequence = "ALA-TRP"
+        bg = BatchedGenerator(sequence, n_batch=5, full_atom=True)
+        batch = bg.generate_batch()
+        
+        # ALA has 10 atoms (stripped), TRP has many more. 
+        # Just check if it's > 4 * L
+        self.assertGreater(batch.n_atoms, 8)
+        self.assertEqual(len(batch.atom_names), batch.n_atoms)
+        self.assertEqual(len(batch.residue_indices), batch.n_atoms)
+        
+        # Check first few atom names
+        self.assertEqual(batch.atom_names[0], "N")
+        self.assertEqual(batch.atom_names[1], "CA")
+        
+    @unittest.skipIf(BatchedGenerator is None, "BatchedGenerator not yet implemented")
+    def test_pdb_export(self):
+        """Verify PDB string generation for a batched structure."""
+        bg = BatchedGenerator("ALA", n_batch=1, full_atom=True)
+        batch = bg.generate_batch()
+        pdb_str = batch.to_pdb(0)
+        
+        self.assertIn("ATOM      1  N   ALA A   1", pdb_str)
+        self.assertIn("ATOM      2  CA  ALA A   1", pdb_str)
+        self.assertIn("TER", pdb_str)
+        self.assertIn("END", pdb_str)
+
 if __name__ == "__main__":
     unittest.main()

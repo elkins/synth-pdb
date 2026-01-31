@@ -22,13 +22,28 @@ STANDARD_AMINO_ACIDS: List[str] = [
     "LYS",
     "MET",
     "PHE",
-    "PRO",
+    "PRO",  # Proline
     "VAL",
     "SER",
     "THR",
     "TRP",
     "TYR",
 ]
+
+# EDUCATIONAL NOTE - Proline Sterics (The "Proline Effect"):
+# --------------------------------------------------------
+# Proline is the "structure breaker" of the protein world. Unlike any other 
+# amino acid, its sidechain is cyclized back onto the backbone Nitrogen.
+# 
+# Consequences:
+# 1. Exceptional Rigidity: The N-CA bond is locked in a ring, preventing 
+#    rotation. This makes Proline the most restricted residue in the 
+#    Ramachandran plot.
+# 2. No H-Bonding Donor: Proline lacks the amide Hydrogen (H) that normally 
+#    participates in alpha-helix and beta-sheet hydrogen bonding.
+# 3. Cis-Trans Isomerization: While 99.9% of peptide bonds are "trans" (180 deg),
+#    Proline is unique in that "cis" (0 deg) is energetically accessible, 
+#    often forming sharp turns in protein chains.
 
 # --- D-Amino Acids ---
 # Mapping from 3-letter L-code to 3-letter D-code for PDB compatibility.
@@ -281,7 +296,22 @@ RAMACHANDRAN_POLYGONS: Dict[str, Dict[str, List[List[Tuple[float, float]]]]] = {
 # --- Standard Bond Lengths and Angles (Approximations) ---
 
 # Values are in Angstroms for bond lengths and degrees for angles
-# These are simplified averages and will not create perfectly accurate structures.
+# 
+# EDUCATIONAL NOTE - Engh & Huber Parameters (The Gold Standard):
+# -------------------------------------------------------------
+# These bond lengths and angles are not just "good guesses." They are the 
+# "Engh & Huber Parameters," derived in 1991 from a statistical survey of 
+# small-molecule crystal structures in the Cambridge Structural Database (CSD).
+# 
+# Significance:
+# 1. Foundation of Crystallography: Almost all protein structure refinement 
+#    software (like Phenix or CCP4) uses these targets as "restraints." If a 
+#    structure deviates too far from 1.458Ą for an N-CA bond, it's flagged.
+# 2. Physics-Informed: By assuming these bond lengths are fixed (rigid), we 
+#    reduce the complexity of protein simulation from thousands of variables 
+#    down to just a few torsion angles (Phi, Psi, Chi).
+# 
+# Source: Engh, R. A., & Huber, R. (1991). Acta Crystallographica Section A.
 
 # Peptide bond geometry
 

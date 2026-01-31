@@ -30,6 +30,7 @@ class TestDocumentationIntegrity(unittest.TestCase):
         self.nef_io_path = os.path.join(self.base_dir, 'synth_pdb', 'nef_io.py')
         self.dataset_path = os.path.join(self.base_dir, 'synth_pdb', 'dataset.py')
         self.batch_generator_path = os.path.join(self.base_dir, 'synth_pdb', 'batch_generator.py')
+        self.data_path = os.path.join(self.base_dir, 'synth_pdb', 'data.py')
 
     def _check_file_contains(self, filepath, substrings):
         """Helper to assert file contains list of substrings."""
@@ -168,10 +169,38 @@ class TestDocumentationIntegrity(unittest.TestCase):
             "Bond Length", "Bond Angle", "Torsion/Dihedral Angle",
             "EDUCATIONAL NOTE - NeRF Geometry",
             "Natural Extension Reference Frame",
-            "mathematical precision",
             "EDUCATIONAL NOTE - SIMD & Parallel Geometry:",
+            "EDUCATIONAL NOTE - Vectorized Kabsch Algorithm:",
+            "Root Mean Square Deviation (RMSD)",
+            "EDUCATIONAL NOTE - GPU-First Operations:",
+            "Memory bandwidth",
+            "EDUCATIONAL NOTE - Circular Statistics (The 180/-180 Problem):",
+            "Boundary Artifact",
+            "mathematical precision",
         ]
         self._check_file_contains(self.geometry_path, required_notes)
+
+    def test_batch_generator_educational_notes(self):
+        """Ensure batch_generator.py retains performance notes."""
+        required_notes = [
+            "EDUCATIONAL OVERVIEW - Batched Generation (GPU-First):",
+            "Broadcasting",
+            "Hardware Acceleration",
+            "EDUCATIONAL NOTE - Peptidyl Chain Walk:",
+            "EDUCATIONAL NOTE - The \"Memory Wall\" in AI Training:",
+            "PCIE Latency",
+        ]
+        self._check_file_contains(self.batch_generator_path, required_notes)
+
+    def test_data_educational_notes(self):
+        """Ensure data.py retains geometric and amino acid notes."""
+        required_notes = [
+            "EDUCATIONAL NOTE - Engh & Huber Parameters (The Gold Standard):",
+            "Gold Standard",
+            "EDUCATIONAL NOTE - Proline Sterics (The \"Proline Effect\"):",
+            "structure breaker",
+        ]
+        self._check_file_contains(self.data_path, required_notes)
 
     def test_packing_and_scoring_educational_notes(self):
         """Ensure packing.py and scoring.py retain optimization notes."""

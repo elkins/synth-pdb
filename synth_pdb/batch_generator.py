@@ -6,7 +6,8 @@ from .data import (
     ANGLE_N_CA_C, ANGLE_CA_C_N, ANGLE_C_N_CA,
     ONE_TO_THREE_LETTER_CODE, RAMACHANDRAN_PRESETS
 )
-from .geometry import position_atoms_batch
+from .geometry import position_atoms_batch, superimpose_batch
+import biotite.structure as struc
 
 # EDUCATIONAL OVERVIEW - Batched Generation (GPU-First):
 # ----------------------------------------------------
@@ -23,31 +24,136 @@ from .geometry import position_atoms_batch
 #
 # This architecture is "ML-Ready" - the output is a single contiguous tensor
 # that can be passed directly to frameworks like MLX, PyTorch, or JAX.
+#
+# EDUCATIONAL NOTE - The "Memory Wall" in AI Training:
+# --------------------------------------------------
+# When generating millions of protein samples, the bottleneck is rarely the 
+# CPU math (thanks to vectorization), but rather the "Memory Wall":
+# 
+# 1. PCIE Latency: Copying large tensors from CPU to GPU memory can be slower 
+#    than actually generating the coordinates. 
+# 2. Contiguity: Deep Learning models require contiguous memory blocks. 
+#    BatchedGenerator ensures the output is one massive C-style array, 
+#    avoiding the "gather" overhead of traditional Python lists.
+# 3. Unified Memory: On Apple Silicon (M4), CPU and GPU share the same physical 
+#    RAM. This means the coordinate tensor can be "zero-copy" - once generated 
+#    by NumPy, it is IMMEDIATELY visible to the Metal/MLX GPU without any 
+#    data movement.
 
 class BatchedPeptide:
     """
     A lightweight container for batched protein coordinates.
     Designed for high-performance handover to ML frameworks.
     """
-    def __init__(self, coords: np.ndarray, sequence: List[str]):
+    def __init__(self, coords: np.ndarray, sequence: List[str], atom_names: List[str], residue_indices: List[int]):
         self.coords = coords # (B, N_atoms, 3)
         self.sequence = sequence
+        self.atom_names = atom_names
+        self.residue_indices = residue_indices
+        self.n_structures = self.coords.shape[0]
+        self.n_atoms = self.coords.shape[1]
+        self.n_residues = len(sequence)
+
+    def __len__(self):
+        return self.n_structures
+
+    def __getitem__(self, index):
+        if isinstance(index, int):
+            return BatchedPeptide(self.coords[index:index+1], self.sequence, self.atom_names, self.residue_indices)
+        return BatchedPeptide(self.coords[index], self.sequence, self.atom_names, self.residue_indices)
+
+    def save_pdb(self, path: str, index: int = 0):
+        """Saves one structure from the batch to a PDB file."""
+        with open(path, 'w') as f:
+            f.write(self.to_pdb(index))
+
+    def to_pdb(self, index: int = 0) -> str:
+        """Converts one structure in the batch to a PDB string."""
+        lines = []
+        c = self.coords[index]
+        # PDB Format String: ATOM, Serial, Name, ResName, Chain, ResSeq, X, Y, Z, Occupancy, B-factor, Element
+        fmt = "ATOM  {:>5d} {:<4s} {:>3s} A{:>4d}    {:>8.3f}{:>8.3f}{:>8.3f}  1.00  0.00          {:>2s}"
+        
+        for i in range(self.n_atoms):
+            name = self.atom_names[i]
+            res_idx = self.residue_indices[i]
+            res_name = self.sequence[res_idx - 1]
+            element = name[0] if not name[0].isdigit() else name[1]
+            
+            # Atom names with 4 chars start at col 13, others at col 14
+            # We simplify here for the generator tool compatibility
+            clean_name = name.strip()
+            if len(clean_name) < 4:
+                atom_field = " " + clean_name.ljust(3)
+            else:
+                atom_field = clean_name
+                
+            lines.append(fmt.format(
+                i + 1, atom_field, res_name, res_idx, 
+                c[i, 0], c[i, 1], c[i, 2], element
+            ))
+        lines.append("TER")
+        lines.append("END")
+        return "\n".join(lines)
 
 class BatchedGenerator:
     """
     High-performance vectorized protein structure generator.
     Optimized for generating millions of labeled samples for AI training.
     """
-    def __init__(self, sequence_str: str, n_batch: int = 1):
-        # Resolve sequence (simplified for now to match TDD)
+    def __init__(self, sequence_str: str, n_batch: int = 1, full_atom: bool = False):
+        # Resolve sequence
         if "-" in sequence_str:
             self.sequence = [s.strip() for s in sequence_str.split("-")]
         else:
-            # Assume 1-letter codes if no dashes
             self.sequence = [ONE_TO_THREE_LETTER_CODE.get(c, "ALA") for c in sequence_str]
         
         self.n_batch = n_batch
         self.n_res = len(self.sequence)
+        self.full_atom = full_atom
+        
+        # Build Atom Topology & Load Templates
+        self.atom_names = []
+        self.residue_indices = []
+        self.templates = []
+        self.template_backbones = []
+        self.offsets = []
+        
+        current_offset = 0
+        for i, res_name in enumerate(self.sequence):
+            if full_atom:
+                # Get full-atom template from biotite
+                template = struc.info.residue(res_name).copy()
+                
+                # Remove terminal atoms (OXT, H2, H3) to match peptide chain logic
+                # (Simple heuristic for now, matches generator.py logic)
+                mask = ~np.isin(template.atom_name, ["OXT", "H2", "H3", "HXT"])
+                template = template[mask]
+                
+                names = template.atom_name.tolist()
+                n_atoms = len(names)
+                
+                # Ensure N, CA, C are present for superimposition
+                if not all(a in names for a in ["N", "CA", "C"]):
+                    raise ValueError(f"Template for {res_name} missing core backbone atoms.")
+                
+                self.templates.append(template)
+                # Store (N, CA, C) coordinates of template for Kabsch (shape 3, 3)
+                n_idx = names.index("N")
+                ca_idx = names.index("CA")
+                c_idx = names.index("C")
+                self.template_backbones.append(template.coord[[n_idx, ca_idx, c_idx]])
+            else:
+                # Backbone only: N, CA, C, O
+                names = ["N", "CA", "C", "O"]
+                n_atoms = 4
+            
+            self.atom_names.extend(names)
+            self.residue_indices.extend([i + 1] * n_atoms)
+            self.offsets.append(current_offset)
+            current_offset += n_atoms
+            
+        self.total_atoms = current_offset
 
     def generate_batch(self, seed: Optional[int] = None, conformation: str = 'alpha', drift: float = 0.0) -> BatchedPeptide:
         """
@@ -133,4 +239,41 @@ class BatchedGenerator:
                 bl, ba, di = np.full(B, BOND_LENGTH_C_O), np.full(B, ANGLE_CA_C_O), np.full(B, 180.0)
                 coords[:, idx+3] = position_atoms_batch(p1, p2, p3, bl, ba, di)
 
-        return BatchedPeptide(coords, self.sequence)
+        # 3. Full-Atom Superimposition
+        if self.full_atom:
+            # Allocate full-atom coords
+            fa_coords = np.zeros((B, self.total_atoms, 3))
+            
+            for i in range(L):
+                # Target backbone frame (B, 3, 3) from the NeRF backbone
+                # NeRF backbone order: N(0), CA(1), C(2), O(3)
+                target_n = coords[:, i*4]
+                target_ca = coords[:, i*4+1]
+                target_c = coords[:, i*4+2]
+                target_bb = np.stack([target_n, target_ca, target_c], axis=1) # (B, 3, 3)
+                
+                # Source backbone frame (3, 3)
+                template_bb = self.template_backbones[i]
+                # Broadcast template to batch: (B, 3, 3)
+                source_bb = np.repeat(template_bb[np.newaxis, :, :], B, axis=0)
+                
+                # Align template to target
+                trans, rot = superimpose_batch(source_bb, target_bb)
+                
+                # Apply rotation and translation to all atoms in template
+                # template.coord: (N_res_atoms, 3)
+                template_coords = self.templates[i].coord
+                
+                # (B, 3, 3) @ (N_res_atoms, 3)^T -> (B, 3, N_res_atoms)
+                # Then transpose back to (B, N_res_atoms, 3)
+                rotated = np.matmul(rot, template_coords.T).transpose(0, 2, 1)
+                aligned = rotated + trans[:, np.newaxis, :]
+                
+                # Write to global tensor
+                offset = self.offsets[i]
+                n_res_atoms = template_coords.shape[0]
+                fa_coords[:, offset:offset+n_res_atoms] = aligned
+                
+            return BatchedPeptide(fa_coords, self.sequence, self.atom_names, self.residue_indices)
+
+        return BatchedPeptide(coords, self.sequence, ["N", "CA", "C", "O"] * L, self.residue_indices)
