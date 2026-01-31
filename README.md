@@ -2,7 +2,7 @@
 
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/elkins/synth-pdb/blob/master/interactive_relaxation.ipynb)
 
-[![PyPI version](https://img.shields.io/badge/pypi-v1.13.0-blue)](https://pypi.org/project/synth-pdb/)
+[![PyPI version](https://img.shields.io/badge/pypi-v1.13.1-blue)](https://pypi.org/project/synth-pdb/)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Tests](https://github.com/elkins/synth-pdb/actions/workflows/test.yml/badge.svg)](https://github.com/elkins/synth-pdb/actions/workflows/test.yml)
@@ -1025,7 +1025,7 @@ pytest tests/test_generator.py -v
 ```
 
 **Test Coverage**: 95% overall
-- 360 tests covering generation, validation, CLI, and edge cases
+- 361 tests covering generation, validation, CLI, and edge cases
 
 ### Project Structure
 

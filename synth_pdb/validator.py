@@ -434,13 +434,15 @@ class PDBValidator:
                         and c_atom
                         and next_res_atoms
                         and next_res_atoms.get("N")
+                        and next_res_atoms.get("CA")
                     ):
                         next_n_atom = next_res_atoms["N"]
+                        next_ca_atom = next_res_atoms["CA"]
                         # The angle we are checking is C(i)-N(i+1)-CA(i+1)
                         actual_angle = self._calculate_angle(
                             c_atom["coords"],
                             next_n_atom["coords"],
-                            next_res_atoms.get("CA")["coords"],
+                            next_ca_atom["coords"],
                         )
                         expected_angle = angle_standards[
                             "CA-C-N_peptide"

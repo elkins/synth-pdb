@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.13.1] - 2026-01-30
+
+### Added
+- **EGF Generation Example**: Added a new example script `examples/generate_egf.py` demonstrating the generation of a complex 53-residue protein with disarmament minimization and synthetic NMR data.
+
+### Fixed
+- **Validator Stability**: Fixed a critical `TypeError` in `validator.py` where terminal caps or incomplete backbone atoms could cause a crash during bond angle validation.
+- **Regression Testing**: Added automated regression tests for the validator crash to prevent future regressions.
+
 ## [1.13.0] - 2026-01-30
 
 ### Added

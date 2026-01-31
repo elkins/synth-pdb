@@ -810,3 +810,30 @@ class TestPDBValidator:
         assert "chi1" in violations[0]
         assert "0.0" in violations[0] # Should mention the measured angle
 
+    def test_validate_bond_angles_missing_ca_regression(self):
+        """
+        Regression test for a 'NoneType' object is not subscriptable error
+        that occurred when next_res_atoms.get("CA") returned None.
+        This often happens with terminal caps (like ACE/NME) or incomplete models.
+        """
+        # Residue 1: N1-CA1-C1
+        n1 = np.array([0.0, 0.0, 0.0])
+        ca1 = np.array([1.46, 0.0, 0.0])
+        c1 = np.array([2.5, 1.0, 0.0])
+        
+        # Residue 2: N2 (but missing CA2)
+        n2 = np.array([3.5, 1.0, 0.0])
+        
+        pdb_content = (
+            create_atom_line(1, "N", "ALA", "A", 1, *n1, "N") + "\n" +
+            create_atom_line(2, "CA", "ALA", "A", 1, *ca1, "C") + "\n" +
+            create_atom_line(3, "C", "ALA", "A", 1, *c1, "C") + "\n" +
+            create_atom_line(4, "N", "ALA", "A", 2, *n2, "N")
+            # Missing CA for ALA 2
+        )
+        
+        validator = PDBValidator(pdb_content)
+        # This call should no longer raise TypeError: 'NoneType' object is not subscriptable
+        validator.validate_bond_angles()
+        # It should not have found a C-N-CA angle because CA is missing
+        assert len(validator.get_violations()) == 0 or not any("C-N-CA" in v for v in validator.get_violations())
