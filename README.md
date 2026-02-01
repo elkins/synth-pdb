@@ -14,6 +14,7 @@ A command-line tool to generate Protein Data Bank (PDB) files with full atomic r
 | **The Hard Decoy Challenge** | [![Open In Colab: Decoys](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/elkins/synth-pdb/blob/master/examples/ml_integration/hard_decoy_challenge.ipynb) |
 | **Macrocycle Design Lab** | [![Open In Colab: Macrocycles](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/elkins/synth-pdb/blob/master/examples/ml_integration/macrocycle_lab.ipynb) |
 | **Bulk Dataset Factory** | [![Open In Colab: Dataset](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/elkins/synth-pdb/blob/master/examples/ml_integration/dataset_factory.ipynb) |
+| **Neural NMR Pipeline** | [![Open In Colab: NMR](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/elkins/synth-pdb/blob/master/examples/ml_integration/neural_nmr_pipeline.ipynb) |
 
 
 ## Table of Contents

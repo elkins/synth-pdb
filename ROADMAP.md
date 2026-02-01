@@ -59,14 +59,13 @@ Sorted by **High-Value / Low-Risk** first.
 *   **Concept**: Export the full 6D inter-residue orientations used by models like trRosetta/RoseTTAFold.
 *   **Changes**: `synth_pdb/processing.py`.
 
-### 3. 📁 Bulk Dataset Factory (NPZ Pipeline)
-*   **Objective**: Show the end-to-end workflow of generating a 10,000-sample dataset and loading it directly into a PyTorch DataLoader.
-*   **Key Features**: `--mode dataset`, `--dataset-format npz`, and `dataset_manifest.csv`.
-*   **Value**: Highlights the scalability. Instead of parsing thousands of individual PDB files (which is slow), it treats the generator as a streaming tensor source.
+### 3. ✅ Bulk Dataset Factory (NPZ Pipeline)
+*   **Result**: Implemented high-performance NPZ export and PyTorch integration.
+*   **Demo**: [dataset_factory.ipynb](file:///Users/georgeelkins/nmr/synth-pdb/examples/ml_integration/dataset_factory.ipynb)
 
 ### 4. 🧠 Multi-Modal Transformer Training (Structure + NMR)
 *   **Objective**: Generate synchronized structural coordinates (PDB) and synthetic experimental data (NEF Chemical Shifts) for multi-modal AI training.
-*   **Key Features**: `--gen-nef`, `predict_chemical_shifts`, and `predict_order_parameters`.
+*   **Status**: [/] IN PROGRESS. Building the `neural_nmr_pipeline.ipynb`.
 *   **Value**: Demonstrates how synth-pdb can train models to predict experimental observables (like NMR shifts) directly from sequence or 3D geometry.
 
 ### 5. 📉 Torsion Angle Drift & Distribution Analysis
