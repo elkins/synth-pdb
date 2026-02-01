@@ -1,6 +1,6 @@
 # synth-pdb
 
-A command-line tool to generate Protein Data Bank (PDB) files with full atomic representation for testing, benchmarking, and educational purposes.
+A command-line tool to generate Protein Data Bank (PDB) files with full atomic representation for testing, benchmarking and educational purposes.
 
 [![PyPI version](https://img.shields.io/badge/pypi-v1.14.0-blue)](https://pypi.org/project/synth-pdb/)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
@@ -13,6 +13,7 @@ A command-line tool to generate Protein Data Bank (PDB) files with full atomic r
 | **AI Protein Data Factory** | [![Open In Colab: ML Integration](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/elkins/synth-pdb/blob/master/examples/ml_integration/ml_handover_demo.ipynb) |
 | **The Hard Decoy Challenge** | [![Open In Colab: Decoys](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/elkins/synth-pdb/blob/master/examples/ml_integration/hard_decoy_challenge.ipynb) |
 | **Macrocycle Design Lab** | [![Open In Colab: Macrocycles](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/elkins/synth-pdb/blob/master/examples/ml_integration/macrocycle_lab.ipynb) |
+| **Bulk Dataset Factory** | [![Open In Colab: Dataset](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/elkins/synth-pdb/blob/master/examples/ml_integration/dataset_factory.ipynb) |
 
 
 ## Table of Contents
