@@ -12,6 +12,7 @@ A command-line tool to generate Protein Data Bank (PDB) files with full atomic r
 | **The Virtual NMR Spectrometer** | [![Open In Colab: Relaxation](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/elkins/synth-pdb/blob/master/interactive_relaxation.ipynb) |
 | **AI Protein Data Factory** | [![Open In Colab: ML Integration](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/elkins/synth-pdb/blob/master/examples/ml_integration/ml_handover_demo.ipynb) |
 | **The Hard Decoy Challenge** | [![Open In Colab: Decoys](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/elkins/synth-pdb/blob/master/examples/ml_integration/hard_decoy_challenge.ipynb) |
+| **Macrocycle Design Lab** | [![Open In Colab: Macrocycles](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/elkins/synth-pdb/blob/master/examples/ml_integration/macrocycle_lab.ipynb) |
 
 
 ## Table of Contents
