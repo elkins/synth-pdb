@@ -99,6 +99,19 @@ class BatchedPeptide:
         lines.append("END")
         return "\n".join(lines)
 
+    def get_6d_orientations(self) -> Dict[str, np.ndarray]:
+        """
+        Computes 6D inter-residue orientations (trRosetta style).
+        Returns a dictionary of (B, L, L) tensors: dist, omega, theta, phi.
+        """
+        from .orientogram import compute_6d_orientations
+        return compute_6d_orientations(
+            self.coords, 
+            self.atom_names, 
+            self.residue_indices, 
+            self.n_residues
+        )
+
 class BatchedGenerator:
     """
     High-performance vectorized protein structure generator.

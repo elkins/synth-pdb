@@ -55,17 +55,17 @@ Sorted by **High-Value / Low-Risk** first.
 *   **Concept**: Generate a *family* of sequences that imply a specific fold, simulating evolution.
 *   **Implementation**: Enhance `dataset.py` to generate correlated mutations based on the contact map.
 
-### 2. Full Orientogram Export ($\omega, \theta, \phi$ angles) 📐
-*   **Concept**: Export the full 6D inter-residue orientations used by models like trRosetta/RoseTTAFold.
-*   **Changes**: `synth_pdb/processing.py`.
+### 2. ✅ Full Orientogram Factory ($\omega, \theta, \phi$ angles)
+*   **Result**: Implemented vectorized 6D inter-residue orientations with virtual GLY $C\beta$ support.
+*   **Demo**: [orientogram_lab.ipynb](file:///Users/georgeelkins/nmr/synth-pdb/examples/ml_integration/orientogram_lab.ipynb)
 
 ### 3. ✅ Bulk Dataset Factory (NPZ Pipeline)
 *   **Result**: Implemented high-performance NPZ export and PyTorch integration.
 *   **Demo**: [dataset_factory.ipynb](file:///Users/georgeelkins/nmr/synth-pdb/examples/ml_integration/dataset_factory.ipynb)
 
-### 4. 🧠 Multi-Modal Transformer Training (Structure + NMR)
-*   **Objective**: Generate synchronized structural coordinates (PDB) and synthetic experimental data (NEF Chemical Shifts) for multi-modal AI training.
-*   **Status**: [/] IN PROGRESS. Building the `neural_nmr_pipeline.ipynb`.
+### 4. ✅ Multi-Modal Transformer Training (Structure + NMR)
+*   **Result**: Integrated synchronized structural generation with synthetic NMR observables.
+*   **Demo**: [neural_nmr_pipeline.ipynb](file:///Users/georgeelkins/nmr/synth-pdb/examples/ml_integration/neural_nmr_pipeline.ipynb)
 *   **Value**: Demonstrates how synth-pdb can train models to predict experimental observables (like NMR shifts) directly from sequence or 3D geometry.
 
 ### 5. 📉 Torsion Angle Drift & Distribution Analysis

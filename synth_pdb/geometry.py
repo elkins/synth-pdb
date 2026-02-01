@@ -325,6 +325,58 @@ def calculate_dihedral_angle(
     
     return np.degrees(np.arctan2(y, x))
 
+
+def batched_angle(p1: np.ndarray, p2: np.ndarray, p3: np.ndarray) -> np.ndarray:
+    """
+    Vectorized calculation of angles for batches of point triplets.
+    Args:
+        p1, p2, p3: arrays of shape (..., 3)
+    Returns:
+        angles: array of shape (...) in degrees
+    """
+    v1 = p1 - p2
+    v2 = p3 - p2
+    
+    # Dot product
+    dot = np.sum(v1 * v2, axis=-1)
+    
+    # Norms
+    norm1 = np.linalg.norm(v1, axis=-1)
+    norm2 = np.linalg.norm(v2, axis=-1)
+    
+    # Cosine
+    cos = dot / (norm1 * norm2 + 1e-9)
+    cos = np.clip(cos, -1.0, 1.0)
+    
+    return np.degrees(np.arccos(cos))
+
+
+def batched_dihedral(p1: np.ndarray, p2: np.ndarray, p3: np.ndarray, p4: np.ndarray) -> np.ndarray:
+    """
+    Vectorized calculation of dihedral angles for batches of point quadruplets.
+    Args:
+        p1, p2, p3, p4: arrays of shape (..., 3)
+    Returns:
+        dihedrals: array of shape (...) in degrees
+    """
+    b0 = -1.0 * (p2 - p1)
+    b1 = p3 - p2
+    b2 = p4 - p3
+
+    # Normalize b1
+    b1 /= (np.linalg.norm(b1, axis=-1, keepdims=True) + 1e-9)
+
+    # Vector rejections
+    # v = p - (p.b1) / (b1.b1) * b1
+    v = b0 - np.sum(b0 * b1, axis=-1, keepdims=True) * b1
+    w = b2 - np.sum(b2 * b1, axis=-1, keepdims=True) * b1
+
+    # Angle between v and w is the dihedral angle
+    x = np.sum(v * w, axis=-1)
+    y = np.sum(np.cross(b1, v, axis=-1) * w, axis=-1)
+
+    return np.degrees(np.arctan2(y, x))
+
 def reconstruct_sidechain(
     peptide: struc.AtomArray,
     res_id: int,
