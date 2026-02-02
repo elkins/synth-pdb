@@ -97,10 +97,24 @@ class TestEducationalExamples:
         assert "END" in content
         
         # The generator should ATTEMPT to detect disulfides and write SSBOND if found.
-        # We can't guarantee 3 are found due to random conformation, but we can check if
-        # the format logic handles it by asserting no crash and content exists.
-        # Ideally, we would mock the geometry to force a hit, but that's a unit test.
-        # Here we just verify the "educational" pipeline runs.
+        # BPTI is small and constrained; some disulfides should be detected.
+        # Check for SSBOND and CONECT correlation
+        if "SSBOND" in content:
+            assert "CONECT" in content, "SSBOND header present but no CONECT records for structural bonding"
+            
+            # Verify that SG atoms are involved in CONECT records
+            lines = content.split('\n')
+            sg_indices = [int(l[6:11]) for l in lines if l.startswith('ATOM') and l[12:16].strip() == 'SG']
+            conect_lines = [l for l in lines if l.startswith('CONECT')]
+            
+            sg_bonded = False
+            import re
+            for line in conect_lines:
+                parts = [int(p) for p in re.findall(r'\d+', line[6:])]
+                if any(idx in parts for idx in sg_indices):
+                    sg_bonded = True
+                    break
+            assert sg_bonded, "SSBOND present but no SG atoms found in CONECT records"
 
 
     def test_ubiquitin_complex_structure(self, tmp_path):
@@ -161,5 +175,11 @@ class TestEducationalExamples:
         
         # Check for SSBOND records
         # hEGF is physically small and highly constrained by 3 disulfides.
-        # Even with a random start, minimization should ideally bring some Cys together.
-        assert "SSBOND" in content or "ATOM" in content # At least ensure atoms exist.
+        # With minimization, we expect at least one disulfide to form reliably.
+        assert "SSBOND" in content, "hEGF failed to form any disulfides after minimization"
+        assert "CONECT" in content, "hEGF has SSBOND but no CONECT records"
+        
+        # Verify CONECT references SG atoms
+        lines = content.split('\n')
+        sg_indices = [int(l[6:11]) for l in lines if l.startswith('ATOM') and l[12:16].strip() == 'SG']
+        assert any("CONECT" in l and any(str(idx) in l for idx in sg_indices) for l in lines)

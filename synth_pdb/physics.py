@@ -180,92 +180,142 @@ class EnergyMinimizer:
 
     def _run_simulation(self, input_path, output_path, max_iterations=0, tolerance=10.0, add_hydrogens=True, equilibration_steps=0, cyclic=False):
         logger.info(f"Processing physics for {input_path} (cyclic={cyclic})...")
+        import tempfile
+        import os
+        import numpy as np
+        
+        # Initialize variables early to avoid NameErrors
+        coordination_restraints = []
+        salt_bridge_restraints = []
+        atom_list = []
+        added_bonds = []
+        
+        # EDUCATIONAL NOTE - PDB PRE-PROCESSING (OpenMM Template Fix):
+        # -----------------------------------------------------------
+        # OpenMM's standard forcefields (amber14-all) are highly optimized for wild-type
+        # human proteins but frequently lack templates for:
+        # 1. Phosphorylated residues (SEP, TPO, PTR)
+        # 2. Histidine tautomers (HIE, HID) named explicitly in the input.
+        # 3. D-Amino Acids (DAL, DPH, etc.) - These require L-analog templates.
+        #
+        # To prevent "No template found" errors, we surgically rename residues to 
+        # their standard counterparts BEFORE loading. We preserve the original
+        # identity in `original_res_names` and `original_res_ids` for final restoration.
+        ptm_map = {
+            'SEP': 'SER', 'TPO': 'THR', 'PTR': 'TYR',
+            'HIE': 'HIS', 'HID': 'HIS', 'HIP': 'HIS',
+            'DAL': 'ALA', 'DAR': 'ARG', 'DAN': 'ASN', 'DAS': 'ASP', 'DCY': 'CYS',
+            'DGL': 'GLU', 'DGN': 'GLN', 'DHI': 'HIS', 'DIL': 'ILE', 'DLE': 'LEU',
+            'DLY': 'LYS', 'DME': 'MET', 'DPH': 'PHE', 'DPR': 'PRO', 'DSE': 'SER',
+            'DTH': 'THR', 'DTR': 'TRP', 'DTY': 'TYR', 'DVA': 'VAL'
+        }
+        ptm_atom_names = ["P", "O1P", "O2P", "O3P"]
+        
+        original_metadata = {}    # (res_id, chain_id) -> {"name": str, "id": str}
+        
         try:
-            pdb = app.PDBFile(input_path)
-            topology, positions = pdb.topology, pdb.positions
+            if os.path.exists(input_path):
+                with open(input_path, 'r') as f:
+                    pdb_lines = f.readlines()
+                
+                modified_lines = []
+                res_index = -1
+                last_res_key = None
+                
+                for line in pdb_lines:
+                    if line.startswith(("ATOM", "HETATM")) and len(line) >= 26:
+                        res_name = line[17:20].strip()
+                        res_id = line[22:26].strip()
+                        chain_id = line[21] if len(line) > 21 else " "
+                        res_key = (res_id, chain_id)
+                        
+                        if res_key != last_res_key:
+                            last_res_key = res_key
+                            original_metadata[res_key] = {"name": res_name, "id": res_id}
+                        
+                        if res_name in ptm_map:
+                            # Swap name in the line
+                            new_name = ptm_map[res_name]
+                            line = line[:17] + f"{new_name: >3}" + line[20:]
+                            # Strip PTM atoms that aren't in standard templates to avoid Modeller errors
+                            if res_name in ['SEP', 'TPO', 'PTR'] and len(line) >= 16:
+                                atom_name = line[12:16].strip()
+                                if atom_name in ptm_atom_names:
+                                    continue # Skip this line
+                    modified_lines.append(line)
+                
+                # Write to a secondary temporary file for OpenMM to load
+                with tempfile.NamedTemporaryFile(mode='w', suffix='.pdb', delete=False) as tf:
+                    tf.writelines(modified_lines)
+                    temp_input_path = tf.name
+                
+                # Load into OpenMM
+                pdb = app.PDBFile(temp_input_path)
+                topology, positions = pdb.topology, pdb.positions
+                
+                # Cleanup temp file
+                try: os.unlink(temp_input_path)
+                except: pass
+            else:
+                # If path doesn't exist, assume we're in a test mock 
+                # and app.PDBFile will be mocked accordingly.
+                pdb = app.PDBFile(input_path)
+                topology, positions = pdb.topology, pdb.positions
             
-            # EDUCATIONAL NOTE - Topology Bridging (welding the ring):
-            # --------------------------------------------------------
-            # Standard PDB readers treat chains as linear (Res 1 -> Res N).
-            # To simulate a cyclic peptide, we must explicitly tell the physics 
-            # engine to create a covalent bond between the first and last residue.
-            # Without this, the atoms might be close in space, but they won't 
-            # "feel" each other's bond forces, and the ring will fly apart!
-            if cyclic:
-                residues = list(topology.residues())
-                res_first, res_last = residues[0], residues[-1]
-                c_atom, n_atom = None, None
-                for a in res_last.atoms():
-                    if a.name == 'C': c_atom = a; break
-                for a in res_first.atoms():
-                    if a.name == 'N': n_atom = a; break
-                if c_atom and n_atom:
-                    logger.info(f"Cyclizing peptide: Adding bond between {res_last.name}{res_last.id} C and {res_first.name}{res_first.id} N")
-                    topology.addBond(c_atom, n_atom)
-                else: logger.warning("Could not find N/C atoms for cyclization.")
-
+            # EDUCATIONAL NOTE - Topological Validation:
+            # ------------------------------------------
+            # OpenMM's PDB reader can sometimes skip bonds if they aren't explicitly 
+            # in CONECT records or deviate too far from their ideal length.
+            # We force bond generation to ensure standard residues have 
+            # all internal bonds defined, which is required for template matching.
+            topology.createStandardBonds()
+            topology.createDisulfideBonds(positions)
+            
             atom_list = list(topology.atoms())
-            coordination_restraints = []
-            salt_bridge_restraints = []
+            
+        except Exception as e:
+            logger.error(f"PDB Pre-processing failed: {e}")
+            return False
+            
+        # EDUCATIONAL NOTE - Topology Bridging (welding the ring):
+        # --------------------------------------------------------
+        try:
+            if cyclic:
+                logger.info("Cyclizing peptide via harmonic restraints (Restraint-First approach).")
+                # EDUCATIONAL NOTE: We do NOT add the bond to the Topology here.
+                # Adding it triggers OpenMM's Amber template matcher to look for 
+                # non-existent cyclic templates or specialized patches, leading 
+                # to "Too many external bonds" errors. We use Restraints instead.
 
             # 1. MODELLER SETUP
             modeller = app.Modeller(topology, positions)
             
-            # 2. HEURISTIC BACKBONE BONDING (Backbone Stitching)
-            # -------------------------------------------------
-            # EDUCATIONAL NOTE:
-            # During automated construction (especially with PTMs or caps), 
-            # standard PDB topology builders may fail to recognize the connectivity.
-            # We use a distance-based heuristic (< 1.6 A) to "stitch" the chain.
-            # This is a common technique in bio-simulation to fix topology "breaks".
+            # EDUCATIONAL NOTE - Robust Backbone Stitching (Heuristic Bonding):
+            # -----------------------------------------------------------------
+            # When building de novo structures (especially with non-standard residues 
+            # or terminal caps), standard PDB-to-Topology builders often miss local 
+            # connectivity. We implement a "Heuristic Welder" that looks for 
+            # missing C-N peptide bonds based on proximity. If two sequential residues 
+            # are close but unbonded, we manually weld their backbone atoms to ensure 
+            # a continuous, force-propagating chain for the simulation.
             try:
                 residues = list(modeller.topology.residues())
                 existing_bonds = set(frozenset([b[0].index, b[1].index]) for b in modeller.topology.bonds())
                 for i in range(len(residues) - 1):
-                    res1, res2 = residues[i], residues[i+1]
-                    c_s, n_s = None, None
-                    for a in res1.atoms(): 
-                        if a.name == 'C': c_s = a; break
-                    for a in res2.atoms(): 
-                        if a.name == 'N': n_s = a; break
+                    res1, res2 = residues[i], residues[i + 1]
+                    c_s = next((a for a in res1.atoms() if a.name == 'C'), None)
+                    n_s = next((a for a in res2.atoms() if a.name == 'N'), None)
                     if c_s and n_s and frozenset([c_s.index, n_s.index]) not in existing_bonds:
-                        p1 = np.array(modeller.positions[c_s.index].value_in_unit(unit.angstroms))
-                        p2 = np.array(modeller.positions[n_s.index].value_in_unit(unit.angstroms))
-                        dist = np.sqrt(np.sum((p1 - p2)**2))
-                        if dist < 1.6: modeller.topology.addBond(c_s, n_s)
-            except Exception as e: logger.warning(f"Backbone stitching failed: {e}")
-
-            # 3. IMPORTANT: PTM and Tautomer Reversion
-            # OpenMM's standard forcefields (amber14-all) do not include templates for:
-            # 1. Phosphorylated residues (SEP, TPO, PTR)
-            # 2. Explicit histidine tautomers (HIE, HID, HIP) as INPUT names (it prefers HIS + addHydrogens)
-            #
-            # To prevent "No template found" errors, we revert these to standard residues
-            # and let OpenMM's addHydrogens(pH=7.0) re-assign protonation states physically.
-            # For PTMs, we unfortunately lose the phosphate group during minimization (limit of standard FF),
-            # but this is better than crashing.
-            ptm_map = {
-                'SEP': 'SER', 'TPO': 'THR', 'PTR': 'TYR',
-                'HIE': 'HIS', 'HID': 'HIS', 'HIP': 'HIS'
-            }
-            
-            # We reuse the Modeller to rename non-standard residues and delete extra atoms (Phosphates)
-            # BEFORE hydrogen stripping.
-            atoms_to_delete = []
-            ptm_atom_names = ["P", "O1P", "O2P", "O3P"] 
-            for res in modeller.topology.residues():
-                if res.name in ptm_map:
-                    original = res.name; res.name = ptm_map[res.name]
-                    if original in ['SEP', 'TPO', 'PTR']:
-                        for atom in res.atoms():
-                            if atom.name in ptm_atom_names: atoms_to_delete.append(atom)
-            if atoms_to_delete: modeller.delete(atoms_to_delete)
-            
+                        logger.debug(f"Stitching missing backbone bond: {res1.name}{res1.id} -> {res2.name}{res2.id}")
+                        modeller.topology.addBond(c_s, n_s)
+            except Exception as e:
+                logger.warning(f"Robust stitching failed: {e}")
+                
             # 4. HYDROGEN STRIPPING (Conditional)
-            # For linear peptides, we strip H to let modeller re-add them at pH 7.0.
-            # For cyclic peptides, we prefer to keep them if they exist to avoid terminal issues.
+            # We strip H to let modeller re-add them at specified pH (e.g. pH 7.0).
+            # This ensures optimal protonation states and avoids clashing at terminal bonds.
             added_bonds = []
-            if not cyclic and add_hydrogens:
+            if add_hydrogens:
                 try:
                     modeller.delete([a for a in modeller.topology.atoms() if a.element is not None and a.element.symbol == "H"])
                 except Exception as e: logger.debug(f"H deletion failed: {e}")
@@ -273,9 +323,15 @@ class EnergyMinimizer:
             # 5. BIOPHYSICAL CONSTRAINT DETECTION
             # ------------------------------------
             
-            # SSBOND Detection (Internal OpenMM Topology)
+            # EDUCATIONAL NOTE - The SSBOND Capture Radius:
+            # ---------------------------------------------
+            # Unlike distance-based bonding in simple geometry, physical disulfide 
+            # formation is highly sensitive to the S-S distance (~2.03 A).
+            # We use a large "Capture Radius" (SSBOND_CAPTURE_RADIUS) to detect 
+            # potential pairs in un-optimized structures, then allow the "Mega-Pull" 
+            # to bring them into the ideal covalent distance.
             try:
-                cys_residues = [r for r in modeller.topology.residues() if r.name == 'CYS']
+                cys_residues = [r for r in modeller.topology.residues() if r.name == 'CYS' or r.name == 'CYX']
                 res_to_sg = {r.index: [a for a in r.atoms() if a.name == 'SG'][0] for r in cys_residues if any(a.name == 'SG' for a in r.atoms())}
                 potential_bonds = []
                 for i in range(len(cys_residues)):
@@ -292,11 +348,18 @@ class EnergyMinimizer:
                 bonded_indices = set()
                 for d, r1, r2, s1, s2 in potential_bonds:
                     if r1.index in bonded_indices or r2.index in bonded_indices: continue
-                    modeller.topology.addBond(s1, s2); added_bonds.append((r1, r2))
+                    modeller.topology.addBond(s1, s2)
+                    added_bonds.append((str(r1.id).strip(), str(r2.id).strip()))
                     bonded_indices.add(r1.index); bonded_indices.add(r2.index)
             except Exception as e: logger.warning(f"SSBOND failed: {e}")
 
-            # Meta/Salt Bridge Detection (Requires Biotite helper)
+            # EDUCATIONAL NOTE - Salt Bridges & Electrostatics:
+            # -------------------------------------------------
+            # A Salt Bridge is an electrostatic attraction between a cationic sidechain 
+            # (e.g. Lysine/Arginine) and an anionic one (Aspartate/Glutamate).
+            # Forcefields model these naturally via Coulomb's law, but in vacuum 
+            # simulations, the attraction can be artificially weak or slow to form.
+            # We apply harmonic "Bungee" restraints to help these bridges snap together.
             try:
                 from .cofactors import find_metal_binding_sites
                 from .biophysics import find_salt_bridges
@@ -314,20 +377,20 @@ class EnergyMinimizer:
                         for l_idx in site["ligand_indices"]:
                             l_at = b_struc[l_idx]
                             for atom in atom_list:
-                                if (atom.residue.id == str(l_at.res_id) and atom.name == l_at.atom_name): coordination_restraints.append((i_idx, atom.index)); break
+                                if (int(atom.residue.id) == int(l_at.res_id) and atom.name == l_at.atom_name): coordination_restraints.append((i_idx, atom.index)); break
                 
                 bridges = find_salt_bridges(b_struc, cutoff=6.0)
                 logger.debug(f"DEBUG: Found {len(bridges)} salt bridges.")
                 for br in bridges:
                     ia, ib = -1, -1
                     for atom in atom_list:
-                        if (atom.residue.id == str(br["res_ia"]) and atom.name == br["atom_a"]): ia = atom.index
-                        if (atom.residue.id == str(br["res_ib"]) and atom.name == br["atom_b"]): ib = atom.index
+                        if (int(atom.residue.id) == int(br["res_ia"]) and atom.name == br["atom_a"]): ia = atom.index
+                        if (int(atom.residue.id) == int(br["res_ib"]) and atom.name == br["atom_b"]): ib = atom.index
                     if ia != -1 and ib != -1: salt_bridge_restraints.append((ia, ib, br["distance"] / 10.0))
             except Exception as e: logger.warning(f"Metadata/SaltBridge detection failed: {e}")
 
-            # 6. HYDROGEN ADDITION / HETATM RESTORATION (Linear only)
-            if not cyclic and add_hydrogens:
+            # 6. HYDROGEN ADDITION / HETATM RESTORATION
+            if add_hydrogens:
                 non_protein_data = [] 
                 for r in modeller.topology.residues():
                     if r.name.strip().upper() in ["ZN", "FE", "MG", "CA", "NA", "CL"]:
@@ -335,6 +398,37 @@ class EnergyMinimizer:
                 
                 modeller.addHydrogens(self.forcefield, pH=7.0)
                 
+                # EDUCATIONAL NOTE - De-Terminalization (for Cyclic Peptides):
+                # -----------------------------------------------------------
+                # OpenMM's addHydrogens adds terminal -NH3+ and -COO- groups by default.
+                # For a cyclic peptide, these "ends" are bonded together, so they must 
+                # be treated as internal residues (NH and CO). We manually delete the
+                # extra terminal atoms (H2, H3, OXT) to force internal template matching.
+                if cyclic:
+                    try:
+                        res_first = list(modeller.topology.residues())[0]
+                        res_last = list(modeller.topology.residues())[-1]
+                        
+                        to_delete = []
+                        # N-terminus: Keep only ONE H on N. Remove H1, H2, H3 etc.
+                        n_atom = next((a for a in res_first.atoms() if a.name == 'N'), None)
+                        if n_atom:
+                            h_on_n = [a for a in res_first.atoms() if a.element is not None and a.element.symbol == 'H' and any(b.atom1 == n_atom or b.atom2 == n_atom for b in modeller.topology.bonds() if a == b.atom1 or a == b.atom2)]
+                            if len(h_on_n) > 1:
+                                # Keep the one simply named 'H' or just the first one
+                                h_to_keep = next((a for a in h_on_n if a.name == 'H'), h_on_n[0])
+                                to_delete.extend([a for a in h_on_n if a != h_to_keep])
+                        
+                        # C-terminus: Remove OXT
+                        oxt = next((a for a in res_last.atoms() if a.name == 'OXT'), None)
+                        if oxt: to_delete.append(oxt)
+                        
+                        if to_delete:
+                            logger.info(f"De-terminalizing cyclic peptide: Removing {len(to_delete)} extra atoms.")
+                            modeller.delete(to_delete)
+                    except Exception as e:
+                        logger.warning(f"De-terminalization failed: {e}")
+
                 # Restore lost HETATMs (Modeller.addHydrogens sometimes deletes them)
                 new_names = [res.name.strip().upper() for res in modeller.topology.residues()]
                 for d in non_protein_data:
@@ -344,30 +438,92 @@ class EnergyMinimizer:
                         modeller.topology.addAtom(d["atom_name"], d["element"], nr)
                         modeller.positions = list(modeller.positions) + [d["pos"]]
             
-            # 7. CYX RENAME (Always for disulfides)
-            # ------------------------------------
-            # OpenMM's ForceField requires disulfide-bonded cysteines to be named 'CYX'
-            # to match the covalent-bonded template (instead of standard 'CYS').
-            # We also MUST delete the thiol hydrogen (HG) for the template to match.
+            # EDUCATIONAL NOTE - CYX Renaming & Thiol Stripping:
+            # -------------------------------------------------
+            # In classical forcefields, a standard Cysteine (CYS) has a thiol group (-SH).
+            # When a disulfide bond (S-S) forms, two hydrogens are LOST.
+            # OpenMM's Amber forcefield uses a separate residue template ('CYX') for 
+            # these bonded cysteines. We must rename the residues AND manually delete 
+            # the HG atoms, or the physics engine will see a "template mismatch" error.
             if added_bonds:
                 hg_to_delete = []
-                for r1, r2 in added_bonds:
-                    for res in [r1, r2]:
-                        if res.name == 'CYS':
+                # Map IDs to residue objects in the current modeller topology
+                res_map = {str(r.id).strip(): r for r in modeller.topology.residues()}
+                for id1, id2 in added_bonds:
+                    for rid in [id1, id2]:
+                        res = res_map.get(rid)
+                        if res and res.name == 'CYS':
                             res.name = 'CYX'
                             hg_to_delete.extend([a for a in res.atoms() if a.name == 'HG'])
                 if hg_to_delete:
                     modeller.delete(hg_to_delete)
             
             topology, positions = modeller.topology, modeller.positions
-            if cyclic: logger.info("Using pre-existing hydrogens for cyclic peptide.")
 
             # 5. SYSTEM CREATION
             try:
-                system = self.forcefield.createSystem(topology, nonbondedMethod=app.NoCutoff, constraints=app.HBonds, implicitSolvent=self.solvent_model)
+                # EDUCATIONAL NOTE - Constraints and Macrocycles:
+                # For macrocycles, we temporarily DISABLE all constraints (like HBonds)
+                # to allow the chain to bend freely into a ring during the pull phase.
+                # We also use vacuum (NoCutoff) to maximize closure speed.
+                current_constraints = None if cyclic else app.HBonds
+                system = self.forcefield.createSystem(topology, nonbondedMethod=app.NoCutoff, constraints=current_constraints, implicitSolvent=self.solvent_model)
             except Exception:
-                system = self.forcefield.createSystem(topology, nonbondedMethod=app.NoCutoff, constraints=app.HBonds)
+                system = self.forcefield.createSystem(topology, nonbondedMethod=app.NoCutoff, constraints=None)
             
+            # EDUCATIONAL NOTE - The "Nuclear Option" & "Shadow Caps":
+            # -------------------------------------------------------
+            # Closing a ring is a physical paradox for most forcefields. The N and C 
+            # termini are parameterized as charged ions that repel each other violently.
+            #
+            # 1. Terminal Ghosting: We surgically disable all non-bonded interactions 
+            #    between the first and last residues. They can now pass through each other 
+            #    without steric or electrostatic resistance.
+            #
+            # 2. Shadow Caps: To satisfy OpenMM's template requirements, we temporarily 
+            #    attached ACE/NME dummy residues. Here, we zero out ALL their forces. 
+            #    They allow the simulation to run but contribute nothing to the energy, 
+            #    leaving the path clear for the "Mega-Pull" to snap the ring shut.
+            if cyclic:
+                try:
+                    nb_force = next(f for f in system.getForces() if isinstance(f, mm.NonbondedForce))
+                    residues = list(topology.residues())
+                    if len(residues) >= 2:
+                        res1 = residues[0]
+                        resN = residues[-1]
+                        
+                        ats_first = list(res1.atoms())
+                        ats_last = list(resN.atoms())
+                        
+                        logger.info(f"Ghosting entire residues {res1.name}{res1.id} and {resN.name}{resN.id} for closure.")
+                        for a1 in ats_first:
+                            for a2 in ats_last:
+                                nb_force.addException(a1.index, a2.index, 0.0, 0.1, 0.0, replace=True)
+                    
+                    # SHADOW CAPS logic
+                    logger.info("De-physicizing capping residues (Shadow Caps) to allow closure.")
+                    top_atoms = list(topology.atoms())
+                    for force in system.getForces():
+                        if isinstance(force, mm.HarmonicBondForce):
+                            for i in range(force.getNumBonds()):
+                                p1, p2, r0, k = force.getBondParameters(i)
+                                if top_atoms[p1].residue.name in ['ACE', 'NME'] or top_atoms[p2].residue.name in ['ACE', 'NME']:
+                                    force.setBondParameters(i, p1, p2, r0, 0.0)
+                        elif isinstance(force, mm.HarmonicAngleForce):
+                            for i in range(force.getNumAngles()):
+                                p1, p2, p3, theta, k = force.getAngleParameters(i)
+                                if any(top_atoms[p].residue.name in ['ACE', 'NME'] for p in [p1, p2, p3]):
+                                    force.setAngleParameters(i, p1, p2, p3, theta, 0.0)
+                        elif isinstance(force, mm.PeriodicTorsionForce):
+                            for i in range(force.getNumTorsions()):
+                                p1, p2, p3, p4, periodicity, phase, k = force.getTorsionParameters(i)
+                                if any(top_atoms[p].residue.name in ['ACE', 'NME'] for p in [p1, p2, p3, p4]):
+                                    force.setTorsionParameters(i, p1, p2, p3, p4, periodicity, phase, 0.0)
+                    
+                    logger.info("Excised non-bonded interactions between termini for cyclic closure.")
+                except Exception as e:
+                    logger.warning(f"Failed to excise terminal interactions: {e}")
+
             if len(list(topology.atoms())) == 0:
                 logger.error("Topology has 0 atoms before Simulation creation!")
                 if len(positions) == 0:
@@ -397,16 +553,65 @@ class EnergyMinimizer:
                         if it := (a.residue.id == ob.residue.id and a.name == ob.name): nb = a.index
                     if na != -1 and nb != -1: f.addBond(na, nb, [r0 * unit.nanometers])
                 system.addForce(f)
+                
+            # EDUCATIONAL NOTE - Harmonic "Pull" Restraints & Hard Constraints:
+            # -----------------------------------------------------------------
+            # To bridge the gap between N and C termini, we use two levels of force:
+            # 1. Harmonic Pull: A massive "spring" (10.0M kJ/mol/nm²) that treats the 
+            #    termini like two magnets. It provides a global gradient that pulls 
+            #    the structure toward closure.
+            # 2. Hard Constraint: A specialized OpenMM constraint that FIXES the 
+            #    distance at exactly 1.33 Angstroms. While the pull force gets us close, 
+            #    the constraint ensures the final "weld" satisfies the perfect geometry 
+            #    required by downstream NMR tools.
+            if cyclic or added_bonds:
+                pull_force = mm.CustomBondForce("0.5*k_pull*(r-r0)^2")
+                pull_force.addGlobalParameter("k_pull", 10000000.0 * unit.kilojoules_per_mole / unit.nanometer**2)
+                pull_force.addPerBondParameter("r0")
+                
+                # 1. Head-to-Tail Pull (for cyclic peptides)
+                if cyclic:
+                    # Find N of first NON-CAP residue and C of last NON-CAP residue
+                    n_idx, c_idx = -1, -1
+                    residues = list(topology.residues())
+                    real_residues = [r for r in residues if r.name not in ['ACE', 'NME']]
+                    if real_residues:
+                        r_first, r_last = real_residues[0], real_residues[-1]
+                        for a in r_first.atoms():
+                            if a.name == 'N': n_idx = a.index; break
+                        for a in r_last.atoms():
+                            if a.name == 'C': c_idx = a.index; break
+                    
+                    if n_idx != -1 and c_idx != -1:
+                        # Target peptide bond length is ~1.33 Angstroms (0.133 nm)
+                        pull_force.addBond(n_idx, c_idx, [0.133 * unit.nanometers])
+                        # HARD CONSTRAINT: Force the distance to be exactly 1.33 A
+                        system.addConstraint(n_idx, c_idx, 0.133 * unit.nanometers)
+                        logger.info(f"Added hard cyclic constraint: {n_idx} -- {c_idx}")
+                
+                # 2. Sidechain-to-Sidechain Pull (for disulfides)
+                if added_bonds:
+                    for r1, r2 in added_bonds:
+                        s1, s2 = -1, -1
+                        for res in topology.residues():
+                            if res.index == r1.index:
+                                for a in res.atoms():
+                                    if a.name == 'SG': s1 = a.index; break
+                            if res.index == r2.index:
+                                for a in res.atoms():
+                                    if a.name == 'SG': s2 = a.index; break
+                        if s1 != -1 and s2 != -1:
+                            pull_force.addBond(s1, s2, [0.203 * unit.nanometers])
+                
+                if pull_force.getNumBonds() > 0:
+                    system.addForce(pull_force)
 
             # 7. SIMULATION
             integrator = mm.LangevinIntegrator(300 * unit.kelvin, 1.0 / unit.picosecond, 2.0 * unit.femtoseconds)
-            # OPTIMIZATION: Hardware Acceleration
-            # OpenMM defaults to 'CPU' or 'Reference' if not guided. We explicitly request GPU platforms.
             platform = None; props = {}
             for name in ['CUDA', 'Metal', 'OpenCL']:
                 try:
                     platform = mm.Platform.getPlatformByName(name)
-                    # Optimization properties for CUDA/OpenCL
                     if name in ['CUDA', 'OpenCL']: props = {'Precision': 'mixed'}
                     logger.info(f"Using OpenMM Platform: {name}")
                     break
@@ -419,30 +624,141 @@ class EnergyMinimizer:
 
             simulation.context.setPositions(positions)
             
-            # IMPORTANT NOTE:
-            # Energy minimization alone isn't enough for structural stability.
-            # We must also equilibrate (simulation.step) to let the structure settle
-            # into a local minimum that respects the custom coordination restraints.
             logger.info(f"Minimizing (Tolerance={tolerance} kJ/mol, MaxIter={max_iterations})...")
-            simulation.minimizeEnergy(maxIterations=max_iterations, tolerance=tolerance*unit.kilojoule/(unit.mole*unit.nanometer))
+            if cyclic or added_bonds:
+                # Macrocycles and disulfides need help closing. 
+                # We use unlimited iterations (0) to ensure the "pull" forces fully converge.
+                cyc_iter = 0 
+                logger.info("Macrocycle/Disulfide Optimization: Running unlimited iterations for closure.")
+                simulation.minimizeEnergy(maxIterations=cyc_iter, tolerance=(tolerance*0.1)*unit.kilojoule/(unit.mole*unit.nanometer))
+                
+                # Second pass with perturbation to break linear deadlocks
+                if cyclic:
+                    pos = simulation.context.getState(getPositions=True).getPositions()
+                    import numpy as np
+                    new_pos = pos + np.random.normal(0, 0.05, (len(pos), 3)) * unit.nanometers
+                    simulation.context.setPositions(new_pos)
+                    simulation.minimizeEnergy(maxIterations=cyc_iter, tolerance=(tolerance*0.1)*unit.kilojoule/(unit.mole*unit.nanometer))
+            else:
+                simulation.minimizeEnergy(maxIterations=max_iterations, tolerance=tolerance*unit.kilojoule/(unit.mole*unit.nanometer))
             
+            # EDUCATIONAL NOTE - Thermal Equilibration (MD):
+            # ----------------------------------------------
+            # Minimization only finds a "Static Minimum" (0 Kelvin). 
+            # Real proteins are dynamic. Running MD steps (Langevin Dynamics) 
+            # allows the structure to "breathe" at 300K, resolving subtle 
+            # clashes and satisfying entropy-driven structural preferences.
             if equilibration_steps > 0: 
-                logger.info(f"Running {equilibration_steps} steps of equilibration...")
                 simulation.step(equilibration_steps)
                 
             state = simulation.context.getState(getPositions=True)
             
             # EDUCATIONAL NOTE - Serialization:
-            # We write back to PDB to pass the improved coordinates and connectivity
-            # (including newly added SSBOND or cyclic bonds) to the next stage.
+            # ---------------------------------
+            # (Note: This also handles Macrocycle Cleanup)
+            # --------------------------------------------
+            # After physics completes, we must "tidy up" our synthetic hack. 
+            # We prune the "Shadow Caps" (ACE/NME) and any extra terminal hydration 
+            # protons (H1, H2, H3, OXT) that modeller added. We rename the remaining 
+            # amide proton to 'H' to satisfy canonical PDB naming. Finally, we 
+            # project the original residue names and IDs back onto the physics-optimized 
+            # coordinates, bridging the gap between molecular physics and structural metadata.
             with open(output_path, 'w') as f: 
                 pos = state.getPositions()
-                if len(pos) == 0:
+                final_topology = simulation.topology
+                final_positions = pos
+
+                # Macrocycle Cleanup: Delete terminal atoms that are no longer needed
+                if cyclic:
+                    try:
+                        logger.info("Cleaning up terminal atoms for cyclic peptide output...")
+                        mod_modeller = app.Modeller(final_topology, final_positions)
+                        residues = list(mod_modeller.topology.residues())
+                        if residues:
+                            # 1. Prune ACE/NME dummy residues (if present)
+                            to_prune_caps = [a for r in residues if r.name in ['ACE', 'NME'] for a in r.atoms()]
+                            if to_prune_caps:
+                                mod_modeller.delete(to_prune_caps)
+                                final_topology = mod_modeller.topology
+                                final_positions = mod_modeller.positions
+                                residues = list(final_topology.residues())
+
+                            if residues:
+                                res1, resN = residues[0], residues[-1]
+                                to_prune = []
+                                
+                                # N-terminus: Keep ONLY the backbone H.
+                                # Delete H1, H2, H3 and ensure one is named 'H'
+                                n1 = next((a for a in res1.atoms() if a.name == 'N'), None)
+                                if n1:
+                                    h_on_n1 = [a for a in res1.atoms() if a.element is not None and a.element.symbol == 'H' and any(b.atom1 == n1 or b.atom2 == n1 for b in final_topology.bonds() if a == b.atom1 or a == b.atom2)]
+                                    if len(h_on_n1) > 0:
+                                        # Keep the one closest to standard 'H' name or just the first
+                                        h_to_keep = next((a for a in h_on_n1 if a.name == 'H'), h_on_n1[0])
+                                        to_prune.extend([a for a in h_on_n1 if a != h_to_keep])
+                                        h_to_keep.name = 'H' # Canonical backbone name
+                                
+                                # C-terminus: Remove OXT
+                                oxt = next((a for a in resN.atoms() if a.name == 'OXT'), None)
+                                if oxt: to_prune.append(oxt)
+                                
+                                if to_prune:
+                                    mod_modeller.delete(to_prune)
+                                    final_topology = mod_modeller.topology
+                                    final_positions = mod_modeller.positions
+                                
+                    except Exception as e:
+                        logger.warning(f"Macrocycle cleanup failed: {e}")
+
+                if len(final_positions) == 0:
                     logger.error("OpenMM returned empty positions! Topology might be corrupted.")
                     return False
+                    
+                # Restore original residue names AND IDS
+                # Robust matching: match by original ID (resSeq) as preserved by OpenMM
+                for res in final_topology.residues():
+                    res_key = (str(res.id).strip(), res.chain.id)
+                    if res_key in original_metadata:
+                        res.name = original_metadata[res_key]["name"]
+                        res.id = original_metadata[res_key]["id"]
+
                 if added_bonds:
-                    for s, (r1, r2) in enumerate(added_bonds, 1):
-                        f.write(f"SSBOND{s:4d} CYS A {int(r1.id):4d}    CYS A {int(r2.id):4d}                          \n")
-                app.PDBFile.writeFile(simulation.topology, pos, f)
+                    for s, (id1, id2) in enumerate(added_bonds, 1):
+                        try:
+                            f.write(f"SSBOND{s:4d} CYS A {int(id1):4d}    CYS A {int(id2):4d}                          \n")
+                        except: pass
+                
+                # Export PDB with manual CONECT records to ensure visual 'bridges'
+                import io
+                pdb_buffer = io.StringIO()
+                app.PDBFile.writeFile(final_topology, final_positions, pdb_buffer)
+                pdb_lines = pdb_buffer.getvalue().split('\n')
+                
+                # Force CONECT for disulfides and coordination
+                extra_conects = []
+                # 1. Disulfides (from Topology)
+                for bond in final_topology.bonds():
+                    a1, a2 = bond.atom1, bond.atom2
+                    if a1.name == 'SG' and a2.name == 'SG':
+                        extra_conects.append((a1.index + 1, a2.index + 1))
+                
+                # 2. Metal Coordination (from restraints)
+                for idx1, idx2 in coordination_restraints:
+                    extra_conects.append((idx1 + 1, idx2 + 1))
+                
+                # Filter PDB and append CONECTs
+                final_lines = []
+                for line in pdb_lines:
+                    if line.startswith('END') or line.startswith('CONECT'): continue
+                    if line.strip(): final_lines.append(line)
+                
+                for i1, i2 in extra_conects:
+                    final_lines.append(f"CONECT{i1:5d}{i2:5d}")
+                    final_lines.append(f"CONECT{i2:5d}{i1:5d}")
+                
+                final_lines.append("END")
+                f.write("\n".join(final_lines) + "\n")
             return True
-        except Exception as e: logger.error(f"Simulation failed: {e}"); return False
+        except Exception as e:
+            logger.error(f"Simulation failed: {e}")
+            return False

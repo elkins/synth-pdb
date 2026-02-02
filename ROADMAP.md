@@ -41,9 +41,9 @@ Sorted by **High-Value / Low-Risk** first.
 *   **Use Case**: Capturing "water-bridging" interactions that stabilize specific conformations.
 *   **Risk**: Medium. Increases minimization time significantly.
 
-### 2. 💍 Macrocycle Design Lab (Cyclic Peptides)
-*   **Objective**: Explore the generation of random cyclic peptides and visualize the "closure" of the macrocycle via physics-based minimization.
-*   **Key Features**: `--cyclic`, `--minimize`, and `--refine-clashes`.
+### 2. ✅ Macrocycle Design Lab (Cyclic Peptides)
+*   **Result**: Implemented modeling for Oxytocin (disulfide) and Cyclosporine A (cyclic/D-amino).
+*   **Demo**: [hormone_lab.ipynb](file:///Users/georgeelkins/nmr/synth-pdb/examples/ml_integration/hormone_lab.ipynb)
 *   **Value**: Macrocycles are at the forefront of drug discovery. An AI model that can design cyclic peptides needs a training set of realistic closed loops, which standard PDBs lack in sufficient quantity.
 
 ---

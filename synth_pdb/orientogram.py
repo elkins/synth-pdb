@@ -11,7 +11,24 @@ def compute_6d_orientations(
     """
     Computes 6D inter-residue orientations for all pairs of residues.
     This follows the trRosetta convention: (dist, omega, theta, phi).
+
+    ### EDUCATIONAL NOTE - trRosetta 6D Orientations:
+    -------------------------------------------------
+    In protein structure prediction (like trRosetta or AlphaFold), 3D geometry 
+    is often described by 4 parameters between residue pairs (i, j):
+    1. dist:  Distance between C-beta atoms (or virtual CB for Glycine).
+    2. omega: Dihedral angle (Ca_i, Cb_i, Cb_j, Ca_j).
+    3. theta: Angle (Ca_i, Cb_i, Cb_j).
+    4. phi:   Dihedral angle (N_i, Ca_i, Cb_i, Cb_j).
+
+    These parameters completely define the relative position and orientation 
+    of two residues in space. Because they are "Internal Coordinates", they 
+    are invariant to global rotation and translation, making them ideal 
+    features for Machine Learning models.
     
+    In this tool, we use NeRF (Natural Extension Reference Frame) to reconstruct 
+    the "Virtual C-beta" for Glycine, ensuring the 6D map is dense and consistent.
+
     Args:
         coords: (B, N_atoms, 3) tensor of atomic coordinates.
         atom_names: List of atom names for the N_atoms.

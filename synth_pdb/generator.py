@@ -905,11 +905,19 @@ def generate_pdb_content(
         res_name = full_res_name[2:] if is_d else full_res_name
         
         # Determine backbone coordinates based on previous residue or initial placement
-
         # Determine conformation for this residue
         # Use 0-based index to lookup in dictionary
         # Default to 'alpha' if not specified (though _parse_structure_regions handles this mostly)
+
+        # If no conformation specified and (cyclic OR potential disulfide loop), 
+        # use 'curved' for better initial overlap.
         res_conformation = residue_conformations.get(i, conformation)
+        if res_conformation == 'alpha' and not structure:
+             # Search the resolved sequence (list of 3-letter codes)
+             cys_count = sum(1 for aa in sequence if "CYS" in aa.upper() or "DCY" in aa.upper())
+             if cyclic or cys_count >= 2:
+                  res_conformation = 'curved'
+        
         # Compatibility alias for rotamer selection logic downstream
         current_conformation = res_conformation
         
@@ -1181,6 +1189,16 @@ def generate_pdb_content(
                 # Keep within standard PDB dihedral range [-180, 180]
                 current_phi = ((current_phi + 180) % 360) - 180
                 current_psi = ((current_psi + 180) % 360) - 180
+            
+            # EDUCATIONAL NOTE - Chiral Inversion (The Backbone Mirror):
+            # D-amino acids are stereochemically the mirror image of standard L-amino acids.
+            # This applies not just to the sidechains, but to the backbone energetic landscape.
+            # A D-residue naturally "wants" to have Phi/Psi angles that are the negative of
+            # its L-counterpart. We multiply by -1.0 to reflect the conformation into 
+            # the "right-handed" region of the Ramachandran plot.
+            if is_d:
+                current_phi *= -1.0
+                current_psi *= -1.0
                  
             c_coord = _place_atom_with_dihedral(
                 prev_c_coord, n_coord, ca_coord,
@@ -1471,13 +1489,12 @@ def generate_pdb_content(
                 # Use atomic content + minimal header
                 
                 # CRITICAL Fix for OpenMM:
-                # OpenMM's addHydrogens is robust if we start with clean headers.
-                # But inputting existing Hydrogens (from Biotite templates) often causes
-                # template mismatch errors ("too many H atoms" or naming issues).
-                # So we STRIP all hydrogens before passing to OpenMM for standard linear chains.
-                # FOR CYCLIC: We KEEP them to help OpenMM identify internal residues vs termini.
+                # OpenMM's Amber forcefield requires terminal capping groups (ACE/NME) 
+                # or standard protonation states to match templates.
+                # For CYCLIC peptides, we temporarily add caps to satisfy the engine,
+                # then prune them in physics.py cleanup.
                 if cyclic:
-                    peptide_to_save = peptide
+                    peptide_to_save = biophysics.cap_termini(peptide)
                 else:
                     peptide_to_save = peptide[peptide.element != "H"]
                 
@@ -1714,7 +1731,9 @@ def generate_pdb_content(
             s1 = sg_serials.get(r1)
             s2 = sg_serials.get(r2)
             if s1 and s2:
+                # Add both directions for bidirectional CONECT
                 conect_records.append(f"CONECT{s1:5d}{s2:5d}".ljust(80))
+                conect_records.append(f"CONECT{s2:5d}{s1:5d}".ljust(80))
 
     conect_block = "\n".join(conect_records)
     if conect_block:

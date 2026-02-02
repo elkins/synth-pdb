@@ -158,6 +158,12 @@ RAMACHANDRAN_PRESETS: Dict[str, Dict[str, float]] = {
         'phi': -120.0,  # Extended/stretched conformation
         'psi': 120.0,
     },
+    'curved': {
+        # A specialized "tight" conformation to help the initial guess of cyclic peptides 
+        # have N and C ends meet in 3D space.
+        'phi': -80.0,
+        'psi': -20.0,
+    },
     # Residue-specific for random sampling
     'GLY': {
         'phi_mean': 0.0,

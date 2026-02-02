@@ -31,6 +31,7 @@ class TestDocumentationIntegrity(unittest.TestCase):
         self.dataset_path = os.path.join(self.base_dir, 'synth_pdb', 'dataset.py')
         self.batch_generator_path = os.path.join(self.base_dir, 'synth_pdb', 'batch_generator.py')
         self.data_path = os.path.join(self.base_dir, 'synth_pdb', 'data.py')
+        self.orientogram_path = os.path.join(self.base_dir, 'synth_pdb', 'orientogram.py')
 
     def _check_file_contains(self, filepath, substrings):
         """Helper to assert file contains list of substrings."""
@@ -264,7 +265,6 @@ class TestDocumentationIntegrity(unittest.TestCase):
             "Atomic Records & B-Factors",
         ]
         self._check_file_contains(readme_path, required_notes)
-
     def test_dataset_educational_notes(self):
         """Ensure dataset.py retains key educational blocks."""
         required_notes = [
@@ -274,3 +274,13 @@ class TestDocumentationIntegrity(unittest.TestCase):
             "Data Factory Overview:",
         ]
         self._check_file_contains(self.dataset_path, required_notes)
+
+    def test_orientogram_educational_notes(self):
+        """Ensure orientogram.py retains orientations note."""
+        required_notes = [
+            "EDUCATIONAL NOTE - trRosetta 6D Orientations:",
+            "dist, omega, theta, phi",
+            "Internal Coordinates",
+            "Virtual C-beta",
+        ]
+        self._check_file_contains(self.orientogram_path, required_notes)

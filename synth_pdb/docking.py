@@ -35,11 +35,54 @@ class DockingPrep:
             bool: True if successful.
         """
         try:
-            # 1. Load PDB
-            pdb = app.PDBFile(input_pdb)
+            import tempfile
+            import os
+            # 0. PDB PRE-PROCESSING (Standardize residues for OpenMM)
+            ptm_map = {
+                'SEP': 'SER', 'TPO': 'THR', 'PTR': 'TYR',
+                'HIE': 'HIS', 'HID': 'HIS', 'HIP': 'HIS',
+                'DAL': 'ALA', 'DAR': 'ARG', 'DAN': 'ASN', 'DAS': 'ASP', 'DCY': 'CYS',
+                'DGL': 'GLU', 'DGN': 'GLN', 'DHI': 'HIS', 'DIL': 'ILE', 'DLE': 'LEU',
+                'DLY': 'LYS', 'DME': 'MET', 'DPH': 'PHE', 'DPR': 'PRO', 'DSE': 'SER',
+                'DTH': 'THR', 'DTR': 'TRP', 'DTY': 'TYR', 'DVA': 'VAL'
+            }
+            ptm_atom_names = ["P", "O1P", "O2P", "O3P"]
             
+            with open(input_pdb, 'r') as f:
+                pdb_lines = f.readlines()
+            
+            modified_lines = []
+            for line in pdb_lines:
+                if line.startswith(("ATOM", "HETATM")):
+                    res_name = line[17:20].strip()
+                    if res_name in ptm_map:
+                        new_name = ptm_map[res_name]
+                        line = line[:17] + f"{new_name: >3}" + line[20:]
+                        if res_name in ['SEP', 'TPO', 'PTR']:
+                            atom_name = line[12:16].strip()
+                            if atom_name in ptm_atom_names: continue
+                modified_lines.append(line)
+            
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.pdb', delete=False) as tf:
+                tf.writelines(modified_lines)
+                temp_input_path = tf.name
+                
+            # 1. Load PDB
+            pdb = app.PDBFile(temp_input_path)
+            topology, positions = pdb.topology, pdb.positions
+            
+            # EDUCATIONAL NOTE: Ensure connectivity before hydrogen addition
+            topology.createStandardBonds()
+            topology.createDisulfideBonds(positions)
+            
+            # Cleanup
+            try: os.unlink(temp_input_path)
+            except: pass
+
             # 2. Add Hydrogens (Crucial for correct charge assignment)
-            modeller = app.Modeller(pdb.topology, pdb.positions)
+            modeller = app.Modeller(topology, positions)
+            # STRIP existing H to avoid template mismatches/conflicts
+            modeller.delete([a for a in modeller.topology.atoms() if a.element is not None and a.element.symbol == "H"])
             modeller.addHydrogens(self.forcefield, pH=7.4) # Physiological pH
             
             # 3. Create System to get forces (charges/sigmas)

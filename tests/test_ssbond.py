@@ -46,6 +46,7 @@ Understanding disulfide bonds teaches:
 4. Importance of cellular environment (oxidizing vs reducing)
 """
 
+
 import pytest
 import numpy as np
 from synth_pdb.generator import generate_pdb_content
@@ -53,6 +54,7 @@ import biotite.structure.io as strucio
 import biotite.structure as struc
 import tempfile
 import os
+import re
 
 
 class TestDisulfideBonds:
@@ -208,32 +210,82 @@ class TestDisulfideBonds:
     
     def test_ssbond_in_generated_pdb(self):
         """
-        Test that SSBOND records appear in generated PDB files.
-        
-        EDUCATIONAL NOTE - Integration:
-        SSBOND records should appear in the PDB header, typically:
-        - After REMARK records
-        - Before SEQRES records
-        - In the header section (before ATOM records)
-        
-        This allows structure viewers and analysis tools to:
-        - Display disulfide bonds correctly
-        - Calculate bond energies
-        - Understand protein stability
+        Test that SSBOND and CONECT records appear in generated PDB files.
         """
         # Generate structure with cysteines
         pdb_content = generate_pdb_content(sequence_str="CCCCC", conformation='alpha')
         
         # Check if SSBOND records are present (if any disulfides detected)
-        # Note: May not have any in random structure, which is OK
         if 'SSBOND' in pdb_content:
-            # Verify format
+            # Verify SSBOND format
             ssbond_lines = [l for l in pdb_content.split('\n') if l.startswith('SSBOND')]
             assert len(ssbond_lines) > 0
             
             for line in ssbond_lines:
                 assert 'CYS' in line
-                assert len(line) >= 30  # Minimum length for SSBOND record
+                assert len(line) >= 30
+            
+            # Verify CONECT format (New Requirement)
+            # When a disulfide is present, the SG atoms should be linked via CONECT
+            conect_lines = [l for l in pdb_content.split('\n') if l.startswith('CONECT')]
+            assert len(conect_lines) >= 2, "Disulfide found but no CONECT records generated"
+            
+            # Check for reciprocity
+            # If atom X is connected to Y, Y matches X
+            import re
+            conect_pairs = []
+            for line in conect_lines:
+                parts = re.findall(r'\d+', line[6:])
+                if len(parts) >= 2:
+                    conect_pairs.append(tuple(sorted((int(parts[0]), int(parts[1])))))
+            
+            assert len(conect_pairs) > 0, "No valid CONECT pairs found in records"
+
+    def test_ssbond_and_conect_correlation(self):
+        """
+        Verify that SSBOND header records have corresponding CONECT records.
+        """
+        # We need a predictable structure. CGGGGC cyclic forces 1-6 proximity.
+        from synth_pdb.physics import HAS_OPENMM
+        if not HAS_OPENMM:
+            pytest.skip("Requires OpenMM for disulfide closure logic")
+            
+        pdb_content = generate_pdb_content(
+            sequence_str="CGGGGC",
+            cyclic=True,
+            minimize_energy=True
+        )
+        
+        lines = pdb_content.split('\n')
+        ssbond_lines = [l for l in lines if l.startswith('SSBOND')]
+        conect_lines = [l for l in lines if l.startswith('CONECT')]
+        
+        assert len(ssbond_lines) >= 1
+        assert len(conect_lines) >= 3 # 2 for N-C closure + at least 1 for S-S (bidirectional usually)
+        
+        # Find SG atoms for residues 1 and 6
+        atom_lines = [l for l in lines if l.startswith('ATOM')]
+        sg1_idx = None
+        sg6_idx = None
+        for line in atom_lines:
+            res_id = int(line[22:26].strip())
+            atom_name = line[12:16].strip()
+            atom_idx = int(line[6:11].strip())
+            if res_id == 1 and atom_name == 'SG': sg1_idx = atom_idx
+            if res_id == 6 and atom_name == 'SG': sg6_idx = atom_idx
+            
+        assert sg1_idx is not None
+        assert sg6_idx is not None
+        
+        # Verify CONECT specifically links sg1_idx and sg6_idx
+        ss_conect_found = False
+        for line in conect_lines:
+            parts = [int(p) for p in re.findall(r'\d+', line[6:])]
+            if sg1_idx in parts and sg6_idx in parts:
+                ss_conect_found = True
+                break
+        
+        assert ss_conect_found, f"No CONECT record found between SG1 ({sg1_idx}) and SG6 ({sg6_idx})"
     
     def test_handles_no_cysteines_gracefully(self):
         """

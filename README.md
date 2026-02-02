@@ -7,6 +7,8 @@ A command-line tool to generate Protein Data Bank (PDB) files with full atomic r
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Tests](https://github.com/elkins/synth-pdb/actions/workflows/test.yml/badge.svg)](https://github.com/elkins/synth-pdb/actions/workflows/test.yml)
 
+The following Jupyter Notebook tutorials relying upon synth-pdb are available.
+
 | Tutorial | Action |
 | :--- | :--- |
 | **The Virtual NMR Spectrometer** | [![Open In Colab: Relaxation](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/elkins/synth-pdb/blob/master/interactive_relaxation.ipynb) |
@@ -16,6 +18,7 @@ A command-line tool to generate Protein Data Bank (PDB) files with full atomic r
 | **Bulk Dataset Factory** | [![Open In Colab: Dataset](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/elkins/synth-pdb/blob/master/examples/ml_integration/dataset_factory.ipynb) |
 | **Neural NMR Pipeline** | [![Open In Colab: NMR](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/elkins/synth-pdb/blob/master/examples/ml_integration/neural_nmr_pipeline.ipynb) |
 | **6D Orientogram Lab** | [![Open In Colab: Orientogram](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/elkins/synth-pdb/blob/master/examples/ml_integration/orientogram_lab.ipynb) |
+| **Bio-Active Hormone Lab** | [![Open In Colab: Hormones](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/elkins/synth-pdb/blob/master/examples/ml_integration/hormone_lab.ipynb) |
 
 
 ## Table of Contents
@@ -1108,7 +1111,7 @@ pytest tests/test_generator.py -v
 ```
 
 **Test Coverage**: 95% overall
-- 440 tests covering generation, validation, CLI, and edge cases
+- 446 tests covering generation, validation, CLI, and edge cases
 
 ### Project Structure
 

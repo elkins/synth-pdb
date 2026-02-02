@@ -24,8 +24,32 @@ class TestTopologicalComplexity:
         # 1. Verify SSBOND record (Disulfide)
         assert "SSBOND" in pdb_content, "SSBOND record missing in cyclic-disulfide peptide"
         
-        # 2. Verify CONECT records (Cyclic)
+        # 2. Verify CONECT records (Cyclic Backbone AND Disulfide Bridge)
         assert "CONECT" in pdb_content, "CONECT records missing in cyclic-disulfide peptide"
+        
+        # Verify specific CONECT indices for the disulfide bridge
+        # In CGGGGC: C1 and C6 are the cysteines.
+        # SG atoms are usually atoms 6 and 45 (approx based on earlier runs)
+        # But we should find them dynamically.
+        lines = pdb_content.split('\n')
+        atom_lines = [l for l in lines if l.startswith('ATOM')]
+        sg_indices = []
+        for line in atom_lines:
+            if line[12:16].strip() == 'SG':
+                sg_indices.append(int(line[6:11].strip()))
+        
+        assert len(sg_indices) == 2, f"Expected 2 SG atoms, found {len(sg_indices)}"
+        
+        import re
+        conect_lines = [l for l in lines if l.startswith('CONECT')]
+        ss_conect_found = False
+        for line in conect_lines:
+            parts = [int(p) for p in re.findall(r'\d+', line[6:])]
+            if sg_indices[0] in parts and sg_indices[1] in parts:
+                ss_conect_found = True
+                break
+        
+        assert ss_conect_found, f"Disulfide CONECT missing between {sg_indices[0]} and {sg_indices[1]}"
         
         # 3. Verify N-C Closure
         import io
