@@ -2,7 +2,7 @@
 
 A command-line tool to generate Protein Data Bank (PDB) files with full atomic representation for testing, benchmarking and educational purposes.
 
-[![PyPI version](https://img.shields.io/badge/pypi-v1.14.1-blue)](https://pypi.org/project/synth-pdb/)
+[![PyPI version](https://img.shields.io/badge/pypi-v1.15.0-blue)](https://pypi.org/project/synth-pdb/)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Tests](https://github.com/elkins/synth-pdb/actions/workflows/test.yml/badge.svg)](https://github.com/elkins/synth-pdb/actions/workflows/test.yml)
@@ -18,7 +18,8 @@ The following Jupyter Notebook tutorials relying upon synth-pdb are available.
 | **Bulk Dataset Factory** | [![Open In Colab: Dataset](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/elkins/synth-pdb/blob/master/examples/ml_integration/dataset_factory.ipynb) |
 | **Neural NMR Pipeline** | [![Open In Colab: NMR](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/elkins/synth-pdb/blob/master/examples/ml_integration/neural_nmr_pipeline.ipynb) |
 | **6D Orientogram Lab** | [![Open In Colab: Orientogram](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/elkins/synth-pdb/blob/master/examples/ml_integration/orientogram_lab.ipynb) |
-| **Bio-Active Hormone Lab** | [![Open In Colab: Hormones](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/elkins/synth-pdb/blob/master/examples/ml_integration/hormone_lab.ipynb) |
+| **Bio-Active Hormone Lab** | [![Open In Colab: Hormones](https://colab.research.google.com/github/elkins/synth-pdb/blob/master/examples/ml_integration/hormone_lab.ipynb) |
+| **Framework Handover (JAX/PyTorch/MLX)** | [View Notebooks](file:///Users/georgeelkins/nmr/synth-pdb/examples/ml_loading/) |
 
 
 ## Table of Contents
@@ -633,7 +634,13 @@ coords_tensor = torch.from_numpy(batch.coords).float()
 ### 🚀 Try it in the Cloud
 - **AI Protein Data Factory:** [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/elkins/synth-pdb/blob/master/examples/ml_integration/ml_handover_demo.ipynb)
 
-See the full [ML Integration Demo](file:///Users/georgeelkins/nmr/synth-pdb/examples/ml_integration/ml_handover_demo.ipynb) for examples of Radius of Gyration prediction and JAX/MLX support.
+### 🧩 Framework Specifics
+For detailed examples of how to load generated data into your favorite framework without any performance overhead, see our specialized handover notebooks:
+- [JAX Handover](file:///Users/georgeelkins/nmr/synth-pdb/examples/ml_loading/jax_handover.ipynb) - Zero-copy using `jax.numpy.asarray`.
+- [PyTorch Handover](file:///Users/georgeelkins/nmr/synth-pdb/examples/ml_loading/pytorch_handover.ipynb) - Unified memory mapping with `torch.from_numpy`.
+- [MLX Handover](file:///Users/georgeelkins/nmr/synth-pdb/examples/ml_loading/mlx_handover.ipynb) - Optimized for Apple Silicon (M-series CPUs/GPUs).
+
+See the full [ML Integration Demo](file:///Users/georgeelkins/nmr/synth-pdb/examples/ml_integration/ml_handover_demo.ipynb) for examples of Radius of Gyration prediction and 6D orientation maps.
 
 #### Quality Control (Continued)
 
@@ -1111,7 +1118,7 @@ pytest tests/test_generator.py -v
 ```
 
 **Test Coverage**: 95% overall
-- 446 tests covering generation, validation, CLI, and edge cases
+- 467 tests covering generation, validation, CLI, and edge cases
 
 ### Project Structure
 

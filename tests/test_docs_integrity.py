@@ -32,6 +32,8 @@ class TestDocumentationIntegrity(unittest.TestCase):
         self.batch_generator_path = os.path.join(self.base_dir, 'synth_pdb', 'batch_generator.py')
         self.data_path = os.path.join(self.base_dir, 'synth_pdb', 'data.py')
         self.orientogram_path = os.path.join(self.base_dir, 'synth_pdb', 'orientogram.py')
+        self.special_chemistry_path = os.path.join(self.base_dir, 'synth_pdb', 'special_chemistry.py')
+        self.coupling_path = os.path.join(self.base_dir, 'synth_pdb', 'coupling.py')
 
     def _check_file_contains(self, filepath, substrings):
         """Helper to assert file contains list of substrings."""
@@ -57,6 +59,7 @@ class TestDocumentationIntegrity(unittest.TestCase):
             "Threading",
             "Shuffling",
             "torsion errors (Drift)",
+            'EDUCATIONAL NOTE - RMSD (Root Mean Square Deviation):',
         ]
         self._check_file_contains(self.decoys_path, required_notes)
 
@@ -127,6 +130,18 @@ class TestDocumentationIntegrity(unittest.TestCase):
             "EDUCATIONAL NOTE - Serialization:",
             "EDUCATIONAL NOTE - Anatomy of a Forcefield:",
             "Bonded Terms (Springs)",
+            "EDUCATIONAL NOTE - Explicit vs. Implicit Solvent:",
+            "EDUCATIONAL NOTE - PDB PRE-PROCESSING (OpenMM Template Fix):",
+            "EDUCATIONAL NOTE - Topological Validation:",
+            "EDUCATIONAL NOTE - Robust Backbone Stitching (Heuristic Bonding):",
+            "EDUCATIONAL NOTE - The SSBOND Capture Radius:",
+            "EDUCATIONAL NOTE - Salt Bridges & Electrostatics:",
+            "EDUCATIONAL NOTE - CYX Renaming & Thiol Stripping:",
+            "EDUCATIONAL NOTE - Constraints and Macrocycles:",
+            "EDUCATIONAL NOTE - The \"Nuclear Option\" & \"Shadow Caps\":",
+            "EDUCATIONAL NOTE - Harmonic \"Pull\" Restraints & Hard Constraints:",
+            "EDUCATIONAL NOTE - Thermal Jiggling (Simulated Annealing):",
+            "EDUCATIONAL NOTE - Thermal Equilibration (MD):",
         ]
         self._check_file_contains(self.physics_path, required_notes)
 
@@ -200,6 +215,11 @@ class TestDocumentationIntegrity(unittest.TestCase):
             "Gold Standard",
             "EDUCATIONAL NOTE - Proline Sterics (The \"Proline Effect\"):",
             "structure breaker",
+            "EDUCATIONAL NOTE - The \"Mirror Image\" World:",
+            "EDUCATIONAL NOTE - Backbone Dependency:",
+            "EDUCATIONAL NOTE - Rotamers for Non-Branched Residues:",
+            "EDUCATIONAL NOTE - Aromatic Residues (PHE, TYR, TRP):",
+            "EDUCATIONAL NOTE - Electrostatics vs Sterics:",
         ]
         self._check_file_contains(self.data_path, required_notes)
 
@@ -284,3 +304,23 @@ class TestDocumentationIntegrity(unittest.TestCase):
             "Virtual C-beta",
         ]
         self._check_file_contains(self.orientogram_path, required_notes)
+
+    def test_special_chemistry_educational_notes(self):
+        """Ensure special_chemistry.py retains GFP note."""
+        required_notes = [
+            "EDUCATIONAL OVERVIEW - GFP Chromophore Maturation:",
+            "residues Ser65, Tyr66, and Gly67",
+            "nucleophilic attack",
+            "Cyclization", "Dehydration", "Oxidation",
+            "imidazolinone ring",
+        ]
+        self._check_file_contains(self.special_chemistry_path, required_notes)
+
+    def test_coupling_educational_notes(self):
+        """Ensure coupling.py retains Karplus note."""
+        required_notes = [
+            "Educational Note - The Karplus Equation",
+            "depends strongly on the dihedral angle",
+            "A * cos^2(theta) + B * cos(theta) + C",
+        ]
+        self._check_file_contains(self.coupling_path, required_notes)

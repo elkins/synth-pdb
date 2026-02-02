@@ -12,7 +12,8 @@ def test_salt_bridge_restraint_logging(caplog):
     Verify that salt bridge restraints are detected and applied.
     We use sequence ER in alpha helical conformation.
     """
-    caplog.set_level(logging.DEBUG)
+    logging.getLogger('numba').setLevel(logging.WARNING)
+    caplog.set_level(logging.INFO)
     
     # E and K separated by 3 A: i, i+4 (common in helices)
     sequence = "AEAAAK"

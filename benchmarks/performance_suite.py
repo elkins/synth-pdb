@@ -7,6 +7,9 @@ import sys
 from pathlib import Path
 import numpy as np
 
+import psutil
+import platform
+
 # Ensure local synth_pdb is prioritized
 current_path = Path(__file__).resolve().parent
 repo_root = current_path.parent
@@ -15,6 +18,20 @@ if (repo_root / "synth_pdb").exists():
 
 from synth_pdb.generator import generate_pdb_content
 from synth_pdb.batch_generator import BatchedGenerator
+
+def get_hardware_info():
+    """Gathers detailed hardware and platform information."""
+    return {
+        "platform": platform.system(),
+        "platform_release": platform.release(),
+        "platform_version": platform.version(),
+        "architecture": platform.machine(),
+        "processor": platform.processor(),
+        "cpu_brand": platform.processor(), # Fallback, specific brand might need other methods
+        "cpu_cores": psutil.cpu_count(logical=False),
+        "cpu_threads": psutil.cpu_count(logical=True),
+        "ram_total_gb": round(psutil.virtual_memory().total / (1024**3), 2),
+    }
 
 def benchmark_serial(sequence, n_samples):
     print(f"  Running Serial Benchmark (N={n_samples})...")
@@ -46,10 +63,15 @@ def main():
     # Create directory if needed
     os.makedirs(os.path.dirname(args.output), exist_ok=True)
 
+    hardware_info = get_hardware_info()
+    print("🚀 Hardware Information:")
+    for key, value in hardware_info.items():
+        print(f"  - {key}: {value}")
+
     test_sizes = [10, 100, 500, args.n]
     results = []
 
-    print(f"🚀 Starting Benchmarks (Sequence Length: {len(args.seq.split('-'))})")
+    print(f"\n🚀 Starting Benchmarks (Sequence Length: {len(args.seq.split('-'))})")
     
     for n in test_sizes:
         print(f"\nTesting N={n}")
@@ -64,22 +86,24 @@ def main():
         print(f"  Batched: {batched_time:.3f}s ({throughput_batched:.1f} struct/sec)")
         print(f"  💪 Speedup: {speedup:.1f}x")
         
-        results.append({
+        result_row = {
             "N": n,
             "serial_time": serial_time,
             "batched_time": batched_time,
             "speedup": speedup,
             "throughput_serial": throughput_serial,
             "throughput_batched": throughput_batched
-        })
+        }
+        result_row.update(hardware_info)
+        results.append(result_row)
 
     # Save results
-    with open(args.output, "w", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=results[0].keys())
-        writer.writeheader()
-        writer.writerows(results)
-    
-    print(f"\n✅ Results saved to {args.output}")
+    if results:
+        with open(args.output, "w", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=results[0].keys())
+            writer.writeheader()
+            writer.writerows(results)
+        print(f"\n✅ Results saved to {args.output}")
 
 if __name__ == "__main__":
     main()

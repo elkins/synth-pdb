@@ -46,6 +46,7 @@ _position_atom_3d_from_internal_coords = position_atom_3d_from_internal_coords
 
 from .packing import optimize_sidechains as run_optimization
 from .physics import EnergyMinimizer
+from .batch_generator import BatchedGenerator, BatchedPeptide
 from . import biophysics # New Module
 import os
 import shutil
@@ -1507,13 +1508,21 @@ def generate_pdb_content(
                 minimizer = EnergyMinimizer(forcefield_name=forcefield)
                 
                 # We use add_hydrogens_and_minimize because synth-pdb lacks H by default
+                # Detect restraints for physics
+                current_disulfides = _detect_disulfide_bonds(peptide)
+                # Note: Coordination currently handles Zn motifs
+                # generator.py calls cofactors.find_metal_binding_sites earlier
+                # but we need to pass them to physics. For now, we'll focus on disulfides
+                # which are established by proximity.
+                
                 if equilibrate:
                     logger.info(f"Running MD Equilibration ({equilibrate_steps} steps). This includes minimization.")
                     success = minimizer.equilibrate(
                         input_pdb_path, 
                         output_pdb_path, 
                         steps=equilibrate_steps,
-                        cyclic=cyclic
+                        cyclic=cyclic,
+                        disulfides=current_disulfides
                     )
                 else:
                     success = minimizer.add_hydrogens_and_minimize(
@@ -1521,99 +1530,53 @@ def generate_pdb_content(
                         output_pdb_path,
                         max_iterations=minimization_max_iter,
                         tolerance=minimization_k,
-                        cyclic=cyclic
+                        cyclic=cyclic,
+                        disulfides=current_disulfides
                     )
                 
-                    if success:
-                        logger.info("Minimization/Equilibration successful.")
-                        # Read back the optimized structure
-                        # We return the CONTENT of this file
-                        with open(output_pdb_path, 'r') as f:
-                            atomic_and_ter_content = f.read()
-                            
-                        # CRITICAL FIX: Do NOT return early.
-                        # We must continue execution so that B-factors and Occupancies 
-                        # are calculated and injected below.
+                if success:
+                    logger.info("Minimization/Equilibration successful.")
+                    # Read back the optimized structure
+                    with open(output_pdb_path, 'r') as f:
+                        atomic_and_ter_content = f.read()
+                    
+                    pdb_file = pdb.PDBFile.read(output_pdb_path)
+                    peptide = pdb_file.get_structure(model=1)
+                    
+                    # RESTORE PTM NAMES (Fix for "Missing Orange Balls"):
+                    # OpenMM minimization required reverting SEP->SER etc.
+                    # We now restore the original names so the viewer (and user) knows 
+                    # where the PTMs are, even if the Phosphate atom is missing (sacrificed for physics).
+                    # The sequence list contains the INTENDED residue names.
+                    # We assume 1-to-1 mapping (residue indices align).
+                    try:
+                        unique_res_ids = np.unique(peptide.res_id)
+                        n_seq = len(sequence)
+                        n_min = len(unique_res_ids)
                         
-                        # EDUCATIONAL NOTE - Re-parsing Minimized Structure:
-                        # We must read the minimized structure back into our internal 'peptide' object.
-                        # Why? Because downstream steps (like disulfide detection and B-factor calculation)
-                        # depend on the exact atomic coordinates. If we used the old 'peptide' object,
-                        # we would be analyzing the un-minimized geometry!
-                        pdb_file = pdb.PDBFile.read(output_pdb_path)
-                        peptide = pdb_file.get_structure(model=1)
+                        start_offset = 0
                         
-                        # RESTORE PTM NAMES (Fix for "Missing Orange Balls"):
-                        # OpenMM minimization required reverting SEP->SER etc.
-                        # We now restore the original names so the viewer (and user) knows 
-                        # where the PTMs are, even if the Phosphate atom is missing (sacrificed for physics).
-                        # The sequence list contains the INTENDED residue names.
-                        # We assume 1-to-1 mapping (residue indices align).
-                        try:
-                            # Build map from sequence index to PTM name
-                            # sequence is 0-indexed list of names ['ALA', 'SEP', ...]
-                            # peptide residues are 1-indexed in res_id
-                            
-                            # Note: sequence might not include ACE/NME caps if added by OpenMM?
-                            # Our generator doesn't add ACE/NME unless 'cap_termini' is True, 
-                            # in which case biophysics.cap_termini does it.
-                            # But biophysics.cap_termini adds ATOMS to the terminal residues, 
-                            # it doesn't usually add new RESIDUES (unless NME is separate?).
-                            # Usually NME is a separate residue. ACE is part of N-term?
-                            # Let's assume residues match 'sequence'.
-                            
-                            # Safest way: iterate by matching index if possible.
-                            
-                            unique_res_ids = np.unique(peptide.res_id)
-                            # N residues (sequence) vs M residues (minimized structure)
-                            n_seq = len(sequence)
-                            n_min = len(unique_res_ids)
-                            
-                            start_offset = 0
-                            
-                            # Robust Offset Detection:
-                            # Check if the first residue is 'ACE'. If so, everything shifts by 1.
-                            if n_min > 0:
-                                first_res_id = unique_res_ids[0]
-                                # Get name of this residue from the atom array
-                                # (Any atom matching this res_id will share the res_name)
-                                mask_first = peptide.res_id == first_res_id
-                                if np.any(mask_first):
-                                    first_res_name = peptide.res_name[mask_first][0]
-                                    if first_res_name == "ACE":
-                                        logger.info("Detected N-terminal ACE cap. Applying start offset of 1.")
-                                        start_offset = 1
-                            
-                            # Safety Check:
-                            # Do we have enough minimized residues to cover the sequence?
-                            # e.g., if offset=1 and n_seq=24, we need at least index 24 (total 25 items).
-                            # n_min must be >= n_seq + start_offset
-                            
-                            if n_min < n_seq + start_offset:
-                                logger.warning(f"Residue count mismatch: Minimized structure has {n_min} residues, but sequence needs {n_seq} (offset {start_offset}). Cannot map PTMs.")
-                                match_valid = False
-                            else:
-                                match_valid = True
-                                
-                            if match_valid:
-                                for i, res_name_target in enumerate(sequence):
-                                    # unique_res_ids includes caps. 
-                                    # If offset=1, sequence[0] maps to unique_res_ids[1]
-                                    rid = unique_res_ids[i + start_offset]
-                                    
-                                    if res_name_target in ['SEP', 'TPO', 'PTR', 'HIE', 'HID', 'HIP']:
-                                        # Restore name in peptide array
-                                        mask = peptide.res_id == rid
-                                        peptide.res_name[mask] = res_name_target
-                                
-                        except Exception as e:
-                            logger.warning(f"Failed to restore PTM names: {e}")
+                        # Robust Offset Detection:
+                        if n_min > 0:
+                            first_res_id = unique_res_ids[0]
+                            mask_first = peptide.res_id == first_res_id
+                            if np.any(mask_first):
+                                first_res_name = peptide.res_name[mask_first][0]
+                                if first_res_name == "ACE":
+                                    logger.info("Detected N-terminal ACE cap. Applying start offset of 1.")
+                                    start_offset = 1
                         
-                        # We skip the biotite PDB generation block below since we have content.
-                        pass
-                    else:
-                        logger.error("Minimization failed. Returning un-minimized structure.")
-                    # If failed, we fall through to standard generation below
+                        if n_min >= n_seq + start_offset:
+                            for i, res_name_target in enumerate(sequence):
+                                rid = unique_res_ids[i + start_offset]
+                                if res_name_target in ['SEP', 'TPO', 'PTR', 'HIE', 'HID', 'HIP']:
+                                    mask = peptide.res_id == rid
+                                    peptide.res_name[mask] = res_name_target
+                    except Exception as e:
+                        logger.warning(f"Failed to restore PTM names: {e}")
+                    
+                else:
+                    logger.error("Minimization failed. Returning un-minimized structure.")
                     atomic_and_ter_content = None
         except Exception as e:
             logger.error(f"Error during minimization workflow: {e}")

@@ -1,5 +1,5 @@
 {% set name = "synth-pdb" %}
-{% set version = "1.14.1" %}
+{% set version = "1.15.0" %}
 
 package:
   name: {{ name|lower }}

@@ -133,13 +133,26 @@ class DockingPrep:
                             
                             atom_idx += 1
                             
-                            # PQR Format (Standard)
-                            # Field_name Atom_number Atom_name Residue_name Chain_ID Residue_number X Y Z Charge Radius
-                            # Note: Chain ID is often optional or skipped in some PQR variants (like PDB2PQR whitespace separated)
-                            # We'll stick to fixed width PDB-like if possible, or whitespace
-                            # ATOM      1  N   ALA A   1      27.525  26.046  14.628  0.1340 1.8240
+                            # PQR Format (Whitespace separated with standard columns)
+                            # Field  Serial Atom Residue Chain ResID  X  Y  Z  Charge Radius
+                            # Standard PQR columns:
+                            # 1-6   "ATOM  " or "HETATM"
+                            # 7-11   Atom serial number
+                            # 13-16  Atom name
+                            # 18-20  Residue name
+                            # 22     Chain identifier
+                            # 23-26  Residue sequence number
+                            # 31-38  X coordinate (Angstroms)
+                            # 39-46  Y coordinate (Angstroms)
+                            # 47-54  Z coordinate (Angstroms)
+                            # 55-62  Charge (e)
+                            # 63-70  Radius (Angstroms)
                             
-                            line = f"ATOM  {atom_idx:>5} {atom.name:<4} {residue.name:<3} {chain.id:<1} {int(residue.id):>4}    {x:>8.3f}{y:>8.3f}{z:>8.3f} {q:>6.4f} {r_angstrom:>6.4f}\n"
+                            # Template for robust alignment (8.3f for coords, 8.4f for Q and R)
+                            # PQR is often whitespace-separated, but fixed-width is more compatible.
+                            line = (f"{'ATOM':<6}{atom_idx:>5} {atom.name:<4} {residue.name:<3} "
+                                    f"{chain.id:<1}{residue.id:>4}    "
+                                    f"{x:8.3f}{y:8.3f}{z:8.3f}{q:8.4f}{r_angstrom:8.4f}\n")
                             f.write(line)
                             
             logger.info(f"Successfully wrote PQR to {output_pqr}")

@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [1.15.0] - 2026-02-02
+### Added
+- **ML Handover Notebooks**: Added zero-copy handover examples for **JAX**, **MLX**, and **PyTorch** in `examples/ml_loading/`.
+- **Vectorized Batch Generation**: Exposed `BatchedGenerator` and `BatchedPeptide` via `synth_pdb.generator` for high-performance AI training pipelines.
+- **Salt Bridge Consolidation**: Unified salt bridge force parameters to prevent global parameter conflicts in complex structures.
+
+### Fixed
+- **Cyclic Peptide Physics**: Refined covalent ring closure using a surgical linear-to-cyclic conversion strategy, bypassing OpenMM template matching limitations.
+- **Physics Preprocessing**: Resolved an `UnboundLocalError` in the simulation engine that caused crashes in specific edge-case topologies.
+- **Notebook Robustness**: Added graceful dependency checks and precision-safe assertions (`assert_allclose`) to ML handover notebooks.
+- **Test Stability**: Suppressed verbose Numba debug logging and fixed mock assertion failures in the physics test suite.
+
 ## [1.14.0] - 2026-01-31
 ### Added
 - **D-Amino Acid Support**: Support for generating and validating peptides with D-amino acids using the `D-` prefix in sequences.
