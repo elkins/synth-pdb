@@ -129,9 +129,13 @@ class EnergyMinimizer:
 
     def minimize(self, pdb_file_path, output_path, max_iterations=0, tolerance=10.0, cyclic=False, disulfides=None, coordination=None):
         """
-        Minimizes the energy of a structure already containing correct atoms (including Hydrogens).
+        Run energy minimization to regularize geometry and resolve clashes.
         
-        EDUCATIONAL NOTE - Anatomy of a Forcefield:
+        Uses OpenMM with implicit solvent (OBC2) and the AMBER forcefield.
+        This provides a "physically valid" structure by moving atoms into their 
+        local energy minimum.
+        
+        ### EDUCATIONAL NOTE - Anatomy of a Forcefield:
         -------------------------------------------
         A forcefield (like Amber14) approximates the potential energy (U) of a 
         molecule as a sum of four main terms:
@@ -156,6 +160,9 @@ class EnergyMinimizer:
             output_path: Output PDB path.
             max_iterations: Limit steps (0 = until convergence).
             tolerance: Target energy convergence threshold (kJ/mol).
+            cyclic: Whether to apply head-to-tail peptide bond constraints.
+            disulfides: Optional list of (res1, res2) indices for SSBOND constraints.
+            coordination: Optional list of (ion_name, [res_indices]) for metal constraints.
 
         ### Educational Note - Computational Efficiency:
         ----------------------------------------------
@@ -166,11 +173,21 @@ class EnergyMinimizer:
         Effectively, the validator acts as a "pre-minimizer", placing atoms in the 
         correct basin of attraction so the expensive physics engine only needs to 
         perform local optimization.
+
+        ### NMR Realism:
+        In NMR structure calculation (e.g., CYANA/XPLOR), we often use "Simulated Annealing"
+        to find low energy states. `minimize` is a simpler, gradient-based version
+        of this process. It ensures bond lengths and angles are correct before
+        performing more complex MD.
+        
+        Returns:
+            True if successful.
         """
         if not HAS_OPENMM:
             logger.error("Cannot minimize: OpenMM not found.")
             return False
-        return self._run_simulation(pdb_file_path, output_path, max_iterations=max_iterations, tolerance=tolerance, add_hydrogens=False, cyclic=cyclic, disulfides=disulfides, coordination=coordination)
+        res = self._run_simulation(pdb_file_path, output_path, add_hydrogens=False, max_iterations=max_iterations, tolerance=tolerance, cyclic=cyclic, disulfides=disulfides, coordination=coordination)
+        return res is not None
 
     def equilibrate(self, pdb_file_path, output_path, steps=1000, cyclic=False, disulfides=None, coordination=None):
         """
@@ -180,13 +197,17 @@ class EnergyMinimizer:
             pdb_file_path: Input PDB/File path.
             output_path: Output PDB path.
             steps: Number of MD steps (2 fs per step). 1000 steps = 2 ps.
+            cyclic: Whether to apply head-to-tail peptide bond constraints.
+            disulfides: Optional list of (res1, res2) indices for SSBOND constraints.
+            coordination: Optional list of (ion_name, [res_indices]) for metal constraints.
         Returns:
             True if successful.
         """
         if not HAS_OPENMM:
              logger.error("Cannot equilibrate: OpenMM not found.")
              return False
-        return self._run_simulation(pdb_file_path, output_path, add_hydrogens=True, equilibration_steps=steps, cyclic=cyclic, disulfides=disulfides, coordination=coordination)
+        res = self._run_simulation(pdb_file_path, output_path, add_hydrogens=True, equilibration_steps=steps, cyclic=cyclic, disulfides=disulfides, coordination=coordination)
+        return res is not None
 
     def add_hydrogens_and_minimize(self, pdb_file_path, output_path, max_iterations=0, tolerance=10.0, cyclic=False, disulfides=None, coordination=None):
         """
@@ -202,13 +223,133 @@ class EnergyMinimizer:
         the "eyes" of NMR. Correctly placing them is critical not just for physics but for
         predicting NOEs (Nuclear Overhauser Effects) which depend on H-H distances.
         We use `app.Modeller` to "guess" the standard positions of hydrogens at specific pH (7.0).
+
+        Args:
+            pdb_file_path: Input PDB path.
+            output_path: Output PDB path.
+            max_iterations: Limit steps (0 = until convergence).
+            tolerance: Target energy convergence threshold (kJ/mol).
+            cyclic: Whether to apply head-to-tail peptide bond constraints.
+            disulfides: Optional list of (res1, res2) indices for SSBOND constraints.
+            coordination: Optional list of (ion_name, [res_indices]) for metal constraints.
+
+        Returns:
+            True if successful.
         """
         if not HAS_OPENMM:
              logger.error("Cannot add hydrogens: OpenMM not found.")
              return False
-        return self._run_simulation(pdb_file_path, output_path, add_hydrogens=True, max_iterations=max_iterations, tolerance=tolerance, cyclic=cyclic, disulfides=disulfides, coordination=coordination)
+        res = self._run_simulation(pdb_file_path, output_path, add_hydrogens=True, max_iterations=max_iterations, tolerance=tolerance, cyclic=cyclic, disulfides=disulfides, coordination=coordination)
+        return res is not None
+
+    def calculate_energy(self, input_data, cyclic=False) -> float:
+        """
+        Calculates the potential energy of a structure.
+        
+        Args:
+            input_data: Can be a PDB file path, a PDB string, or a PeptideResult object.
+            cyclic: Whether the peptide is cyclic.
+            
+        Returns:
+            float: Potential energy in kJ/mol.
+        """
+        if not HAS_OPENMM:
+            return 0.0
+            
+        # Handle different input types
+        pdb_path = None
+        temp_file = None
+        
+        try:
+            if isinstance(input_data, str) and input_data.endswith('.pdb') and os.path.exists(input_data):
+                pdb_path = input_data
+            else:
+                # Treat as PDB content or object with .pdb property
+                content = input_data.pdb if hasattr(input_data, 'pdb') else str(input_data)
+                import tempfile
+                temp_file = tempfile.NamedTemporaryFile(suffix='.pdb', mode='w', delete=False)
+                temp_file.write(content)
+                temp_file.close()
+                pdb_path = temp_file.name
+            
+            # Use a dummy output path as we don't care about the result
+            with tempfile.TemporaryDirectory() as tmpdir:
+                out_path = os.path.join(tmpdir, "energy_calc.pdb")
+                # We use _run_simulation with max_iterations=1 to just get the initial state's energy?
+                # Actually, _run_simulation usually minimizes. 
+                # To get the energy WITHOUT moving atoms, we need a "0-step" simulation.
+                # I'll update _run_simulation to handle max_iterations=0 correctly or 
+                # just use the energy from the first step.
+                # Actually, I'll pass a special flag or just use max_iterations=0 and handle it.
+                # For now, let's assume _run_simulation returns the energy if we add a return value.
+                # Wait, I didn't see _run_simulation return energy. 
+                # I'll add a 'return_energy' parameter to _run_simulation.
+                return self._run_simulation(pdb_path, out_path, max_iterations=-1, cyclic=cyclic)
+        finally:
+            if temp_file:
+                try: os.unlink(temp_file.name)
+                except: pass
+
+    def _create_system_robust(self, topology, constraints, modeller=None):
+        """
+        Creates an OpenMM system, with robust fallbacks for template mismatches
+        and incompatible forcefield arguments. Returns (system, topology, positions).
+        """
+        if not hasattr(self, '_suppressed_args'):
+            self._suppressed_args = set()
+
+        sys_kwargs = {
+            "nonbondedMethod": app.NoCutoff,
+            "constraints": constraints
+        }
+        if self.implicit_solvent_enum is not None and "implicitSolvent" not in self._suppressed_args:
+            sys_kwargs["implicitSolvent"] = self.implicit_solvent_enum
+
+        current_topo = topology
+        current_pos = modeller.positions if modeller else None
+
+        def _try_create(topo, **kwargs):
+            nonlocal current_topo, current_pos
+            try:
+                system = self.forcefield.createSystem(topo, **kwargs)
+                return system, topo, (modeller.positions if modeller else None)
+            except Exception as e:
+                msg = str(e)
+                # Fallback 1: Forcefield doesn't support an argument (e.g. implicitSolvent)
+                if "was specified to createSystem() but was never used" in msg:
+                    for arg in ["implicitSolvent"]:
+                        if arg in msg and arg in kwargs:
+                            logger.warning(f"Forcefield does not support {arg}. Retrying without it and suppressing for future calls...")
+                            self._suppressed_args.add(arg)
+                            del kwargs[arg]
+                            return _try_create(topo, **kwargs)
+                
+                # Fallback 2: Template mismatch (Hydrogen issues)
+                if "No template found" in msg and modeller is not None:
+                    try:
+                        logger.warning(f"Template mismatch: {msg}. Attempting re-protonation repair...")
+                        # Strip and re-add hydrogens
+                        h_atoms = [a for a in modeller.topology.atoms() if a.element and a.element.symbol == 'H']
+                        if h_atoms:
+                            modeller.delete(h_atoms)
+                        modeller.addHydrogens(self.forcefield)
+                        current_topo = modeller.topology
+                        current_pos = modeller.positions
+                        return _try_create(current_topo, **kwargs)
+                    except Exception as repair_e:
+                        logger.warning(f"Repair failed: {repair_e}")
+                
+                raise e
+
+        try:
+            return _try_create(current_topo, **sys_kwargs)
+        except Exception as final_e:
+            logger.warning(f"Robust system creation failed, final fallback to no constraints: {final_e}")
+            sys = self.forcefield.createSystem(current_topo, nonbondedMethod=app.NoCutoff, constraints=None)
+            return sys, current_topo, current_pos
 
     def _run_simulation(self, input_path, output_path, max_iterations=0, tolerance=10.0, add_hydrogens=True, equilibration_steps=0, cyclic=False, disulfides=None, coordination=None):
+        """Internal engine. Returns final_energy if successful, else None."""
         logger.info(f"Processing physics for {input_path} (cyclic={cyclic})...")
         import tempfile
         import os
@@ -387,7 +528,7 @@ class EnergyMinimizer:
             
         except Exception as e:
             logger.error(f"PDB Pre-processing failed: {e}")
-            return False
+            return None
             
         # EDUCATIONAL NOTE - Topology Bridging (welding the ring):
         # --------------------------------------------------------
@@ -599,11 +740,14 @@ class EnergyMinimizer:
                     system = self.forcefield.createSystem(topology, nonbondedMethod=app.PME,
                                                           nonbondedCutoff=1.0*unit.nanometers, constraints=app.HBonds)
                 else:
-                    system = self.forcefield.createSystem(topology, nonbondedMethod=app.NoCutoff, 
-                                                          constraints=current_constraints, implicitSolvent=self.implicit_solvent_enum)
+                    system, topology, positions = self._create_system_robust(
+                        topology, 
+                        current_constraints, 
+                        modeller=modeller
+                    )
 
             except Exception as e:
-                logger.warning(f"Initial system creation failed, trying without constraints. Error: {e}")
+                logger.error(f"Initial system creation failed despite robustness. Error: {e}")
                 system = self.forcefield.createSystem(topology, nonbondedMethod=app.NoCutoff, constraints=None)
             
             # EDUCATIONAL NOTE - The "Nuclear Option" & "Shadow Caps":
@@ -660,10 +804,10 @@ class EnergyMinimizer:
                     logger.warning(f"Failed to excise terminal interactions: {e}")
 
             if len(list(topology.atoms())) == 0:
-                logger.error("Topology has 0 atoms before Simulation creation!")
+                logger.error("Health Check Failed: Topology has 0 atoms!")
                 if len(positions) == 0:
                     logger.error("OpenMM returned empty positions! Topology might be corrupted.")
-                return False
+                return None
             
             # 6. RESTRAINTS
             if coordination_restraints:
@@ -798,6 +942,12 @@ class EnergyMinimizer:
 
             simulation.context.setPositions(positions)
             
+            # Single-point energy calculation (bypass minimization)
+            if max_iterations < 0:
+                logger.info("Single-point energy calculation (max_iterations < 0). Skipping minimization.")
+                state = simulation.context.getState(getEnergy=True)
+                return state.getPotentialEnergy().value_in_unit(unit.kilojoule_per_mole)
+
             logger.info(f"Minimizing (Tolerance={tolerance} kJ/mol, MaxIter={max_iterations})...")
             if cyclic or added_bonds or salt_bridge_restraints:
                 # Macrocycles and disulfides need help closing. 
@@ -879,7 +1029,7 @@ class EnergyMinimizer:
                     check_pos = np.array(final_pos.value_in_unit(unit.nanometers))
                     if check_pos.size > 0 and np.any(np.isnan(check_pos)):
                         logger.error("Health Check Failed: Atomic Coordinates contain NaNs!")
-                        return False
+                        return None
             except:
                 logger.debug("Health check (isnan) skipped due to non-standard context.")
 
@@ -889,7 +1039,7 @@ class EnergyMinimizer:
                     logger.warning(f"Health Check Warning: High Potential Energy ({val_energy:.2e} kJ/mol). Structure may contain severe clashes.")
                 if np.isnan(val_energy):
                     logger.error("Health Check Failed: Potential Energy is NaN!")
-                    return False
+                    return None
             except: pass
             
             # EDUCATIONAL NOTE - Thermal Equilibration (MD):
@@ -940,14 +1090,17 @@ class EnergyMinimizer:
                                 res1, resN = amino_residues[0], amino_residues[-1]
                                 to_prune = []
                                 
-                                # N-terminus: Keep ONLY the backbone H.
+                                # N-terminus: Prune ONLY if we are actually cyclizing or have clear reasons.
+                                # For OpenMM amber14 compatibility, we MUST keep H1, H2, H3 if they exist.
                                 n1 = next((a for a in res1.atoms() if a.name == 'N'), None)
                                 if n1:
                                     h_on_n1 = [a for a in res1.atoms() if a.element is not None and a.element.symbol == 'H' and any(b.atom1 == n1 or b.atom2 == n1 for b in final_topology.bonds() if a == b.atom1 or a == b.atom2)]
-                                    if len(h_on_n1) > 0:
-                                        h_to_keep = next((a for a in h_on_n1 if a.name == 'H'), h_on_n1[0])
-                                        to_prune.extend([a for a in h_on_n1 if a != h_to_keep])
-                                        h_to_keep.name = 'H' 
+                                    if len(h_on_n1) > 1:
+                                        # If we have multiple (like 3 for N-terminus), keep them and their names (H1, H2, H3)
+                                        pass 
+                                    elif len(h_on_n1) == 1:
+                                        # If only one, ensure it's named 'H'
+                                        h_on_n1[0].name = 'H'
                                 
                                 # C-terminus: Remove OXT
                                 oxt = next((a for a in resN.atoms() if a.name == 'OXT'), None)
@@ -963,7 +1116,7 @@ class EnergyMinimizer:
 
                 if len(final_positions) == 0:
                     logger.error("OpenMM returned empty positions! Topology might be corrupted.")
-                    return False
+                    return None
                     
                 # Restore original residue names AND IDS
                 # Robust matching: match by original ID (resSeq) as preserved by OpenMM
@@ -1031,7 +1184,7 @@ class EnergyMinimizer:
 
                 final_lines.append("END")
                 f.write("\n".join(final_lines) + "\n")
-            return True
+            return final_energy
         except Exception as e:
             logger.error(f"Simulation failed: {e}", exc_info=True)
-            return False
+            return None

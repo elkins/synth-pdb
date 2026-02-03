@@ -18,8 +18,12 @@ The following Jupyter Notebook tutorials relying upon synth-pdb are available.
 | **Bulk Dataset Factory** | [![Open In Colab: Dataset](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/elkins/synth-pdb/blob/master/examples/ml_integration/dataset_factory.ipynb) |
 | **Neural NMR Pipeline** | [![Open In Colab: NMR](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/elkins/synth-pdb/blob/master/examples/ml_integration/neural_nmr_pipeline.ipynb) |
 | **6D Orientogram Lab** | [![Open In Colab: Orientogram](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/elkins/synth-pdb/blob/master/examples/ml_integration/orientogram_lab.ipynb) |
-| **Bio-Active Hormone Lab** | [![Open In Colab: Hormones](https://colab.research.google.com/github/elkins/synth-pdb/blob/master/examples/ml_integration/hormone_lab.ipynb) |
-| **Framework Handover (JAX/PyTorch/MLX)** | [View Notebooks](file:///Users/georgeelkins/nmr/synth-pdb/examples/ml_loading/) |
+| **Bio-Active Hormone Lab** | [![Open In Colab: Hormones](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/elkins/synth-pdb/blob/master/examples/ml_integration/hormone_lab.ipynb) |
+| **Framework Handover** | [View JAX/PyTorch/MLX Examples](file:///Users/georgeelkins/nmr/synth-pdb/examples/ml_loading/) |
+| **🏔️ The Live Folding Landscape** | [Explore Funnel](examples/interactive_tutorials/folding_landscape.ipynb) |
+| **🌌 AI Latent Space Explorer** | [Explore Galaxy](examples/interactive_tutorials/latent_space_explorer.ipynb) |
+| **🧪 The GFP Molecular Forge** | [Forge Chromophore](examples/interactive_tutorials/gfp_molecular_forge.ipynb) |
+| **🔗 The NeRF Geometry Lab** | [Master Geometry](examples/interactive_tutorials/nerf_geometry_lab.ipynb) |
 
 
 ## Table of Contents
@@ -640,6 +644,13 @@ For detailed examples of how to load generated data into your favorite framework
 - [PyTorch Handover](file:///Users/georgeelkins/nmr/synth-pdb/examples/ml_loading/pytorch_handover.ipynb) - Unified memory mapping with `torch.from_numpy`.
 - [MLX Handover](file:///Users/georgeelkins/nmr/synth-pdb/examples/ml_loading/mlx_handover.ipynb) - Optimized for Apple Silicon (M-series CPUs/GPUs).
 
+### 🎓 Interactive Scientific Tutorials
+We've added a suite of interactive labs for deeper exploration into structural biology and AI physics:
+- **[Folding Landscape](examples/interactive_tutorials/folding_landscape.ipynb)** - 3D Plotly exploration of energy funnels.
+- **[Latent Space Explorer](examples/interactive_tutorials/latent_space_explorer.ipynb)** - Multi-dimensional PCA mapping of orientograms.
+- **[GFP Molecular Forge](examples/interactive_tutorials/gfp_molecular_forge.ipynb)** - Chemical maturation of the SYG chromophore.
+- **[NeRF Geometry Lab](examples/interactive_tutorials/nerf_geometry_lab.ipynb)** - Interactive torsion controls and Z-Matrix math.
+
 See the full [ML Integration Demo](file:///Users/georgeelkins/nmr/synth-pdb/examples/ml_integration/ml_handover_demo.ipynb) for examples of Radius of Gyration prediction and 6D orientation maps.
 
 #### Quality Control (Continued)
@@ -1118,7 +1129,7 @@ pytest tests/test_generator.py -v
 ```
 
 **Test Coverage**: 95% overall
-- 467 tests covering generation, validation, CLI, and edge cases
+- 473 tests covering generation, validation, CLI, and edge cases
 
 ### Project Structure
 

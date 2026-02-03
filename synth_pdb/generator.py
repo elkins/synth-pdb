@@ -1702,6 +1702,7 @@ def generate_pdb_content(
     if conect_block:
         conect_block += "\n"
 
+
     # Final assembly using centralized utility
     return assemble_pdb_content(
         final_atomic_content_block,
@@ -1710,3 +1711,70 @@ def generate_pdb_content(
         extra_records=ssbond_records if ssbond_records else None,
         conect_records=conect_block if conect_block else None
     )
+
+
+class PeptideGenerator:
+    """
+    Object-oriented wrapper for protein structure generation.
+    Provides a cleaner API for interactive notebooks and complex workflows.
+    """
+    def __init__(self, sequence: str = "ALA-GLY-SER", **kwargs):
+        self.sequence = sequence
+        self.config = kwargs
+        self._last_result = None
+
+    def generate(self, **overrides) -> "PeptideResult":
+        """Generates the protein structure and returns a Result object."""
+        # Merge init config with call-time overrides
+        call_config = {**self.config, **overrides}
+        
+        # Call the functional generator
+        pdb_content = generate_pdb_content(
+            sequence_str=self.sequence,
+            **call_config
+        )
+        
+        # Package into a Result object for easy access
+        self._last_result = PeptideResult(pdb_content)
+        return self._last_result
+
+
+class PeptideResult:
+    """
+    Container for generation outputs, providing easy access to 
+    PDB strings, Biotite structures, and metadata.
+    """
+    def __init__(self, pdb_content: str):
+        self.pdb = pdb_content
+        self._structure = None
+
+    @property
+    def structure(self) -> struc.AtomArray:
+        """Returns the structure as a Biotite AtomArray (cached)."""
+        if self._structure is None:
+            # Defensive check for empty or invalid PDB content
+            if not self.pdb or ("ATOM" not in self.pdb and "HETATM" not in self.pdb):
+                logger.error("PeptideResult contains no atomic data. Returning empty AtomArray.")
+                self._structure = struc.AtomArray(0)
+                return self._structure
+
+            # We use io.StringIO to avoid disk I/O
+            from biotite.structure.io.pdb import PDBFile
+            import io
+            f = PDBFile.read(io.StringIO(self.pdb))
+            
+            # Additional check: ensure at least one model exists
+            if f.get_model_count() == 0:
+                logger.error("PDB content has 0 models. Returning empty AtomArray.")
+                self._structure = struc.AtomArray(0)
+            else:
+                self._structure = f.get_structure(model=1)
+        return self._structure
+
+    def save(self, path: str):
+        """Saves the PDB content to a file."""
+        with open(path, 'w') as f:
+            f.write(self.pdb)
+
+    def __repr__(self):
+        return f"<PeptideResult: {len(self.pdb)} chars, {self.structure.array_length()} atoms>"

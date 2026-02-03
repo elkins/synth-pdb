@@ -46,8 +46,8 @@ class TestPhysicsCoverage:
         # Mock PDBFile to fail
         mock_app.PDBFile.side_effect = Exception("Corrupt PDB")
         
-        # Should return False and catch exception
-        assert minimizer._run_simulation("bad.pdb", "out.pdb") is False
+        # Should return None and catch exception
+        assert minimizer._run_simulation("bad.pdb", "out.pdb") is None
 
     @patch("synth_pdb.physics.HAS_OPENMM", True)
     @patch("synth_pdb.physics.app")
@@ -224,7 +224,7 @@ class TestPhysicsCoverage:
         
         result = minimizer._run_simulation("empty.pdb", "out.pdb", add_hydrogens=True)
         
-        assert result is False
+        assert result is None
         assert "Topology has 0 atoms" in caplog.text
 
     @patch("synth_pdb.physics.HAS_OPENMM", True)
@@ -268,7 +268,7 @@ class TestPhysicsCoverage:
         }):
              result = minimizer._run_simulation("test.pdb", "out.pdb", add_hydrogens=True)
              
-        assert result is False
+        assert result is None
         assert "OpenMM returned empty positions" in caplog.text
 
     @patch("synth_pdb.physics.HAS_OPENMM", True)
@@ -398,7 +398,7 @@ class TestPhysicsCoverage:
         with patch.dict(sys.modules, {"biotite": MagicMock(), "synth_pdb.cofactors": MagicMock(), "synth_pdb.biophysics": MagicMock()}):
             result = minimizer._run_simulation("test.pdb", "out.pdb", add_hydrogens=True)
             
-        assert result is True
+        assert result is not None
         # Verify createSystem was called twice
         assert minimizer.forcefield.createSystem.call_count == 2
 

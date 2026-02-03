@@ -105,7 +105,7 @@ class TestCoverageGaps:
         mock_context.getState.return_value = mock_state
         
         # 1. NaN Energy check
-        assert minimizer._run_simulation("dummy.pdb", "out.pdb") is False
+        assert minimizer._run_simulation("dummy.pdb", "out.pdb") is None
         
         # 2. NaN Position check
         mock_state.getPotentialEnergy.return_value.value_in_unit.return_value = 100.0 # Valid energy
@@ -113,7 +113,7 @@ class TestCoverageGaps:
         mock_nan_pos.__len__.return_value = 1
         mock_nan_pos.value_in_unit.return_value = [[np.nan, 1, 1]]
         mock_state.getPositions.return_value = mock_nan_pos
-        assert minimizer._run_simulation("dummy.pdb", "out.pdb") is False
+        assert minimizer._run_simulation("dummy.pdb", "out.pdb") is None
 
     @patch("synth_pdb.physics.HAS_OPENMM", True)
     @patch("synth_pdb.physics.app")
@@ -155,7 +155,7 @@ class TestCoverageGaps:
         mock_sim.context.getState.return_value = mock_state
         
         with patch("synth_pdb.physics.app.PDBFile.writeFile"):
-            assert minimizer._run_simulation("dummy.pdb", "out.pdb") is True
+            assert minimizer._run_simulation("dummy.pdb", "out.pdb") is not None
             assert "High Potential Energy" in caplog.text
 
     @patch("synth_pdb.generator._detect_disulfide_bonds", return_value=[])

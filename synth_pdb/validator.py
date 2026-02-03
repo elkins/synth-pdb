@@ -1186,6 +1186,7 @@ class PDBValidator:
                         f"is an Outlier (does not match any allowed {res_name} rotamers within {tolerance}° tolerance)."
                     )
 
+
     def validate_chirality(self) -> None:
         """
         Validate L-amino acid chirality at C-alpha.
@@ -1222,7 +1223,7 @@ class PDBValidator:
                     continue
                 
                 # Method: Improper dihedral angle or Scalar Triple Product.
-        
+                
                 # The "CORN Rule" for L-Amino Acids:
                 # -----------------------------------
                 # When looking down the H-CA bond (Hydrogen to Alpha-Carbon), the groups read clockwise:
@@ -1248,6 +1249,7 @@ class PDBValidator:
                 # Identify if this is a D-amino acid based on the residues list
                 # (e.g., DAL, DAR, DAN). 
                 is_d = res_name in L_TO_D_MAPPING.values()
+                check_val = -improper if is_d else improper
                 
                 # Check for reasonable improper dihedral values
                 # Accept both negative (standard L-amino acids: -150° to -30°)
@@ -1255,8 +1257,6 @@ class PDBValidator:
                 # The key is that it should be in one of these ranges, not near 0° or ±180°
                 
                 # For D-amino acids, we invert the value for comparison with L-ranges
-                check_val = -improper if is_d else improper
-                
                 is_valid_l = -150.0 <= check_val <= -30.0
                 is_valid_positive = 30.0 <= check_val <= 150.0
                 
@@ -1272,7 +1272,54 @@ class PDBValidator:
                         f"Chirality OK: Chain {chain_id}, Residue {res_num} {res_name} "
                         f"improper dihedral = {improper:.1f}° ({expected_desc})"
                     )
-    
+
+    def calculate_dihedrals(self, input_data=None) -> Dict[str, List[float]]:
+        """
+        Calculates backbone dihedral angles (Phi, Psi, Omega) for all residues.
+        
+        Args:
+            input_data: Optional. If provided, uses this as the source (can be PDB content,
+                       PeptideResult, or AtomArray). If None, uses the validator's initial content.
+        
+        Returns:
+            Dict[str, List[float]]: Dictionary with 'phi', 'psi', 'omega' keys mapping to degree lists.
+        """
+        import biotite.structure as struc
+        
+        # Resolve structure
+        structure = None
+        if input_data is None:
+            # Re-read from initial content to ensure we have an AtomArray
+            from biotite.structure.io.pdb import PDBFile
+            import io
+            f = PDBFile.read(io.StringIO(self.pdb_content))
+            structure = f.get_structure(model=1)
+        elif hasattr(input_data, 'structure'):
+            structure = input_data.structure
+        elif isinstance(input_data, struc.AtomArray):
+            structure = input_data
+        else:
+            # Treat as PDB content
+            from biotite.structure.io.pdb import PDBFile
+            import io
+            f = PDBFile.read(io.StringIO(str(input_data)))
+            structure = f.get_structure(model=1)
+
+        # Use Biotite's robust dihedral calculation
+        # dihedral_backbone returns (phi, psi, omega)
+        phi, psi, omega = struc.dihedral_backbone(structure)
+        
+        # Convert from radians to degrees and to list for JSON compatibility
+        phi_deg = np.degrees(phi).tolist()
+        psi_deg = np.degrees(psi).tolist()
+        omega_deg = np.degrees(omega).tolist()
+        
+        return {
+            'phi': phi_deg,
+            'psi': psi_deg,
+            'omega': omega_deg
+        }
+
     def validate_all(self) -> None:
         """Run all validation checks."""
         logger.info("Running all validation checks.")
