@@ -3,7 +3,6 @@
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/elkins/synth-pdb/blob/main/demo.ipynb)
 [![PyPI version](https://badge.fury.io/py/synth-pdb.svg)](https://badge.fury.io/py/synth-pdb)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![DOI](https://zenodo.org/badge/latestdoi/123456789)](https://zenodo.org/badge/latestdoi/123456789)
 
 **Generate realistic PDB files with mixed secondary structures for bioinformatics testing, education, and tool development.**
 

@@ -1,0 +1,169 @@
+/* Custom styling for synth-pdb documentation */
+
+/* Enhanced code blocks */
+.md-typeset code {
+  background-color: rgba(0, 150, 136, 0.1);
+  border-radius: 3px;
+  padding: 2px 4px;
+  font-size: 0.85em;
+}
+
+.md-typeset pre > code {
+  background-color: transparent;
+  padding: 0;
+}
+
+/* Enhanced admonitions */
+.md-typeset .admonition {
+  border-left: 4px solid;
+  border-radius: 4px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.md-typeset .admonition.tip {
+  border-left-color: #00c853;
+}
+
+.md-typeset .admonition.warning {
+  border-left-color: #ff9800;
+}
+
+.md-typeset .admonition.danger {
+  border-left-color: #f44336;
+}
+
+/* Gallery grid layout */
+.gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 2rem;
+  margin: 2rem 0;
+}
+
+.gallery-item {
+  border: 1px solid var(--md-default-fg-color--lightest);
+  border-radius: 8px;
+  padding: 1rem;
+  transition: all 0.3s ease;
+  background: var(--md-default-bg-color);
+}
+
+.gallery-item:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 16px rgba(0,0,0,0.15);
+  border-color: var(--md-primary-fg-color);
+}
+
+.gallery-item img {
+  width: 100%;
+  border-radius: 4px;
+  margin-bottom: 0.5rem;
+}
+
+.gallery-item h3 {
+  margin-top: 0.5rem;
+  color: var(--md-primary-fg-color);
+}
+
+/* Card grid for navigation */
+.grid.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 1.5rem;
+  margin: 2rem 0;
+}
+
+.grid.cards > div {
+  border: 1px solid var(--md-default-fg-color--lightest);
+  border-radius: 8px;
+  padding: 1.5rem;
+  transition: all 0.3s ease;
+}
+
+.grid.cards > div:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  border-color: var(--md-primary-fg-color);
+}
+
+/* Enhanced tables */
+.md-typeset table:not([class]) {
+  border: 1px solid var(--md-default-fg-color--lightest);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.md-typeset table:not([class]) th {
+  background-color: var(--md-primary-fg-color);
+  color: white;
+  font-weight: 600;
+}
+
+.md-typeset table:not([class]) tr:hover {
+  background-color: rgba(0, 150, 136, 0.05);
+}
+
+/* Code annotation styling */
+.md-typeset .md-annotation {
+  background-color: var(--md-primary-fg-color);
+  color: white;
+  border-radius: 50%;
+  font-size: 0.75em;
+  padding: 0.2em 0.5em;
+}
+
+/* Tabbed content enhancement */
+.md-typeset .tabbed-set {
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.md-typeset .tabbed-labels {
+  background-color: var(--md-default-fg-color--lightest);
+}
+
+/* Math equation styling */
+.md-typeset .arithmatex {
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+/* Footer customization */
+.md-footer-meta {
+  background-color: var(--md-footer-bg-color);
+}
+
+/* Navigation improvements */
+.md-nav__item--active > .md-nav__link {
+  font-weight: 600;
+  color: var(--md-primary-fg-color);
+}
+
+/* Search result highlighting */
+.md-search-result__article--document {
+  border-left: 3px solid var(--md-primary-fg-color);
+}
+
+/* Responsive adjustments */
+@media screen and (max-width: 76.1875em) {
+  .gallery-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .grid.cards {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Print styles */
+@media print {
+  .md-header,
+  .md-sidebar,
+  .md-footer {
+    display: none;
+  }
+  
+  .md-content {
+    max-width: 100%;
+  }
+}
