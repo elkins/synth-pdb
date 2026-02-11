@@ -289,7 +289,7 @@ def _generate_random_amino_acid_sequence(
         return [random.choice(STANDARD_AMINO_ACIDS) for _ in range(length)]
 
 
-def _detect_disulfide_bonds(peptide) -> list:
+def _detect_disulfide_bonds(peptide: struc.AtomArray) -> list:
     """
     Detect potential disulfide bonds between cysteine residues.
     

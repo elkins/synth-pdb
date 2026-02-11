@@ -86,6 +86,7 @@ nav:
     - Biophysics Fundamentals: science/biophysics.md
     - Ramachandran Plots: science/ramachandran.md
     - Rotamer Libraries: science/rotamers.md
+    - NeRF Geometry: science/nerf-geometry.md
     - NMR Theory: science/nmr-theory.md
     - Energy Minimization: science/energy-minimization.md
   - Development:

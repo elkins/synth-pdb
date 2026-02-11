@@ -39,8 +39,6 @@ View your structure interactively in the browser:
 synth-pdb --length 10 --conformation alpha --visualize
 ```
 
-![Visualization Example](../images/quickstart_viz.png)
-
 ## Add Physics
 
 Generate a more realistic structure with energy minimization:

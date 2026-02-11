@@ -134,8 +134,6 @@ $$B \propto (1 - S^2)$$
 - Side-chain atoms: 20-35 Ų
 - Terminal residues: 30-50 Ų
 
-See [`_calculate_bfactor`](../api/generator.md#synth_pdb.generator._calculate_bfactor) for implementation details.
-
 ## See Also
 
 - [geometry Module](geometry.md) - 3D coordinate calculations
