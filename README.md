@@ -26,12 +26,14 @@ A command-line tool to generate Protein Data Bank (PDB) files with full atomic r
 | **🔗 Framework Handover** | ⭐ Beginner | 10 min | [View JAX/PyTorch/MLX Examples](https://github.com/elkins/synth-pdb/tree/master/examples/ml_loading) |
 | **⭕ Macrocycle Design Lab** | ⭐⭐ Intermediate | 20 min | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/elkins/synth-pdb/blob/master/examples/ml_integration/macrocycle_lab.ipynb) |
 | **💊 Bio-Active Hormone Lab** | ⭐⭐ Intermediate | 20 min | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/elkins/synth-pdb/blob/master/examples/ml_integration/hormone_lab.ipynb) |
-| **🔬 The Virtual NMR Spectrometer** | ⭐⭐ Intermediate | 25 min | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/elkins/synth-pdb/blob/master/interactive_relaxation.ipynb) |
+| **🔍 Protein Quality Assessment** | ⭐⭐ Intermediate | 25 min | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/elkins/synth-pdb/blob/master/examples/interactive_tutorials/protein_quality_assessment.ipynb) |
+| **🔬 The Virtual NMR Spectrometer** | ⭐⭐ Intermediate | 25 min | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/elkins/synth-pdb/blob/master/examples/interactive_tutorials/virtual_nmr_spectrometer.ipynb) |
 | **📡 Neural NMR Pipeline** | ⭐⭐ Intermediate | 25 min | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/elkins/synth-pdb/blob/master/examples/ml_integration/neural_nmr_pipeline.ipynb) |
 | **🔗 The NeRF Geometry Lab** | ⭐⭐ Intermediate | 25 min | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/elkins/synth-pdb/blob/master/examples/interactive_tutorials/nerf_geometry_lab.ipynb) |
 | **🧪 The GFP Molecular Forge** | ⭐⭐ Intermediate | 30 min | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/elkins/synth-pdb/blob/master/examples/interactive_tutorials/gfp_molecular_forge.ipynb) |
 | **📐 6D Orientogram Lab** | ⭐⭐⭐ Advanced | 30 min | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/elkins/synth-pdb/blob/master/examples/ml_integration/orientogram_lab.ipynb) |
 | **🎯 The Hard Decoy Challenge** | ⭐⭐⭐ Advanced | 35 min | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/elkins/synth-pdb/blob/master/examples/ml_integration/hard_decoy_challenge.ipynb) |
+| **💊 Drug Discovery Pipeline** | ⭐⭐⭐ Advanced | 35 min | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/elkins/synth-pdb/blob/master/examples/ml_integration/drug_discovery_pipeline.ipynb) |
 | **🌌 AI Latent Space Explorer** | ⭐⭐⭐ Advanced | 35 min | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/elkins/synth-pdb/blob/master/examples/interactive_tutorials/latent_space_explorer.ipynb) |
 | **🏔️ The Live Folding Landscape** | ⭐⭐⭐ Advanced | 40 min | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/elkins/synth-pdb/blob/master/examples/interactive_tutorials/folding_landscape.ipynb) |
 
@@ -52,19 +54,21 @@ Choose a path based on your background and goals:
 *Understand structure, dynamics, and spectroscopy*
 
 1. **🔗 NeRF Geometry Lab** (25 min) - Learn internal coordinate systems
-2. **🔬 Virtual NMR Spectrometer** (25 min) - Predict relaxation rates and chemical shifts
-3. **🧪 GFP Molecular Forge** (30 min) - Explore chromophore chemistry
-4. **🏔️ Live Folding Landscape** (40 min) - Visualize energy surfaces and Ramachandran space
-5. **📡 Neural NMR Pipeline** (25 min) - Connect structure to NMR observables
+3. **🔬 Virtual NMR Spectrometer** (25 min) - Predict relaxation rates and chemical shifts
+2. **🔍 Protein Quality Assessment** (25 min) - Validate structure quality and geometry
+4. **🧪 GFP Molecular Forge** (30 min) - Explore chromophore chemistry
+5. **🏔️ Live Folding Landscape** (40 min) - Visualize energy surfaces and Ramachandran space
+6. **📡 Neural NMR Pipeline** (25 min) - Connect structure to NMR observables
 
 #### 💊 **For Drug Designers**
 *Design and optimize therapeutic peptides*
 
-1. **⭕ Macrocycle Design Lab** (20 min) - Create head-to-tail cyclic peptides
-2. **💊 Bio-Active Hormone Lab** (20 min) - Model bioactive peptide hormones
-3. **🎯 Hard Decoy Challenge** (35 min) - Generate decoys for docking validation
-4. **🌌 AI Latent Space Explorer** (35 min) - Navigate chemical space with ML
-5. **🔬 Virtual NMR Spectrometer** (25 min) - Predict experimental observables
+1. **💊 Drug Discovery Pipeline** (35 min) - End-to-end peptide library to lead selection
+2. **⭕ Macrocycle Design Lab** (20 min) - Create head-to-tail cyclic peptides
+3. **💊 Bio-Active Hormone Lab** (20 min) - Model bioactive peptide hormones
+4. **🎯 Hard Decoy Challenge** (35 min) - Generate decoys for docking validation
+5. **🌌 AI Latent Space Explorer** (35 min) - Navigate chemical space with ML
+6. **🔬 Virtual NMR Spectrometer** (25 min) - Predict experimental observables
 
 
 ## Table of Contents
