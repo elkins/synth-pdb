@@ -10,23 +10,61 @@ A command-line tool to generate Protein Data Bank (PDB) files with full atomic r
 
 📚 **[Read the full documentation](https://elkins.github.io/synth-pdb/)** | [Getting Started](https://elkins.github.io/synth-pdb/getting-started/quickstart/) | [API Reference](https://elkins.github.io/synth-pdb/api/overview/) | [Tutorials](https://elkins.github.io/synth-pdb/tutorials/gfp_molecular_forge/)
 
-The following Jupyter Notebook tutorials relying upon synth-pdb are available.
+## 📚 Interactive Tutorials
 
-| Tutorial | Action |
-| :--- | :--- |
-| **🔬 The Virtual NMR Spectrometer** | [![Open In Colab: Relaxation](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/elkins/synth-pdb/blob/master/interactive_relaxation.ipynb) |
-| **🤖 AI Protein Data Factory** | [![Open In Colab: ML Integration](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/elkins/synth-pdb/blob/master/examples/ml_integration/ml_handover_demo.ipynb) |
-| **🎯 The Hard Decoy Challenge** | [![Open In Colab: Decoys](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/elkins/synth-pdb/blob/master/examples/ml_integration/hard_decoy_challenge.ipynb) |
-| **⭕ Macrocycle Design Lab** | [![Open In Colab: Macrocycles](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/elkins/synth-pdb/blob/master/examples/ml_integration/macrocycle_lab.ipynb) |
-| **🏭 Bulk Dataset Factory** | [![Open In Colab: Dataset](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/elkins/synth-pdb/blob/master/examples/ml_integration/dataset_factory.ipynb) |
-| **📡 Neural NMR Pipeline** | [![Open In Colab: NMR](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/elkins/synth-pdb/blob/master/examples/ml_integration/neural_nmr_pipeline.ipynb) |
-| **📐 6D Orientogram Lab** | [![Open In Colab: Orientogram](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/elkins/synth-pdb/blob/master/examples/ml_integration/orientogram_lab.ipynb) |
-| **💊 Bio-Active Hormone Lab** | [![Open In Colab: Hormones](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/elkins/synth-pdb/blob/master/examples/ml_integration/hormone_lab.ipynb) |
-| **🔗 Framework Handover** | [View JAX/PyTorch/MLX Examples](https://github.com/elkins/synth-pdb/tree/master/examples/ml_loading) |
-| **🏔️ The Live Folding Landscape** | [![Open In Colab: Folding](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/elkins/synth-pdb/blob/master/examples/interactive_tutorials/folding_landscape.ipynb) |
-| **🌌 AI Latent Space Explorer** | [![Open In Colab: Latent Space](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/elkins/synth-pdb/blob/master/examples/interactive_tutorials/latent_space_explorer.ipynb) |
-| **🧪 The GFP Molecular Forge** | [![Open In Colab: GFP](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/elkins/synth-pdb/blob/master/examples/interactive_tutorials/gfp_molecular_forge.ipynb) |
-| **🔗 The NeRF Geometry Lab** | [![Open In Colab: NeRF](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/elkins/synth-pdb/blob/master/examples/interactive_tutorials/nerf_geometry_lab.ipynb) |
+### Prerequisites
+- **Python 3.8+** and basic Python knowledge
+- **Google Colab** account (free) or local Jupyter environment
+- Specific tutorials may require domain knowledge (noted in difficulty levels)
+
+### Tutorial Catalog
+
+| Tutorial | Difficulty | Time | Action |
+| :--- | :---: | :---: | :--- |
+| **🤖 AI Protein Data Factory** | ⭐ Beginner | 15 min | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/elkins/synth-pdb/blob/master/examples/ml_integration/ml_handover_demo.ipynb) |
+| **🏭 Bulk Dataset Factory** | ⭐ Beginner | 15 min | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/elkins/synth-pdb/blob/master/examples/ml_integration/dataset_factory.ipynb) |
+| **🔗 Framework Handover** | ⭐ Beginner | 10 min | [View JAX/PyTorch/MLX Examples](https://github.com/elkins/synth-pdb/tree/master/examples/ml_loading) |
+| **⭕ Macrocycle Design Lab** | ⭐⭐ Intermediate | 20 min | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/elkins/synth-pdb/blob/master/examples/ml_integration/macrocycle_lab.ipynb) |
+| **💊 Bio-Active Hormone Lab** | ⭐⭐ Intermediate | 20 min | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/elkins/synth-pdb/blob/master/examples/ml_integration/hormone_lab.ipynb) |
+| **🔬 The Virtual NMR Spectrometer** | ⭐⭐ Intermediate | 25 min | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/elkins/synth-pdb/blob/master/interactive_relaxation.ipynb) |
+| **📡 Neural NMR Pipeline** | ⭐⭐ Intermediate | 25 min | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/elkins/synth-pdb/blob/master/examples/ml_integration/neural_nmr_pipeline.ipynb) |
+| **🔗 The NeRF Geometry Lab** | ⭐⭐ Intermediate | 25 min | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/elkins/synth-pdb/blob/master/examples/interactive_tutorials/nerf_geometry_lab.ipynb) |
+| **🧪 The GFP Molecular Forge** | ⭐⭐ Intermediate | 30 min | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/elkins/synth-pdb/blob/master/examples/interactive_tutorials/gfp_molecular_forge.ipynb) |
+| **📐 6D Orientogram Lab** | ⭐⭐⭐ Advanced | 30 min | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/elkins/synth-pdb/blob/master/examples/ml_integration/orientogram_lab.ipynb) |
+| **🎯 The Hard Decoy Challenge** | ⭐⭐⭐ Advanced | 35 min | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/elkins/synth-pdb/blob/master/examples/ml_integration/hard_decoy_challenge.ipynb) |
+| **🌌 AI Latent Space Explorer** | ⭐⭐⭐ Advanced | 35 min | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/elkins/synth-pdb/blob/master/examples/interactive_tutorials/latent_space_explorer.ipynb) |
+| **🏔️ The Live Folding Landscape** | ⭐⭐⭐ Advanced | 40 min | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/elkins/synth-pdb/blob/master/examples/interactive_tutorials/folding_landscape.ipynb) |
+
+### 🎓 Learning Paths
+
+Choose a path based on your background and goals:
+
+#### 🤖 **For ML Engineers**
+*Build AI models with synthetic protein data*
+
+1. **🤖 AI Protein Data Factory** (15 min) - Learn zero-copy data handover to PyTorch/JAX
+2. **🏭 Bulk Dataset Factory** (15 min) - Generate thousands of training samples
+3. **🔗 Framework Handover** (10 min) - Integrate with your ML framework
+4. **🎯 Hard Decoy Challenge** (35 min) - Create negative samples for robust training
+5. **📐 6D Orientogram Lab** (30 min) - Work with rotation-invariant representations
+
+#### 🔬 **For Biophysicists**
+*Understand structure, dynamics, and spectroscopy*
+
+1. **🔗 NeRF Geometry Lab** (25 min) - Learn internal coordinate systems
+2. **🔬 Virtual NMR Spectrometer** (25 min) - Predict relaxation rates and chemical shifts
+3. **🧪 GFP Molecular Forge** (30 min) - Explore chromophore chemistry
+4. **🏔️ Live Folding Landscape** (40 min) - Visualize energy surfaces and Ramachandran space
+5. **📡 Neural NMR Pipeline** (25 min) - Connect structure to NMR observables
+
+#### 💊 **For Drug Designers**
+*Design and optimize therapeutic peptides*
+
+1. **⭕ Macrocycle Design Lab** (20 min) - Create head-to-tail cyclic peptides
+2. **💊 Bio-Active Hormone Lab** (20 min) - Model bioactive peptide hormones
+3. **🎯 Hard Decoy Challenge** (35 min) - Generate decoys for docking validation
+4. **🌌 AI Latent Space Explorer** (35 min) - Navigate chemical space with ML
+5. **🔬 Virtual NMR Spectrometer** (25 min) - Predict experimental observables
 
 
 ## Table of Contents
