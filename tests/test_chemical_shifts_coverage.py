@@ -93,11 +93,4 @@ def test_calculate_csi_missing_res_in_coil_shifts():
     csi = calculate_csi(shifts, peptide)
     assert 1 not in csi["A"]
 
-def test_numba_fallback_cs_coverage():
-    """Test njit fallback in chemical_shifts.py."""
-    def dummy(x): return x
-    fallback = cs_mod.njit(dummy)
-    assert fallback(1) == 1
-    
-    fallback_args = cs_mod.njit(cache=True)(dummy)
-    assert fallback_args(2) == 2
+

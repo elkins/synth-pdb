@@ -49,22 +49,4 @@ def test_calculate_relaxation_rates_proline():
     rates = calculate_relaxation_rates(atoms_with_h)
     assert 1 not in rates # Proline should be skipped even if it somehow has an H in our mock
 
-def test_numba_fallback_coverage():
-    """Trigger Numba fallback logic by mocking import error."""
-    import sys
-    with patch.dict("sys.modules", {"numba": None}):
-        # Reload the module to trigger the except ImportError
-        import importlib
-        import synth_pdb.relaxation as relax
-        importlib.reload(relax)
-        
-        @relax.njit
-        def test_func(x):
-            return x + 1
-        
-        assert test_func(5) == 6
-        
-        @relax.njit()
-        def test_func_args(x):
-            return x * 2
-        assert test_func_args(5) == 10
+

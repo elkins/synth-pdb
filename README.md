@@ -471,7 +471,11 @@ my_training_data/
   - Recommended for bulk generation: `1000`
   - Default: `0`
 
-#### **Synthetic NMR Data **
+#### **Synthetic NMR Data**
+
+> **📦 NMR Functionality Powered by [`synth-nmr`](https://github.com/elkins/synth-nmr)**  
+> As of version 1.17.0, all NMR-related functionality (NOE calculation, relaxation rates, chemical shifts, J-couplings) is provided by the standalone [`synth-nmr`](https://pypi.org/project/synth-nmr/) package. This package can be used independently for NMR data generation in your own projects. The integration is fully backward compatible—all existing code continues to work without changes.
+
 
 - `--gen-nef`: Generate synthetic NOE restraints in NEF format.
   - Scans structure for H-H pairs < cutoff.
