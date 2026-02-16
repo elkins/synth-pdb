@@ -63,6 +63,10 @@ dev = [
     "pytest-mock>=3.10.0",
     "psutil>=5.9.0",
 ]
+test = [
+    "pynmrstar",
+    "requests",
+]
 
 [project.scripts]
 synth-pdb = "synth_pdb.main:main"
