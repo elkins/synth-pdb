@@ -84,7 +84,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#ueginners" class="md-skip">
+        <a href="#beginners" class="md-skip">
           Skip to content
         </a>
       
@@ -708,6 +708,24 @@
         
       
       
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    For Beginners
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
       <a href="./" class="md-nav__link md-nav__link--active">
         
   
@@ -724,6 +742,80 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#what-is-synth-pdb" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What is synth-pdb?
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#why-use-synth-pdb" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why use synth-pdb?
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#getting-started-your-first-protein" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Getting Started: Your First Protein
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#key-concepts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Key Concepts
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#where-to-go-next" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where to go next?
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
       
     </li>
   
@@ -2581,6 +2673,69 @@
     
   
   
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#what-is-synth-pdb" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What is synth-pdb?
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#why-use-synth-pdb" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why use synth-pdb?
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#getting-started-your-first-protein" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Getting Started: Your First Protein
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#key-concepts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Key Concepts
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#where-to-go-next" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where to go next?
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
 </nav>
                   </div>
                 </div>
@@ -2599,8 +2754,43 @@
   
 
 
-<h1 id="ueginners">ueginners</h1>
-<p>Documentation coming soon.</p>
+<h1 id="beginners">Beginners</h1>
+<p>Welcome to <code>synth-pdb</code>, a powerful tool designed to generate protein structures for various applications, especially in AI/ML research and educational settings. If you're new to protein modeling, computational structural biology, or simply looking for an efficient way to create diverse protein structures, you're in the right place!</p>
+<h2 id="what-is-synth-pdb">What is <code>synth-pdb</code>?</h2>
+<p><code>synth-pdb</code> is a high-performance Python library that allows you to synthesize Protein Data Bank (PDB) files programmatically. It focuses on generating realistic and diverse protein structures, ranging from simple peptides to complex globular proteins, with control over various biophysical properties.</p>
+<h2 id="why-use-synth-pdb">Why use <code>synth-pdb</code>?</h2>
+<ul>
+<li><strong>AI/ML Data Generation:</strong> Create large, diverse datasets of protein structures for training machine learning models in areas like protein folding, design, and function prediction.</li>
+<li><strong>Education &amp; Visualization:</strong> Generate custom protein examples to illustrate structural biology concepts in classrooms or interactive tutorials.</li>
+<li><strong>Hypothesis Testing:</strong> Quickly prototype and test ideas about protein structure-function relationships.</li>
+<li><strong>Flexibility:</strong> Control parameters such as amino acid sequence, secondary structure elements, and global folds.</li>
+</ul>
+<h2 id="getting-started-your-first-protein">Getting Started: Your First Protein</h2>
+<p>Before you begin, ensure you have <code>synth-pdb</code> installed. If not, please refer to the <a href="../../getting-started/installation/">Installation Guide</a>.</p>
+<p>Once installed, generating a simple protein is straightforward. Let's create a small alanine peptide:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">synth_pdb.generator</span><span class="w"> </span><span class="kn">import</span> <span class="n">generate_protein</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="c1"># Generate a simple 5-residue poly-alanine peptide</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="c1"># This will create a PDB file named &#39;poly_ala_5.pdb&#39; in your current directory</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="n">protein_model</span> <span class="o">=</span> <span class="n">generate_protein</span><span class="p">(</span><span class="n">sequence</span><span class="o">=</span><span class="s2">&quot;AAAAA&quot;</span><span class="p">,</span> <span class="n">output_filepath</span><span class="o">=</span><span class="s2">&quot;poly_ala_5.pdb&quot;</span><span class="p">)</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Generated protein: </span><span class="si">{</span><span class="n">protein_model</span><span class="o">.</span><span class="n">filepath</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</span></code></pre></div>
+<p>This simple command creates a PDB file that you can then visualize using tools like PyMOL, VMD, or NGL Viewer.</p>
+<h2 id="key-concepts">Key Concepts</h2>
+<p>As you delve deeper into <code>synth-pdb</code>, you'll encounter concepts like:</p>
+<ul>
+<li><strong>PDB Files:</strong> The standard file format for recording protein and nucleic acid structures.</li>
+<li><strong>Amino Acids:</strong> The building blocks of proteins, linked together in a specific sequence.</li>
+<li><strong>Residues:</strong> Individual amino acid units within a protein chain.</li>
+<li><strong>Torsional Angles (Phi/Psi):</strong> Key angles that define the backbone conformation of a protein.</li>
+</ul>
+<h2 id="where-to-go-next">Where to go next?</h2>
+<ul>
+<li><strong>Quick Start Guide:</strong> Learn more about basic usage and features in the <a href="../../getting-started/quickstart/">Quick Start Guide</a>.</li>
+<li><strong>Interactive Tutorials:</strong> Explore practical examples and advanced functionalities in the <a href="../../tutorials/gfp_molecular_forge/">Tutorials</a> section.</li>
+<li><strong>API Reference:</strong> Dive into the detailed documentation of specific modules and functions in the <a href="../../api/overview/">API Reference</a>.</li>
+</ul>
+<p>Happy generating!</p>
 
 
 
