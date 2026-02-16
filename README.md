@@ -108,7 +108,9 @@ Choose a path based on your background and goals:
     - **Post-Translational Modifications**: Support for Phosphorylation (SEP, TPO, PTR) with valid physics parameters. ✅
 - **Cyclic Peptides (Macrocycles)**: Support for **Head-to-Tail cyclization**. Closes the peptide bond between N- and C-termini using physics-based minimization. ✅
 47: 
-48: 🚀 **High Performance Physics**
+48: - **NMR Functionality**: As of v1.17.0, all NMR-related features (chemical shifts, relaxation, NOEs, J-couplings) have been refactored into the separate [`synth-nmr`](https://pypi.org/project/synth-nmr/) Python package. This allows for independent use and development of NMR tools.
+
+🚀 **High Performance Physics**
 49: - **Hardware Acceleration**: Automatically detects and uses **GPU acceleration** (CUDA, OpenCL/Metal) if available.
 50:   - **Apple Silicon Support**: Fully supported on M1/M2/M3/M4 chips via OpenCL driver (5x speedup over CPU).
 51: - **Vectorized Geometry**: Construction kernels are optimized with NumPy vectorization for fast validation.
