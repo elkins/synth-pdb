@@ -42,7 +42,7 @@ As you delve deeper into `synth-pdb`, you'll encounter concepts like:
 ## Where to go next?
 
 *   **Quick Start Guide:** Learn more about basic usage and features in the [Quick Start Guide](../getting-started/quickstart.md).
-*   **Interactive Tutorials:** Explore practical examples and advanced functionalities in the [Tutorials](../../tutorials/interactive_tutorials/gfp_molecular_forge.ipynb) section.
-*   **API Reference:** Dive into the detailed documentation of specific modules and functions in the [API Reference](../../api/overview.md).
+*   **Interactive Tutorials:** Explore practical examples and advanced functionalities in the [Tutorials](../tutorials/gfp_molecular_forge.ipynb) section.
+*   **API Reference:** Dive into the detailed documentation of specific modules and functions in the [API Reference](../api/overview.md).
 
 Happy generating!
