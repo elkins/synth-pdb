@@ -107,14 +107,13 @@ Choose a path based on your background and goals:
     - **Cis-Proline Isomerization**: X-Pro bonds can adopt cis conformations (~5% probability). ✅
     - **Post-Translational Modifications**: Support for Phosphorylation (SEP, TPO, PTR) with valid physics parameters. ✅
 - **Cyclic Peptides (Macrocycles)**: Support for **Head-to-Tail cyclization**. Closes the peptide bond between N- and C-termini using physics-based minimization. ✅
-47: 
-48: - **NMR Functionality**: As of v1.17.0, all NMR-related features (chemical shifts, relaxation, NOEs, J-couplings) have been refactored into the separate [`synth-nmr`](https://pypi.org/project/synth-nmr/) Python package. This allows for independent use and development of NMR tools.
+- **NMR Functionality**: As of v1.17.0, all NMR-related features (chemical shifts, relaxation, NOEs, J-couplings) have been refactored into the separate [`synth-nmr`](https://pypi.org/project/synth-nmr/) Python package. This allows for independent use and development of NMR tools.
 
 🚀 **High Performance Physics**
-49: - **Hardware Acceleration**: Automatically detects and uses **GPU acceleration** (CUDA, OpenCL/Metal) if available.
-50:   - **Apple Silicon Support**: Fully supported on M1/M2/M3/M4 chips via OpenCL driver (5x speedup over CPU).
-51: - **Vectorized Geometry**: Construction kernels are optimized with NumPy vectorization for fast validation.
-52: - **Tunable Minimization**: Control `tolerance` and `max_iterations` to balance speed/quality for bulk datasets.
+- **Hardware Acceleration**: Automatically detects and uses **GPU acceleration** (CUDA, OpenCL/Metal) if available.
+    - **Apple Silicon Support**: Fully supported on M1/M2/M3/M4 chips via OpenCL driver (5x speedup over CPU).
+- **Vectorized Geometry**: Construction kernels are optimized with NumPy vectorization for fast validation.
+- **Tunable Minimization**: Control `tolerance` and `max_iterations` to balance speed/quality for bulk datasets.
 
 🔬 **Validation Suite**
 - Bond length validation
@@ -694,15 +693,6 @@ For detailed examples of how to load generated data into your favorite framework
 - [JAX Handover](file:///Users/georgeelkins/nmr/synth-pdb/examples/ml_loading/jax_handover.ipynb) - Zero-copy using `jax.numpy.asarray`.
 - [PyTorch Handover](file:///Users/georgeelkins/nmr/synth-pdb/examples/ml_loading/pytorch_handover.ipynb) - Unified memory mapping with `torch.from_numpy`.
 - [MLX Handover](file:///Users/georgeelkins/nmr/synth-pdb/examples/ml_loading/mlx_handover.ipynb) - Optimized for Apple Silicon (M-series CPUs/GPUs).
-
-### 🎓 Interactive Scientific Tutorials
-We've added a suite of interactive labs for deeper exploration into structural biology and AI physics:
-- **[🏔️ Folding Landscape](examples/interactive_tutorials/folding_landscape.ipynb)** [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/elkins/synth-pdb/blob/master/examples/interactive_tutorials/folding_landscape.ipynb) - 3D energy surface visualization with Ramachandran annotations and thermodynamics theory.
-- **[🌌 Latent Space Explorer](examples/interactive_tutorials/latent_space_explorer.ipynb)** [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/elkins/synth-pdb/blob/master/examples/interactive_tutorials/latent_space_explorer.ipynb) - PCA visualization of 6D orientograms with AI model theory.
-- **[🧪 GFP Molecular Forge](examples/interactive_tutorials/gfp_molecular_forge.ipynb)** [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/elkins/synth-pdb/blob/master/examples/interactive_tutorials/gfp_molecular_forge.ipynb) - Chromophore maturation chemistry with spectroscopy fundamentals.
-- **[🔗 NeRF Geometry Lab](examples/interactive_tutorials/nerf_geometry_lab.ipynb)** [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/elkins/synth-pdb/blob/master/examples/interactive_tutorials/nerf_geometry_lab.ipynb) - Interactive backbone angle manipulation with Z-Matrix theory.
-
-See the full [ML Integration Demo](file:///Users/georgeelkins/nmr/synth-pdb/examples/ml_integration/ml_handover_demo.ipynb) for examples of Radius of Gyration prediction and 6D orientation maps.
 
 #### Quality Control (Continued)
 
