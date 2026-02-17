@@ -51,6 +51,7 @@ dependencies = [
     "openmm>=8.0.0",
     "numba>=0.57.0",
     "synth-nmr>=0.1.0",
+    "scipy>=1.7.0",
 ]
 
 [project.optional-dependencies]
