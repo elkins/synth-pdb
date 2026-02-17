@@ -157,11 +157,7 @@ module = [
 ignore_missing_imports = true
 
 [tool.coverage.run]
-source = ["synth_pdb"]
-omit = [
-    "*/tests/*",
-    "*/__pycache__/*",
-]
+source = ["."]
 
 [tool.coverage.report]
 exclude_lines = [
