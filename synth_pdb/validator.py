@@ -559,7 +559,7 @@ class PDBValidator:
                     psi_str = f"{psi:.2f}"
                     
                     # Determine residue category for validation
-                    # Determine category
+                    # Categories: General, GLY, PRO, Pre-Pro
                     category = "General" # Default
                     if res_name == "GLY":
                         category = "GLY"
