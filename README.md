@@ -36,7 +36,6 @@ A command-line tool to generate Protein Data Bank (PDB) files with full atomic r
 | **💊 Drug Discovery Pipeline** | ⭐⭐⭐ Advanced | 35 min | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/elkins/synth-pdb/blob/master/examples/ml_integration/drug_discovery_pipeline.ipynb) |
 | **🌌 AI Latent Space Explorer** | ⭐⭐⭐ Advanced | 35 min | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/elkins/synth-pdb/blob/master/examples/interactive_tutorials/latent_space_explorer.ipynb) |
 | **🏔️ The Live Folding Landscape** | ⭐⭐⭐ Advanced | 40 min | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/elkins/synth-pdb/blob/master/examples/interactive_tutorials/folding_landscape.ipynb) |
-| **🤖 Model Quality Assessment** | ⭐⭐ Intermediate | 25 min | [View Docs](#model-quality-assessment-ai) |
 
 ### 🎓 Learning Paths
 
