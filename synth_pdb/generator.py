@@ -1191,7 +1191,13 @@ def generate_pdb_content(
                 current_phi = ((current_phi + 180) % 360) - 180
                 current_psi = ((current_psi + 180) % 360) - 180
             
-            # EDUCATIONAL NOTE - Chiral Inversion (The Backbone Mirror):
+            # Place C(i)
+            c_coord = _place_atom_with_dihedral(
+                prev_c_coord, n_coord, ca_coord,
+                BOND_LENGTH_CA_C,
+                ANGLE_N_CA_C,
+                current_phi
+            )
             # D-amino acids are stereochemically the mirror image of standard L-amino acids.
             # This applies not just to the sidechains, but to the backbone energetic landscape.
             # A D-residue naturally "wants" to have Phi/Psi angles that are the negative of
