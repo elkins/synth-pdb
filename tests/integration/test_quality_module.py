@@ -4,11 +4,11 @@ import unittest
 import numpy as np
 import tempfile
 from synth_pdb.generator import generate_pdb_content
-from synth_pdb.ai.features import extract_quality_features, get_feature_names
-from synth_pdb.ai.classifier import ProteinQualityClassifier
-from synth_pdb.ai.interpolate import interpolate_structures
+from synth_pdb.quality.features import extract_quality_features, get_feature_names
+from synth_pdb.quality.classifier import ProteinQualityClassifier
+from synth_pdb.quality.interpolate import interpolate_structures
 
-class TestAIModules(unittest.TestCase):
+class TestQualityModules(unittest.TestCase):
     def setUp(self):
         # Generate two simple PDBs for testing
         self.pdb1_content = generate_pdb_content(length=10, sequence_str="AAAAAAAAAA", conformation="alpha")
@@ -34,9 +34,9 @@ class TestAIModules(unittest.TestCase):
         self.assertTrue(0 <= features[0] <= 100) # Rama favored %
 
     def test_classifier(self):
-        print("\nTesting Classifier...")
+        print("\nTesting Quality Classifier...")
         # Ensure model exists (it should have been trained by previous step)
-        model_path = "synth_pdb/ai/models/quality_filter_v1.joblib"
+        model_path = "synth_pdb/quality/models/quality_filter_v1.joblib"
         if not os.path.exists(model_path):
             print(f"Model not found at {model_path}, skipping classifier test.")
             return

@@ -2,10 +2,10 @@
 import unittest
 import numpy as np
 import biotite.structure as struc
-from synth_pdb.ai.features import extract_quality_features, _analyze_ramachandran, get_feature_names
+from synth_pdb.quality.features import extract_quality_features, _analyze_ramachandran, get_feature_names
 from synth_pdb.validator import PDBValidator
 
-class TestAIFeatures(unittest.TestCase):
+class TestQualityFeatures(unittest.TestCase):
     def test_ramachandran_analysis_ideal(self):
         phi = np.array([-60, -60, -60])
         psi = np.array([-45, -45, -45])

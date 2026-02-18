@@ -120,10 +120,10 @@ class TestScientificRigor(unittest.TestCase):
         # Target Distribution for VAL Alpha
         # From data.py: g- (0.90), t (0.05), g+ (0.05)
         expected_probs = {'g-': 0.90, 't': 0.05, 'g+': 0.05}
-        n_samples = 2000 # Statistical power
+        n_samples = 500  # 500 is sufficient for chi-squared power; 2000 overflows PDB z-coordinate columns
         
-        # Generate Poly-Valine Helix
-        pdb_content = generate_pdb_content(sequence_str="V" * n_samples, conformation="alpha", minimize_energy=False)
+        # Generate Poly-Valine Helix (seed for determinism — test is otherwise stochastic)
+        pdb_content = generate_pdb_content(sequence_str="V" * n_samples, conformation="alpha", minimize_energy=False, seed=42)
         structure = self._get_structure(pdb_content)
         
         # Measure Chi1 angles

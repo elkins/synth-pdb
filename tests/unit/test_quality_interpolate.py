@@ -5,9 +5,9 @@ import tempfile
 import os
 from biotite.structure.io.pdb import PDBFile
 import biotite.structure as struc
-from synth_pdb.ai.interpolate import interpolate_structures
+from synth_pdb.quality.interpolate import interpolate_structures
 
-class TestAIInterpolate(unittest.TestCase):
+class TestQualityInterpolate(unittest.TestCase):
     def setUp(self):
         self.test_dir = tempfile.mkdtemp()
         self.pdb1_path = os.path.join(self.test_dir, "start.pdb")

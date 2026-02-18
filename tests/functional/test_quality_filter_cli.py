@@ -5,7 +5,7 @@ import sys
 import os
 import tempfile
 
-class TestAICLI(unittest.TestCase):
+class TestQualityFilterCLI(unittest.TestCase):
     def setUp(self):
         self.test_dir = tempfile.mkdtemp()
         self.start_pdb = os.path.join(self.test_dir, "start.pdb")
@@ -58,25 +58,24 @@ class TestAICLI(unittest.TestCase):
         self.assertEqual(result.returncode, 0)
         self.assertTrue(os.path.exists(os.path.join(self.test_dir, "morph_0.pdb")))
 
-    def test_cli_ai_filter(self):
-        # synth-pdb --length 10 --ai-filter --ai-score-cutoff 0.0 --out filtered.pdb
+    def test_cli_quality_filter(self):
+        # synth-pdb --length 5 --quality-filter --quality-score-cutoff 0.0 --output filtered.pdb
         # Using cutoff 0.0 guarantees pass
         # Using length 5 to be fast
         
-        # Need to ensure model exists or mock it? 
-        # The environment should have the model from previous steps.
-        # But if not, this relies on global state.
-        # Ideally functional tests run in configured env.
-        
-        # Check if model exists first?
-        if not os.path.exists("synth_pdb/ai/models/quality_filter_v1.joblib"):
-             print("Skipping AI Filter CLI test because model file is missing.")
+        # Check if model exists first
+        model_path = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+            "synth_pdb", "quality", "models", "quality_filter_v1.joblib"
+        )
+        if not os.path.exists(model_path):
+             print("Skipping Quality Filter CLI test because model file is missing.")
              return
 
         cmd = [
             "--length", "5",
-            "--ai-filter",
-            "--ai-score-cutoff", "0.0",
+            "--quality-filter",
+            "--quality-score-cutoff", "0.0",
             "--output", "filtered.pdb"
         ]
         
@@ -88,6 +87,7 @@ class TestAICLI(unittest.TestCase):
              
         self.assertEqual(result.returncode, 0)
         self.assertTrue(os.path.exists(os.path.join(self.test_dir, "filtered.pdb")))
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -7,7 +7,7 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import classification_report, accuracy_score
 from synth_pdb.generator import generate_pdb_content
-from synth_pdb.ai.features import extract_quality_features, get_feature_names
+from synth_pdb.quality.features import extract_quality_features, get_feature_names
 
 def generate_dataset(n_samples=200):
     """Generates a balanced dataset of Good and Bad structures."""
@@ -131,8 +131,8 @@ def train_model(output_path, n_samples=200):
     print("Done!")
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Train AI Quality Filter Model")
-    parser.add_argument("--output", default="synth_pdb/ai/models/quality_filter_v1.joblib", help="Output path for model")
+    parser = argparse.ArgumentParser(description="Train Structure Quality Filter Model (Random Forest classifier)")
+    parser.add_argument("--output", default="synth_pdb/quality/models/quality_filter_v1.joblib", help="Output path for model")
     parser.add_argument("--n-samples", type=int, default=200, help="Number of samples to generate")
     args = parser.parse_args()
     

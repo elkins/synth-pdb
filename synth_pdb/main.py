@@ -199,7 +199,7 @@ def main() -> None:
         type=str,
         default="generate",
         choices=["generate", "decoys", "docking", "pymol", "dataset", "ai"],
-        help="Operation mode: 'generate' (default) single structure, 'decoys' ensemble, 'docking' preparation (PQR), 'pymol' visualization script, 'dataset' bulk generation, 'ai' quality filter.",
+        help="Operation mode: 'generate' (default) single structure, 'decoys' ensemble, 'docking' preparation (PQR), 'pymol' visualization script, 'dataset' bulk generation, 'ai' structure interpolation/clustering.",
     )
     parser.add_argument(
         "--n-decoys",
@@ -415,7 +415,7 @@ def main() -> None:
         help="Run Molecular Dynamics equilibration (at 300K) after minimization. Requires OpenMM."
     )
     
-    # Phase 15: Bulk Dataset Generation (AI)
+    # Phase 15: Bulk Dataset Generation (ML)
     parser.add_argument(
         "--num-samples",
         type=int,
@@ -454,17 +454,17 @@ def main() -> None:
         help="Output format for dataset generation (default: pdb). 'npz' produces compressed arrays.",
     )
 
-    # Phase 16: AI Integration
+    # Phase 16: Structure Quality Filter (Random Forest classifier)
     parser.add_argument(
-        "--ai-filter",
+        "--quality-filter",
         action="store_true",
-        help="Enable AI-based quality filtering. Rejects structures that look 'unnatural' to the classifier.",
+        help="Enable Random Forest-based structure quality filtering. Rejects structures that score below the cutoff on geometric quality metrics (Ramachandran, clashes, bond lengths).",
     )
     parser.add_argument(
-        "--ai-score-cutoff",
+        "--quality-score-cutoff",
         type=float,
         default=0.5,
-        help="Minimum confidence score (0.0-1.0) for AI filter (default: 0.5).",
+        help="Minimum confidence score (0.0-1.0) for structure quality filter (default: 0.5).",
     )
     parser.add_argument(
         "--ai-op",
@@ -743,21 +743,21 @@ def main() -> None:
                 current_violations = validator.get_violations()
                 logger.debug(f"PDBValidator returned {len(current_violations)} violations for attempt {attempt_num}. Content: {current_violations}")
             
-            if args.ai_filter:
+            if args.quality_filter:
                 try:
-                    from .ai.classifier import ProteinQualityClassifier
+                    from .quality.classifier import ProteinQualityClassifier
                     classifier = ProteinQualityClassifier()
                     is_good, prob, _ = classifier.predict(current_pdb_content)
                     
-                    if prob < args.ai_score_cutoff:
-                        logger.warning(f"AI Filter Reject (Attempt {attempt_num}): Score {prob:.2f} < {args.ai_score_cutoff}")
+                    if prob < args.quality_score_cutoff:
+                        logger.warning(f"Quality Filter Reject (Attempt {attempt_num}): Score {prob:.2f} < {args.quality_score_cutoff}")
                         continue # Retry
                     else:
-                        logger.info(f"AI Filter Pass (Attempt {attempt_num}): Score {prob:.2f}")
+                        logger.info(f"Quality Filter Pass (Attempt {attempt_num}): Score {prob:.2f}")
                 except ImportError:
-                    logger.warning("AI Filter enabled but dependencies missing. Install `synth-pdb[ai]`. Skipping filter.")
+                    logger.warning("Quality Filter enabled but dependencies missing. Install `synth-pdb[ai]`. Skipping filter.")
                 except Exception as e:
-                    logger.warning(f"AI Filter failed: {e}. Skipping.")
+                    logger.warning(f"Quality Filter failed: {e}. Skipping.")
 
             if args.guarantee_valid:
                 if not current_violations:

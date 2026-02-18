@@ -6,13 +6,13 @@ from biotite.structure.io.pdb import PDBFile
 import io
 
 from synth_pdb.generator import generate_pdb_content
-from synth_pdb.ai.classifier import ProteinQualityClassifier
+from synth_pdb.quality.classifier import ProteinQualityClassifier
 
-class TestAIQualityDeep(unittest.TestCase):
+class TestQualityFilterDeep(unittest.TestCase):
     def setUp(self):
         self.classifier = ProteinQualityClassifier()
         if self.classifier.model is None:
-            self.skipTest("AI model not found. Skipping deep quality tests.")
+            self.skipTest("Quality classifier model not found. Skipping deep quality tests.")
 
     def test_high_quality_helix(self):
         """Test that a perfect alpha helix is classified as High Quality."""
