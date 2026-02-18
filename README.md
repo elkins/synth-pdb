@@ -36,6 +36,7 @@ A command-line tool to generate Protein Data Bank (PDB) files with full atomic r
 | **💊 Drug Discovery Pipeline** | ⭐⭐⭐ Advanced | 35 min | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/elkins/synth-pdb/blob/master/examples/ml_integration/drug_discovery_pipeline.ipynb) |
 | **🌌 AI Latent Space Explorer** | ⭐⭐⭐ Advanced | 35 min | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/elkins/synth-pdb/blob/master/examples/interactive_tutorials/latent_space_explorer.ipynb) |
 | **🏔️ The Live Folding Landscape** | ⭐⭐⭐ Advanced | 40 min | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/elkins/synth-pdb/blob/master/examples/interactive_tutorials/folding_landscape.ipynb) |
+| **🤖 Model Quality Assessment** | ⭐⭐ Intermediate | 25 min | [View Docs](#model-quality-assessment-ai) |
 
 ### 🎓 Learning Paths
 
@@ -128,6 +129,8 @@ Choose a path based on your background and goals:
 - `--best-of-N`: Generate multiple structures and select the one with fewest violations
 - `--guarantee-valid`: Iteratively generate until a violation-free structure is found
 - `--refine-clashes`: Iteratively adjust atoms to reduce steric clashes
+- `--ai-filter`: Use AI-based Quality Filter to validate structure geometry
+- `--ai-score-cutoff`: Set minimum confidence score for AI (0.0-1.0)
 
 📝 **Reproducibility**
 - Command-line parameters stored in PDB header (REMARK 3 records)
@@ -445,6 +448,19 @@ my_training_data/
   - Applies after structure selection
   - Iterates until improvements stop or max iterations reached
   - Example: `--refine-clashes 10`
+
+#### **Model Quality Assessment (AI)**
+
+- `--ai-filter`: Enable the **AI Quality Filter** to screen generated structures.
+  - Using a Random Forest classifier trained on thousands of samples, this filter automatically rejects "low quality" structures (clashing, distorted geometry).
+  - It considers Ramachandran angles, steric clashes, bond lengths, and radius of gyration.
+  - Useful for filtering out failed minimization attempts in bulk generation.
+
+- `--ai-score-cutoff <FLOAT>`: Minimum probability score (0.0-1.0) for a structure to be considered "Good".
+  - Higher values = stricter filtering (fewer false positives, more false negatives).
+  - Default: `0.5`
+  - Example: `--ai-score-cutoff 0.8` (Only keep highly confident good structures)
+  - Scores below `0.5` are typically rejected as "Bad".
 
 #### **Physics & Advanced Refinement **
 

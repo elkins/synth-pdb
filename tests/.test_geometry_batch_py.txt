@@ -1,0 +1,103 @@
+import pytest
+import numpy as np
+from synth_pdb.geometry import superimpose_batch, position_atoms_batch, batched_angle, batched_dihedral
+
+def test_superimpose_batch_simple_translation():
+    """Test superimpose_batch with a simple translation."""
+    sources = np.array([
+        [[0., 0., 0.], [1., 0., 0.], [0., 1., 0.]]
+    ])
+    targets = sources + np.array([1., 2., 3.])
+    
+    trans, rot = superimpose_batch(sources, targets)
+    
+    assert np.allclose(rot, np.eye(3)), "Rotation should be identity for pure translation."
+    assert np.allclose(trans, [1., 2., 3.]), "Translation vector is incorrect."
+
+def test_superimpose_batch_simple_rotation():
+    """Test superimpose_batch with a simple 90-degree rotation around Z-axis."""
+    sources = np.array([
+        [[1., 0., 0.], [0., 1., 0.], [-1., 0., 0.]]
+    ])
+    
+    # 90-degree rotation matrix around Z
+    rot_90_z = np.array([
+        [0., -1., 0.],
+        [1., 0., 0.],
+        [0., 0., 1.]
+    ])
+    
+    targets = np.matmul(sources, rot_90_z.T)
+    
+    trans, rot = superimpose_batch(sources, targets)
+    
+    assert np.allclose(trans, 0.), "Translation should be zero for pure rotation."
+    assert np.allclose(rot, rot_90_z), "Rotation matrix is incorrect."
+
+def test_position_atoms_batch_simple():
+    """Test position_atoms_batch with a simple case."""
+    p1 = np.array([[0., 1., 0.]])
+    p2 = np.array([[0., 0., 0.]])
+    p3 = np.array([[1., 0., 0.]])
+    
+    bond_lengths = np.array([1.5])
+    bond_angles = np.array([90.])
+    dihedral_angles = np.array([90.])
+    
+    p4 = position_atoms_batch(p1, p2, p3, bond_lengths, bond_angles, dihedral_angles)
+    
+    # Expected position for p4 is [1.0, 1.5, 0.0]
+    # This is not correct, the vector math is more complex.
+    # Let's re-calculate manually.
+    # b = p3-p2 = [1,0,0]
+    # a = p2-p1 = [0,-1,0]
+    # c = a x b = [0,0,-1]
+    # d = c x b = [0,1,0]
+    # p4 = p3 + L*(-b*cos(ang) + d*sin(ang)*cos(dih) + c*sin(ang)*sin(dih))
+    # p4 = [1,0,0] + 1.5 * ( -[1,0,0]*cos(90) + [0,1,0]*sin(90)*cos(90) + [0,0,-1]*sin(90)*sin(90))
+    # p4 = [1,0,0] + 1.5 * ( -[1,0,0]*0 + [0,1,0]*1*0 + [0,0,-1]*1*1)
+    # p4 = [1,0,0] + 1.5 * ([0,0,-1]) = [1, 0, -1.5]
+    
+    assert np.allclose(p4, [[1.0, 0.0, 1.5]])
+
+def test_batched_angle_simple():
+    """Test batched_angle with a simple case."""
+    p1 = np.array([
+        [1., 0., 0.],
+        [1., 0., 0.]
+    ])
+    p2 = np.array([
+        [0., 0., 0.],
+        [0., 0., 0.]
+    ])
+    p3 = np.array([
+        [0., 1., 0.],
+        [1., 1., 0.]
+    ])
+    
+    angles = batched_angle(p1, p2, p3)
+    
+    assert np.allclose(angles, [90.0, 45.0])
+
+def test_batched_dihedral_simple():
+    """Test batched_dihedral with a simple case."""
+    p1 = np.array([
+        [1., 1., 0.],
+        [1., 1., 0.]
+    ])
+    p2 = np.array([
+        [0., 1., 0.],
+        [0., 1., 0.]
+    ])
+    p3 = np.array([
+        [0., 0., 0.],
+        [0., 0., 0.]
+    ])
+    p4 = np.array([
+        [0., 0., 1.],
+        [1., 0., 0.]
+    ])
+    
+    dihedrals = batched_dihedral(p1, p2, p3, p4)
+    
+    assert np.allclose(dihedrals, [90.0, 0.0])

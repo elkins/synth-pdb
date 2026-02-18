@@ -68,6 +68,10 @@ test = [
     "pynmrstar",
     "requests",
 ]
+ai = [
+    "scikit-learn>=1.0.0",
+    "pandas>=1.3.0",
+]
 
 [project.scripts]
 synth-pdb = "synth_pdb.main:main"

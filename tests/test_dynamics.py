@@ -54,6 +54,7 @@ def test_get_secondary_structure_helix():
     ss = get_secondary_structure(structure)
     logger.info(f"Detected SS array: {ss}")
     
+    
     # We determined empirically that with seed interactions, we get some alpha.
     # Let's find *contiguous* alpha and assert it exists.
     

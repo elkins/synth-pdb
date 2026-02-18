@@ -1277,6 +1277,10 @@ def generate_pdb_content(
         
         # Try Backbone-Dependent Lookup first
         # current_conformation is available from earlier in the loop (e.g., 'alpha', 'beta')
+        # Try Backbone-Dependent Lookup first
+        # current_conformation is available from earlier in the loop (e.g., 'alpha', 'beta')
+        # Try Backbone-Dependent Lookup first
+        # current_conformation is available from earlier in the loop (e.g., 'alpha', 'beta')
         if res_name in BACKBONE_DEPENDENT_ROTAMER_LIBRARY:
             if current_conformation in BACKBONE_DEPENDENT_ROTAMER_LIBRARY[res_name]:
                 rotamers = BACKBONE_DEPENDENT_ROTAMER_LIBRARY[res_name][current_conformation]
@@ -1316,9 +1320,10 @@ def generate_pdb_content(
                         n_atom.coord, ca_atom.coord, cb_atom.coord, g_atom.coord
                     )
                     # Rodrigues rotation formula CCW looking down CA->CB 
-                    # results in a NEGATIVE change in dihedral angle in our convention.
-                    # So rotation_angle = current - target
-                    diff_deg = current_chi1 - chi1_target
+                    # results in a NEGATIVE change in dihedral angle in our convention?
+                    # No, with standard IUPAC, Rotation (+CCW) adds to Dihedral.
+                    # So rotation_angle = target - current
+                    diff_deg = chi1_target - current_chi1
                     
                     # Rotate all atoms downstream of CB
                     # We identify sidechain atoms as everything except N, CA, C, O, H, HA

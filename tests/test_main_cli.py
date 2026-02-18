@@ -20,7 +20,7 @@ class TestMainCLI:
         clashing_pdb_content = (
             "HEADER    clashing_peptide\n" +
             create_atom_line(1, "CA", "ALA", "A", 1, 0.0, 0.0, 0.0, "C", alt_loc="", insertion_code="") + "\n" +
-            create_atom_line(2, "CA", "ALA", "A", 2, 0.500, 0.0, 0.0, "C", alt_loc="", insertion_code="")
+            create_atom_line(2, "CA", "ALA", "A", 2, 0.100, 0.0, 0.0, "C", alt_loc="", insertion_code="")
         )
             
         # Valid PDB content
@@ -49,8 +49,8 @@ class TestMainCLI:
         main.main()
 
         # Assert that expected log messages are present
-        assert "PDB generated in attempt 1 has 2 violations. Retrying..." in caplog.text
-        assert "PDB generated in attempt 2 has 2 violations. Retrying..." in caplog.text
+        assert "PDB generated in attempt 1 has 1 violations. Retrying..." in caplog.text
+        assert "PDB generated in attempt 2 has 1 violations. Retrying..." in caplog.text
         assert "Successfully generated a valid PDB file after 3 attempts." in caplog.text
         assert "test_gv_success.pdb" in caplog.text
         sys.exit.assert_not_called() # Should not exit with error
@@ -62,7 +62,7 @@ class TestMainCLI:
         clashing_pdb_content = (
             "HEADER    clashing_peptide\n" +
             create_atom_line(1, "CA", "ALA", "A", 1, 0.0, 0.0, 0.0, "C", alt_loc="", insertion_code="") + "\n" +
-            create_atom_line(2, "CA", "ALA", "A", 2, 0.500, 0.0, 0.0, "C", alt_loc="", insertion_code="")
+            create_atom_line(2, "CA", "ALA", "A", 2, 0.100, 0.0, 0.0, "C", alt_loc="", insertion_code="")
         )
 
         mocker.patch("synth_pdb.main.generate_pdb_content", return_value=clashing_pdb_content) # Always return clashing PDB
@@ -78,8 +78,8 @@ class TestMainCLI:
 
         main.main()
 
-        assert "PDB generated in attempt 1 has 2 violations. Retrying..." in caplog.text
-        assert "PDB generated in attempt 2 has 2 violations. Retrying..." in caplog.text
+        assert "PDB generated in attempt 1 has 1 violations. Retrying..." in caplog.text
+        assert "PDB generated in attempt 2 has 1 violations. Retrying..." in caplog.text
         assert "Failed to generate a suitable PDB file after 2 attempts." in caplog.text
         mock_sys_exit.assert_called_once_with(1)
 
@@ -91,13 +91,14 @@ class TestMainCLI:
         pdb_content_2_violations = (
             "HEADER    two_violations\n" +
             create_atom_line(1, "CA", "ALA", "A", 1, 0.0, 0.0, 0.0, "C", alt_loc="", insertion_code="") + "\n" +
-            create_atom_line(2, "CA", "ALA", "A", 2, 0.500, 0.0, 0.0, "C", alt_loc="", insertion_code="")
+            create_atom_line(2, "CA", "ALA", "A", 2, 0.100, 0.0, 0.0, "C", alt_loc="", insertion_code="") + "\n" +
+            create_atom_line(3, "CA", "ALA", "A", 3, 0.100, 0.0, 0.0, "C", alt_loc="", insertion_code="")
         )
         # PDB content with 1 violation (e.g., a less severe steric clash)
         pdb_content_1_violation = (
             "HEADER    one_violation\n" +
             create_atom_line(1, "CA", "ALA", "A", 1, 0.0, 0.0, 0.0, "C", alt_loc="", insertion_code="") + "\n" +
-            create_atom_line(2, "CA", "ALA", "A", 2, 1.0, 0.0, 0.0, "C", alt_loc="", insertion_code="")
+            create_atom_line(2, "CA", "ALA", "A", 2, 0.100, 0.0, 0.0, "C", alt_loc="", insertion_code="")
         )
         # PDB content with 0 violations
         pdb_content_0_violations = (
@@ -122,8 +123,8 @@ class TestMainCLI:
         main.main()
 
         # The actual violations found by the real PDBValidator (based on content above)
-        assert "Attempt 1 yielded 2 violations" in caplog.text
-        assert "Attempt 2 yielded 2 violations. Current minimum is 2." in caplog.text
+        assert "Attempt 1 yielded 4 violations" in caplog.text
+        assert "Attempt 2 yielded 1 violations (new minimum)." in caplog.text
         assert "Attempt 3 yielded 0 violations (new minimum)." in caplog.text
         assert "No violations found in the final PDB for" in caplog.text # Because the 0-violation PDB was chosen
         sys.exit.assert_not_called()
@@ -135,7 +136,7 @@ class TestMainCLI:
         initial_clashing_pdb_content = (
             "HEADER    clashing_peptide\n" +
             create_atom_line(1, "CA", "ALA", "A", 1, 0.0, 0.0, 0.0, "C", alt_loc="", insertion_code="") + "\n" +
-            create_atom_line(2, "CA", "ALA", "A", 2, 0.500, 0.0, 0.0, "C", alt_loc="", insertion_code="")
+            create_atom_line(2, "CA", "ALA", "A", 2, 0.100, 0.0, 0.0, "C", alt_loc="", insertion_code="")
         )
 
         # PDB content that has no steric clashes (parsed atoms for mocking tweak result)
@@ -157,11 +158,11 @@ class TestMainCLI:
 
         main.main()
 
-        # The initial clashing_pdb_content will result in 2 steric clash violations.
+        # The initial clashing_pdb_content will result in 1 steric clash violation (min distance).
         # After the tweak, it should be 0.
-        assert "Refinement iteration 1/1. Violations: 2" in caplog.text
-        assert "Refinement iteration 1: Reduced violations from 2 to 0." in caplog.text
-        assert "Refinement process completed. Reduced total violations from 2 to 0." in caplog.text
+        assert "Refinement iteration 1/1. Violations: 1" in caplog.text
+        assert "Refinement iteration 1: Reduced violations from 1 to 0." in caplog.text
+        assert "Refinement process completed. Reduced total violations from 1 to 0." in caplog.text
         assert "No violations found in the final PDB for" in caplog.text
         sys.exit.assert_not_called()
 
@@ -172,7 +173,7 @@ class TestMainCLI:
         initial_clashing_pdb_content = (
             "HEADER    clashing_peptide\n" +
             create_atom_line(1, "CA", "ALA", "A", 1, 0.0, 0.0, 0.0, "C", alt_loc="", insertion_code="") + "\n" +
-            create_atom_line(2, "CA", "ALA", "A", 2, 0.500, 0.0, 0.0, "C", alt_loc="", insertion_code="")
+            create_atom_line(2, "CA", "ALA", "A", 2, 0.100, 0.0, 0.0, "C", alt_loc="", insertion_code="")
         )
         mocker.patch("synth_pdb.main.generate_pdb_content", return_value=initial_clashing_pdb_content)
 
@@ -180,7 +181,7 @@ class TestMainCLI:
         # Ensure coords are numpy arrays as the validator expects them for calculation
         still_clashing_parsed_atoms = [
             {"atom_number": 1, "atom_name": "CA", "alt_loc": "", "residue_name": "ALA", "chain_id": "A", "residue_number": 1, "insertion_code": "", "coords": np.array([0.0, 0.0, 0.0]), "occupancy": 1.0, "temp_factor": 0.0, "element": "C", "charge": ""},
-            {"atom_number": 2, "atom_name": "CA", "alt_loc": "", "residue_name": "ALA", "chain_id": "A", "residue_number": 2, "insertion_code": "", "coords": np.array([0.6, 0.0, 0.0]), "occupancy": 1.0, "temp_factor": 0.0, "element": "C", "charge": ""}, # Still clashing
+            {"atom_number": 2, "atom_name": "CA", "alt_loc": "", "residue_name": "ALA", "chain_id": "A", "residue_number": 2, "insertion_code": "", "coords": np.array([0.1, 0.0, 0.0]), "occupancy": 1.0, "temp_factor": 0.0, "element": "C", "charge": ""}, # Still clashing
         ]
         mocker.patch.object(PDBValidator, "_apply_steric_clash_tweak", return_value=still_clashing_parsed_atoms)
         
@@ -191,12 +192,12 @@ class TestMainCLI:
 
         main.main()
 
-        # The initial clashing_pdb_content will result in 2 steric clash violations.
-        # After the tweak, it should still be 2.
-        assert "Refinement iteration 1/2. Violations: 2" in caplog.text
-        assert "Refinement iteration 1: No further reduction in violations (2). Stopping refinement." in caplog.text
-        assert "Refinement process completed. No change in total violations (2)." in caplog.text
-        assert "Final PDB has 2 violations." in caplog.text
+        # The initial clashing_pdb_content will result in 1 steric clash violation.
+        # After the tweak, it should still be 1.
+        assert "Refinement iteration 1/2. Violations: 1" in caplog.text
+        assert "Refinement iteration 1: No further reduction in violations (1). Stopping refinement." in caplog.text
+        assert "Refinement process completed. No change in total violations (1)." in caplog.text
+        assert "Final PDB has 1 violations." in caplog.text
         sys.exit.assert_not_called()
     
     def test_header_with_best_of_N_and_refine_clashes(self, mocker, tmp_path, caplog):

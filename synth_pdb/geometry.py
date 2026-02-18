@@ -323,7 +323,7 @@ def calculate_dihedral_angle(
     x = np.sum(n1 * n2)
     y = np.sum(m1 * n2)
     
-    return np.degrees(np.arctan2(y, x))
+    return -np.degrees(np.arctan2(y, x))
 
 
 def batched_angle(p1: np.ndarray, p2: np.ndarray, p3: np.ndarray) -> np.ndarray:

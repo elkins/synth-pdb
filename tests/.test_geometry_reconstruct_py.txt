@@ -1,0 +1,61 @@
+import pytest
+import numpy as np
+import biotite.structure as struc
+from synth_pdb.geometry import reconstruct_sidechain
+
+def test_reconstruct_sidechain_chi1():
+    """Test sidechain reconstruction with chi1 angle."""
+    from synth_pdb.generator import generate_pdb_content
+    import biotite.structure.io.pdb as pdb
+    import io
+
+    pdb_content = generate_pdb_content(sequence_str="AC", conformation="alpha")
+    pdb_file = pdb.PDBFile.read(io.StringIO(pdb_content))
+    peptide = pdb_file.get_structure(model=1)
+    
+    res_id = 2
+    target_chi1 = 60.0
+    rotamer = {'chi1': [target_chi1]}
+    
+    reconstruct_sidechain(peptide, res_id, rotamer)
+    
+    n_coord = peptide[(peptide.res_id == res_id) & (peptide.atom_name == "N")].coord[0]
+    ca_coord = peptide[(peptide.res_id == res_id) & (peptide.atom_name == "CA")].coord[0]
+    cb_coord = peptide[(peptide.res_id == res_id) & (peptide.atom_name == "CB")].coord[0]
+    sg_coord = peptide[(peptide.res_id == res_id) & (peptide.atom_name == "SG")].coord[0]
+    
+    calc_chi1 = np.rad2deg(struc.dihedral(n_coord, ca_coord, cb_coord, sg_coord))
+    
+    if calc_chi1 < 0: calc_chi1 += 360
+    if target_chi1 < 0: target_chi1 += 360
+    
+    assert pytest.approx(calc_chi1, abs=0.5) == target_chi1
+
+@pytest.mark.xfail(reason="chi2 reconstruction is not implemented correctly yet")
+def test_reconstruct_sidechain_chi2():
+    """Test sidechain reconstruction with chi2 angle."""
+    from synth_pdb.generator import generate_pdb_content
+    import biotite.structure.io.pdb as pdb
+    import io
+
+    pdb_content = generate_pdb_content(sequence_str="AL", conformation="alpha")
+    pdb_file = pdb.PDBFile.read(io.StringIO(pdb_content))
+    peptide = pdb_file.get_structure(model=1)
+    
+    res_id = 2
+    rotamer = {'chi1': [60.0], 'chi2': [120.0]}
+    
+    reconstruct_sidechain(peptide, res_id, rotamer)
+    
+    cb_coord = peptide[(peptide.res_id == res_id) & (peptide.atom_name == "CB")].coord[0]
+    cg_coord = peptide[(peptide.res_id == res_id) & (peptide.atom_name == "CG")].coord[0]
+    cd1_coord = peptide[(peptide.res_id == res_id) & (peptide.atom_name == "CD1")].coord[0]
+    ca_coord = peptide[(peptide.res_id == res_id) & (peptide.atom_name == "CA")].coord[0]
+
+    calc_chi2 = np.rad2deg(struc.dihedral(ca_coord, cb_coord, cg_coord, cd1_coord))
+    
+    target_chi2 = rotamer['chi2'][0]
+    if calc_chi2 < 0: calc_chi2 += 360
+    if target_chi2 < 0: target_chi2 += 360
+    
+    assert pytest.approx(calc_chi2, abs=1.0) == target_chi2

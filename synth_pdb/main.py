@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 """
 CLI entry point for the synth-pdb tool.
 
@@ -196,8 +198,8 @@ def main() -> None:
         "--mode",
         type=str,
         default="generate",
-        choices=["generate", "decoys", "docking", "pymol", "dataset"],
-        help="Operation mode: 'generate' (default) single structure, 'decoys' ensemble, 'docking' preparation (PQR), 'pymol' visualization script, 'dataset' bulk generation.",
+        choices=["generate", "decoys", "docking", "pymol", "dataset", "ai"],
+        help="Operation mode: 'generate' (default) single structure, 'decoys' ensemble, 'docking' preparation (PQR), 'pymol' visualization script, 'dataset' bulk generation, 'ai' quality filter.",
     )
     parser.add_argument(
         "--n-decoys",
@@ -451,6 +453,41 @@ def main() -> None:
         choices=["pdb", "npz"],
         help="Output format for dataset generation (default: pdb). 'npz' produces compressed arrays.",
     )
+
+    # Phase 16: AI Integration
+    parser.add_argument(
+        "--ai-filter",
+        action="store_true",
+        help="Enable AI-based quality filtering. Rejects structures that look 'unnatural' to the classifier.",
+    )
+    parser.add_argument(
+        "--ai-score-cutoff",
+        type=float,
+        default=0.5,
+        help="Minimum confidence score (0.0-1.0) for AI filter (default: 0.5).",
+    )
+    parser.add_argument(
+        "--ai-op",
+        type=str,
+        choices=["interpolate", "cluster"],
+        help="Operation to perform in 'ai' mode.",
+    )
+    parser.add_argument(
+        "--start-pdb",
+        type=str,
+        help="Start PDB file for interpolation.",
+    )
+    parser.add_argument(
+        "--end-pdb",
+        type=str,
+        help="End PDB file for interpolation.",
+    )
+    parser.add_argument(
+        "--steps",
+        type=int,
+        default=5,
+        help="Number of steps for interpolation (default: 5).",
+    )
     
     parser.add_argument(
         "--seed",
@@ -631,6 +668,31 @@ def main() -> None:
         logger.info(f"Dataset generation complete. Output directory: {os.path.abspath(out_dir)}")
         return
 
+    if args.mode == "ai":
+        if args.ai_op == "interpolate":
+            from .ai.interpolate import interpolate_structures
+            if not args.start_pdb or not args.end_pdb:
+                logger.error("Interpolation requires --start-pdb and --end-pdb.")
+                sys.exit(1)
+            
+            try:
+                out_prefix = args.output if args.output else "morph"
+                interpolate_structures(args.start_pdb, args.end_pdb, args.steps, out_prefix)
+                logger.info(f"Interpolation complete. Generated {args.steps} frames.")
+            except ImportError:
+                logger.error("AI modules require scikit-learn and pandas. Install with `pip install synth-pdb[ai]`.")
+                sys.exit(1)
+            except Exception as e:
+                logger.error(f"Interpolation failed: {e}")
+                sys.exit(1)
+            return
+        elif args.ai_op == "cluster":
+            logger.error("Clustering not yet implemented.")
+            sys.exit(1)
+        else:
+            logger.error("AI mode requires --ai-op {interpolate, cluster}.")
+            sys.exit(1)
+
 
     length_for_generator = args.length if args.sequence is None else None
 
@@ -681,6 +743,22 @@ def main() -> None:
                 current_violations = validator.get_violations()
                 logger.debug(f"PDBValidator returned {len(current_violations)} violations for attempt {attempt_num}. Content: {current_violations}")
             
+            if args.ai_filter:
+                try:
+                    from .ai.classifier import ProteinQualityClassifier
+                    classifier = ProteinQualityClassifier()
+                    is_good, prob, _ = classifier.predict(current_pdb_content)
+                    
+                    if prob < args.ai_score_cutoff:
+                        logger.warning(f"AI Filter Reject (Attempt {attempt_num}): Score {prob:.2f} < {args.ai_score_cutoff}")
+                        continue # Retry
+                    else:
+                        logger.info(f"AI Filter Pass (Attempt {attempt_num}): Score {prob:.2f}")
+                except ImportError:
+                    logger.warning("AI Filter enabled but dependencies missing. Install `synth-pdb[ai]`. Skipping filter.")
+                except Exception as e:
+                    logger.warning(f"AI Filter failed: {e}. Skipping.")
+
             if args.guarantee_valid:
                 if not current_violations:
                     logger.info(f"Successfully generated a valid PDB file after {attempt_num} attempts.")
@@ -703,6 +781,7 @@ def main() -> None:
                 else:
                     logger.info(f"Attempt {attempt_num} yielded {len(current_violations)} violations. Current minimum is {min_violations_count}.")
             else: # No guarantee-valid or best-of-N, just take the first one
+                # If AI filter passed (or wasn't used), we accept this one
                 final_pdb_content = current_pdb_content
                 final_violations = current_violations
                 break
