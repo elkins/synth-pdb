@@ -670,7 +670,7 @@ def main() -> None:
 
     if args.mode == "ai":
         if args.ai_op == "interpolate":
-            from .ai.interpolate import interpolate_structures
+            from .quality.interpolate import interpolate_structures
             if not args.start_pdb or not args.end_pdb:
                 logger.error("Interpolation requires --start-pdb and --end-pdb.")
                 sys.exit(1)

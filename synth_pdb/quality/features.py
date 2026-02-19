@@ -1,3 +1,4 @@
+import logging
 import numpy as np
 import io
 import biotite.structure as struc
@@ -5,6 +6,8 @@ import biotite.structure.io.pdb as pdb
 from typing import Dict, List, Any, Tuple
 from synth_pdb.orientogram import compute_6d_orientations
 from synth_pdb.validator import PDBValidator, RAMACHANDRAN_POLYGONS
+
+logger = logging.getLogger(__name__)
 
 # Re-export core function for Latent Space Explorer
 __all__ = ['compute_6d_orientations', 'extract_quality_features', 'get_feature_names']
@@ -39,68 +42,76 @@ def extract_quality_features(pdb_content: str) -> np.ndarray:
     Returns:
         np.ndarray: A 1D array of floats (shape: 8,)
     """
-    # 1. Use PDBValidator for geometric violations
-    # We subclass/intercept to get counts instead of strings
-    validator = PDBValidator(pdb_content)
-    
-    # --- Ramachandran Analysis ---
-    # We need to compute this manually to get percentages, as validator only reports outliers
-    phi, psi = _get_dihedrals(validator)
-    rama_favored, rama_outliers = _analyze_ramachandran(phi, psi, validator)
-    total_residues = len(phi)
-    
-    rama_favored_pct = (rama_favored / total_residues * 100) if total_residues > 0 else 0
-    rama_outliers_pct = (rama_outliers / total_residues * 100) if total_residues > 0 else 0
-    
-    # --- Steric Clashes ---
-    # We count the number of clashes detected by the validator
-    initial_violations = len(validator.violations)
-    # We use backbone_only=True to avoid noise from sidechain generation issues
-    validator.validate_steric_clashes(min_atom_distance=0.5, min_ca_distance=3.0, backbone_only=True)
-    clash_count = len(validator.violations) - initial_violations
-    
-    # --- Bond Lengths ---
-    initial_violations = len(validator.violations)
-    validator.validate_bond_lengths(tolerance=0.1) # 0.1A tolerance
-    bond_len_count = len(validator.violations) - initial_violations
-    
-    # --- Bond Angles ---
-    initial_violations = len(validator.violations)
-    validator.validate_bond_angles(tolerance=10.0) # 10 deg tolerance
-    bond_ang_count = len(validator.violations) - initial_violations
-    
-    # --- Peptide Bond Planarity ---
-    initial_violations = len(validator.violations)
-    validator.validate_peptide_plane(tolerance_deg=30.0)
-    peptide_plane_count = len(validator.violations) - initial_violations
-    
-    # --- Global Properties ---
-    coords = np.array([atom['coords'] for atom in validator.atoms])
-    b_factors = np.array([atom['temp_factor'] for atom in validator.atoms])
-    
-    # Calculate total residues for normalization
-    num_residues = sum(len(res_dict) for res_dict in validator.grouped_atoms.values())
-    if num_residues == 0:
-        num_residues = 1.0
-    
-    # Radius of Gyration
-    rg = 0.0
-    if len(coords) > 0:
-        center_of_mass = np.mean(coords, axis=0)
-        rg = np.sqrt(np.sum(np.linalg.norm(coords - center_of_mass, axis=1)**2) / len(coords))
-        
-    mean_b_factor = np.mean(b_factors) if len(b_factors) > 0 else 0.0
-    
-    return np.array([
-        rama_favored_pct,
-        rama_outliers_pct,
-        float(clash_count) / num_residues,
-        float(bond_len_count) / num_residues,
-        float(bond_ang_count) / num_residues,
-        float(peptide_plane_count) / num_residues,
-        rg,
-        mean_b_factor
-    ])
+    try:
+        # Use PDBValidator for geometric violations; intercept counts, not strings.
+        validator = PDBValidator(pdb_content)
+
+        # --- Ramachandran Analysis ---
+        # We compute this manually to obtain percentages; the validator only reports outliers.
+        phi, psi = _get_dihedrals(validator)
+        rama_favored, rama_outliers = _analyze_ramachandran(phi, psi, validator)
+        total_residues = len(phi)
+
+        rama_favored_pct = (rama_favored / total_residues * 100) if total_residues > 0 else 0
+        rama_outliers_pct = (rama_outliers / total_residues * 100) if total_residues > 0 else 0
+
+        # --- Steric Clashes ---
+        # backbone_only=True reduces noise from sidechain generation artefacts.
+        initial_violations = len(validator.violations)
+        validator.validate_steric_clashes(min_atom_distance=0.5, min_ca_distance=3.0, backbone_only=True)
+        clash_count = len(validator.violations) - initial_violations
+
+        # --- Bond Lengths (0.1 Å tolerance) ---
+        initial_violations = len(validator.violations)
+        validator.validate_bond_lengths(tolerance=0.1)
+        bond_len_count = len(validator.violations) - initial_violations
+
+        # --- Bond Angles (10° tolerance) ---
+        initial_violations = len(validator.violations)
+        validator.validate_bond_angles(tolerance=10.0)
+        bond_ang_count = len(validator.violations) - initial_violations
+
+        # --- Peptide Bond Planarity ---
+        initial_violations = len(validator.violations)
+        validator.validate_peptide_plane(tolerance_deg=30.0)
+        peptide_plane_count = len(validator.violations) - initial_violations
+
+        # --- Global Properties ---
+        coords = np.array([atom['coords'] for atom in validator.atoms])
+        b_factors = np.array([atom['temp_factor'] for atom in validator.atoms])
+
+        # Number of residues used for per-residue normalisation of violation counts.
+        num_residues = sum(len(res_dict) for res_dict in validator.grouped_atoms.values())
+        if num_residues == 0:
+            num_residues = 1.0
+
+        # Radius of Gyration
+        rg = 0.0
+        if len(coords) > 0:
+            center_of_mass = np.mean(coords, axis=0)
+            rg = np.sqrt(np.sum(np.linalg.norm(coords - center_of_mass, axis=1) ** 2) / len(coords))
+
+        mean_b_factor = np.mean(b_factors) if len(b_factors) > 0 else 0.0
+
+        return np.array([
+            rama_favored_pct,
+            rama_outliers_pct,
+            float(clash_count) / num_residues,
+            float(bond_len_count) / num_residues,
+            float(bond_ang_count) / num_residues,
+            float(peptide_plane_count) / num_residues,
+            rg,
+            mean_b_factor,
+        ])
+
+    except Exception as e:
+        logger.error(
+            "extract_quality_features failed: %s. "
+            "The caller is responsible for handling this exception.",
+            e,
+            exc_info=True,
+        )
+        raise
 
 def _get_dihedrals(validator: PDBValidator) -> Tuple[List[float], List[float]]:
     """Extracts Phi/Psi angles from the validator's parsed atoms."""
