@@ -345,21 +345,20 @@ class TestGenerator(unittest.TestCase):
         self.assertIn("O", atom_names) # Check for unpadded name
 
 
-    def test_linear_full_atom_peptide_shows_ramachandran_violations(self):
+    def test_linear_full_atom_peptide_is_ramachandran_valid(self):
         """
-        Test that a linearly generated full-atom peptide, using the current simplified geometry,
-        exhibits Ramachandran violations. This test is expected to PASS with the current generator
-        and FAIL (by having 0 violations) when Ramachandran-guided generation is implemented.
+        Test that a generated full-atom peptide, using the Ramachandran-guided geometry,
+        exhibits NO Ramachandran violations.
         """
-        # Generate a short peptide, full atom mode, so we have N, CA, C atoms for dihedrals
+        # Generate a short peptide, full atom mode
         content = generate_pdb_content(length=5, sequence_str="AAAAA")
         
         validator = PDBValidator(pdb_content=content)
         validator.validate_ramachandran()
         violations = validator.get_violations()
         
-        # Expecting at least some Ramachandran violations due to idealized linear geometry
-        self.assertGreater(len(violations), 0, "Expected Ramachandran violations in linear full-atom peptide, but found none.")
+        # Expecting valid geometry now
+        self.assertEqual(len(violations), 0, "Expected NO Ramachandran violations, but found some.")
         
         # Optionally, print violations for debugging purposes if the test fails unexpectedly
         if not violations:

@@ -128,6 +128,8 @@ Choose a path based on your background and goals:
 - `--best-of-N`: Generate multiple structures and select the one with fewest violations
 - `--guarantee-valid`: Iteratively generate until a violation-free structure is found
 - `--refine-clashes`: Iteratively adjust atoms to reduce steric clashes
+- `--quality-filter`: Use Random Forest-based Structure Quality Filter to validate structure geometry
+- `--quality-score-cutoff`: Set minimum confidence score for quality filter (0.0-1.0)
 
 📝 **Reproducibility**
 - Command-line parameters stored in PDB header (REMARK 3 records)
@@ -445,6 +447,22 @@ my_training_data/
   - Applies after structure selection
   - Iterates until improvements stop or max iterations reached
   - Example: `--refine-clashes 10`
+
+#### **Structure Quality Filter (Random Forest)**
+
+> [!NOTE]
+> Despite the flag name history, this feature uses a **classical Random Forest classifier** (scikit-learn), not a neural network or generative AI. It scores structures on geometric quality metrics derived from Ramachandran angles, steric clashes, bond lengths, and radius of gyration.
+
+- `--quality-filter`: Enable the **Structure Quality Filter** to screen generated structures.
+  - Using a Random Forest classifier trained on thousands of samples, this filter automatically rejects "low quality" structures (clashing, distorted geometry).
+  - It considers Ramachandran angles, steric clashes, bond lengths, and radius of gyration.
+  - Useful for filtering out failed minimization attempts in bulk generation.
+
+- `--quality-score-cutoff <FLOAT>`: Minimum probability score (0.0-1.0) for a structure to be considered "Good".
+  - Higher values = stricter filtering (fewer false positives, more false negatives).
+  - Default: `0.5`
+  - Example: `--quality-score-cutoff 0.8` (Only keep highly confident good structures)
+  - Scores below `0.5` are typically rejected as "Bad".
 
 #### **Physics & Advanced Refinement **
 

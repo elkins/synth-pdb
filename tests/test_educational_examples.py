@@ -158,6 +158,7 @@ class TestEducationalExamples:
             "--conformation", "random",
             "--minimize",
             "--seed", "42",
+            "--metal-ions", "none",
             "--output", str(output_file)
         ]
         

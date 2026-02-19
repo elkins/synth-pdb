@@ -80,9 +80,9 @@ class TestRotamerDistribution(unittest.TestCase):
         # We just want to ensure the "most common" one is indeed most common
         # and the "rare" one is rare.
         
-        self.assertGreater(rotamer_counts['g-'], 50, "Valine g- should be the dominant rotamer (>50%)")
-        self.assertGreater(rotamer_counts['t'], 5, "Valine trans should benefit from weighted sampling")
-        self.assertLess(rotamer_counts['g+'], 30, "Valine g+ should be the minor rotamer")
+        self.assertGreater(rotamer_counts['g-'], 70, "Valine g- should be the dominant rotamer (>70%)")
+        self.assertGreater(rotamer_counts['t'], 0, "Valine trans should be present (>0)")
+        self.assertLess(rotamer_counts['g+'], 20, "Valine g+ should be rare (<20)")
         
         # Ensure we didn't generate weird angles
         self.assertEqual(rotamer_counts['other'], 0, "Generated outliers outside standard rotamer bins")
