@@ -1,5 +1,4 @@
 import os
-import joblib
 import numpy as np
 import logging
 from typing import Optional, Tuple
@@ -40,8 +39,12 @@ class ProteinQualityClassifier:
     def load_model(self, path: str):
         """Loads a pre-trained scikit-learn model."""
         try:
+            import joblib
             self.model = joblib.load(path)
             logger.info(f"Loaded quality classifier model from {path}")
+        except ImportError:
+            logger.error("joblib is not installed. Install synth-pdb[ai] to use the quality filter.")
+            self.model = None
         except Exception as e:
             logger.error(f"Failed to load quality classifier model: {e}")
             self.model = None

@@ -4,6 +4,9 @@ import numpy as np
 import biotite.structure as struc
 from biotite.structure.io.pdb import PDBFile
 import io
+import pytest
+
+joblib = pytest.importorskip("joblib", reason="joblib not installed; install synth-pdb[ai]")
 
 from synth_pdb.generator import generate_pdb_content
 from synth_pdb.quality.classifier import ProteinQualityClassifier
