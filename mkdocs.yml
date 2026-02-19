@@ -61,6 +61,7 @@ nav:
       - Hard Decoy Challenge: tutorials/hard_decoy_challenge.ipynb
       - Dataset Factory: tutorials/dataset_factory.ipynb
       - Neural NMR Pipeline: tutorials/neural_nmr_pipeline.ipynb
+      - PLM Embeddings (ESM-2): tutorials/plm_embeddings.ipynb
   - Examples:
     - Gallery: examples/gallery.md
     - Biologically-Inspired: examples/biological.md
@@ -78,6 +79,7 @@ nav:
       - relaxation: api/relaxation.md
       - nmr: api/nmr.md
       - biophysics: api/biophysics.md
+      - plm: api/plm.md
     - Utilities:
       - batch_generator: api/batch_generator.md
       - viewer: api/viewer.md
@@ -89,6 +91,7 @@ nav:
     - NeRF Geometry: science/nerf-geometry.md
     - NMR Theory: science/nmr-theory.md
     - Energy Minimization: science/energy-minimization.md
+    - Protein Language Models: science/plm.md
   - Development:
     - Contributing: development/contributing.md
     - Architecture: development/architecture.md

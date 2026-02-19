@@ -272,8 +272,73 @@ Explore these interactive notebooks:
     4. **Batch size**: Aim for 1000-10000 structures per batch
     5. **Multiprocessing**: Use `--mode dataset` with automatic parallelization
 
+
+## Protein Language Model Embeddings (PLM) 🧬
+
+synth-pdb includes an optional ESM-2 integration that gives every residue a
+320-dimensional vector encoding **evolutionary, structural, and chemical context**
+— learned from 250 million proteins, with no training required on your part.
+
+!!! note "Installation"
+    ```bash
+    pip install synth-pdb[plm]
+    ```
+
+### What you get
+
+```python
+from synth_pdb.plm import ESM2Embedder
+
+embedder = ESM2Embedder()
+
+# Per-residue embeddings — shape (L, 320), dtype float32
+emb = embedder.embed("MQIFVKTLTGKTITLEVEPS")
+print(emb.shape)   # (20, 320)
+
+# Directly from a structure
+emb = embedder.embed_structure(atom_array)   # (n_residues, 320)
+
+# Sequence-level cosine similarity (mean-pooled)
+sim = embedder.sequence_similarity("ACDEF", "VWLYG")   # float in [-1, 1]
+```
+
+### Use as GNN node features
+
+Drop-in enrichment for the quality GNN:
+
+```python
+plm = ESM2Embedder()
+plm_feats = plm.embed_structure(structure)        # (L, 320)
+node_feats = np.concatenate([geom_feats, plm_feats], axis=-1)
+```
+
+### Linear probe for secondary structure
+
+A single linear layer on PLM embeddings achieves near-SOTA secondary structure prediction — no 3D coordinates needed:
+
+```python
+import torch.nn as nn
+
+probe = nn.Linear(320, 3)   # Helix / Strand / Coil
+logits = probe(torch.tensor(emb))   # (L, 3)
+```
+
+### Upgrading to a more powerful model
+
+The API is identical regardless of model size:
+
+```python
+# 35M params, 480-dim — better accuracy, same code
+embedder = ESM2Embedder(model_name="facebook/esm2_t12_35M_UR50D")
+```
+
+For the full scientific background see [Protein Language Models](../science/plm.md).
+For the API reference see [api/plm](../api/plm.md).
+
 ## Next Steps
 
 - [API Reference: batch_generator](../api/batch_generator.md)
+- [API Reference: plm](../api/plm.md)
+- [Science: Protein Language Models](../science/plm.md)
 - [Examples: Advanced Features](../examples/advanced.md)
 - [Scientific Background: Ramachandran Plots](../science/ramachandran.md)

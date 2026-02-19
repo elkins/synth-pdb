@@ -78,6 +78,10 @@ gnn = [
     "torch_geometric>=2.4.0",
     "scikit-learn>=1.0.0",  # for train/test split and classification_report in training script
 ]
+plm = [
+    "torch>=2.0.0",
+    "transformers>=4.30.0",  # HuggingFace Transformers for ESM-2 model
+]
 
 [project.scripts]
 synth-pdb = "synth_pdb.main:main"
