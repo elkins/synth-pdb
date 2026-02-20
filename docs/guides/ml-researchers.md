@@ -258,9 +258,9 @@ Explore these interactive notebooks:
 
 ## Framework-Specific Examples
 
-- [JAX Handover](https://github.com/elkins/synth-pdb/blob/main/examples/ml_loading/jax_handover.ipynb)
-- [PyTorch Handover](https://github.com/elkins/synth-pdb/blob/main/examples/ml_loading/pytorch_handover.ipynb)
-- [MLX Handover](https://github.com/elkins/synth-pdb/blob/main/examples/ml_loading/mlx_handover.ipynb) (Apple Silicon)
+- [JAX Handover](https://github.com/elkins/synth-pdb/blob/master/examples/ml_loading/jax_handover.ipynb)
+- [PyTorch Handover](https://github.com/elkins/synth-pdb/blob/master/examples/ml_loading/pytorch_handover.ipynb)
+- [MLX Handover](https://github.com/elkins/synth-pdb/blob/master/examples/ml_loading/mlx_handover.ipynb) (Apple Silicon)
 
 ## Performance Tips
 
