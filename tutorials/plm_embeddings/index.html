@@ -29,7 +29,7 @@
     
     
       
-        <title>Protein Language Model Embeddings with ESM-2 🧬 - synth-pdb</title>
+        <title>Protein Language Model Embeddings with ESM-2 - synth-pdb</title>
       
     
     
@@ -120,7 +120,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Protein Language Model Embeddings with ESM-2 🧬
+              Protein Language Model Embeddings with ESM-2
             
           </span>
         </div>
@@ -1236,7 +1236,7 @@
   <span class="md-ellipsis">
     
   
-    Protein Language Model Embeddings with ESM-2 🧬
+    Protein Language Model Embeddings with ESM-2
   
 
     
@@ -1254,7 +1254,7 @@
   <span class="md-ellipsis">
     
   
-    Protein Language Model Embeddings with ESM-2 🧬
+    Protein Language Model Embeddings with ESM-2
   
 
     
@@ -1280,15 +1280,26 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#what-youll-learn" class="md-nav__link">
+  <a href="#background-what-is-a-protein-language-model" class="md-nav__link">
     <span class="md-ellipsis">
       
-        What you'll learn
+        Background: What is a Protein Language Model?
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="What you&#39;ll learn">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-you-will-learn" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What you will learn
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="What you will learn">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -1316,6 +1327,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="1. Setup &amp; Installation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-is-an-embedding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What is an 'embedding'?
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -1337,6 +1365,23 @@
       
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="3. Embed with ESM-2">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#under-the-hood-how-esm-2-produces-embeddings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Under the hood -- how ESM-2 produces embeddings
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -1360,6 +1405,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="5. Sequence Similarity in Embedding Space">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-is-cosine-similarity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What is cosine similarity?
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -1370,6 +1432,23 @@
       
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="6. Residue-Level UMAP Clustering">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-is-dimensionality-reduction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What is dimensionality reduction?
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -1382,6 +1461,34 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="7. Linear Secondary Structure Probe">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-is-a-linear-probe" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What is a 'linear probe'?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-experiment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The experiment
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -1392,6 +1499,23 @@
       
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="8. Embedding a Structure from synth-pdb">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#why-combine-structure-generation-plm-embeddings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why combine structure generation + PLM embeddings?
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -2894,15 +3018,26 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#what-youll-learn" class="md-nav__link">
+  <a href="#background-what-is-a-protein-language-model" class="md-nav__link">
     <span class="md-ellipsis">
       
-        What you'll learn
+        Background: What is a Protein Language Model?
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="What you&#39;ll learn">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-you-will-learn" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What you will learn
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="What you will learn">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -2930,6 +3065,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="1. Setup &amp; Installation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-is-an-embedding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What is an 'embedding'?
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -2951,6 +3103,23 @@
       
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="3. Embed with ESM-2">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#under-the-hood-how-esm-2-produces-embeddings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Under the hood -- how ESM-2 produces embeddings
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -2974,6 +3143,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="5. Sequence Similarity in Embedding Space">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-is-cosine-similarity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What is cosine similarity?
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -2984,6 +3170,23 @@
       
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="6. Residue-Level UMAP Clustering">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-is-dimensionality-reduction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What is dimensionality reduction?
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -2996,6 +3199,34 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="7. Linear Secondary Structure Probe">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-is-a-linear-probe" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What is a 'linear probe'?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-experiment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The experiment
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -3006,6 +3237,23 @@
       
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="8. Embedding a Structure from synth-pdb">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#why-combine-structure-generation-plm-embeddings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why combine structure generation + PLM embeddings?
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -3817,16 +4065,34 @@ span.linenos.special { color: #000000; background-color: #ffffc0; padding-left: 
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h1 id="protein-language-model-embeddings-with-esm-2">Protein Language Model Embeddings with ESM-2 🧬<a class="anchor-link" href="#protein-language-model-embeddings-with-esm-2">¶</a></h1><p><strong>Run this notebook on Google Colab:</strong> <a href="https://colab.research.google.com/github/elkins/synth-pdb/blob/main/docs/tutorials/plm_embeddings.ipynb"><img alt="Open in Colab" src="https://colab.research.google.com/assets/colab-badge.svg"/></a></p>
+<h1 id="protein-language-model-embeddings-with-esm-2">Protein Language Model Embeddings with ESM-2<a class="anchor-link" href="#protein-language-model-embeddings-with-esm-2">¶</a></h1><p><strong>Run this notebook on Google Colab:</strong> <a href="https://colab.research.google.com/github/elkins/synth-pdb/blob/main/docs/tutorials/plm_embeddings.ipynb"><img alt="Open in Colab" src="https://colab.research.google.com/assets/colab-badge.svg"/></a></p>
 <hr/>
-<h2 id="what-youll-learn">What you'll learn<a class="anchor-link" href="#what-youll-learn">¶</a></h2><p>This notebook demonstrates <strong>ESM-2 protein language model embeddings</strong> via <code>synth-pdb</code>.</p>
-<p>A protein language model (PLM) is a transformer trained on 250 million protein sequences.
-After training, its <em>internal activations</em> form per-residue vectors that encode:</p>
+<blockquote>
+<p><strong>Who is this for?</strong> Chemists and biologists who are curious about machine learning
+applied to protein sequences -- no prior ML experience required.
+Every technical concept is explained in plain language as it first appears.</p>
+</blockquote>
+<h2 id="background-what-is-a-protein-language-model">Background: What is a Protein Language Model?<a class="anchor-link" href="#background-what-is-a-protein-language-model">¶</a></h2><p>A <strong>language model</strong> is software that learns patterns from vast amounts of text.
+ChatGPT, for example, was trained on billions of sentences and learned grammar,
+facts, and reasoning from the statistical patterns in that text.</p>
+<p>A <strong>protein language model (PLM)</strong> does exactly the same thing -- but its
+"alphabet" is the 20 standard amino acids (A, C, D, ... Y) instead of English words.
+ESM-2 (Evolutionary Scale Modelling, version 2) was trained on <strong>250 million
+protein sequences</strong> from the UniRef database.</p>
+<p>During training, the model played a fill-in-the-blank game: random residues were
+masked out, and the model had to predict them from context. To succeed, it had to
+implicitly learn <em>evolutionary constraints</em>, <em>structural preferences</em>, and
+<em>functional signals</em> for every position in a sequence.</p>
+<p><strong>Key insight</strong>: ESM-2 never sees 3D coordinates during training -- yet its
+internal representations encode structural information anyway, because
+<strong>sequence and structure are deeply coupled through evolution</strong>.</p>
+<hr/>
+<h2 id="what-you-will-learn">What you will learn<a class="anchor-link" href="#what-you-will-learn">¶</a></h2><p>This notebook demonstrates <strong>ESM-2 protein language model embeddings</strong> via <code>synth-pdb</code>.</p>
 <table>
 <thead>
 <tr>
 <th>What is encoded</th>
-<th>Why it's useful</th>
+<th>Why it is useful</th>
 </tr>
 </thead>
 <tbody>
@@ -3848,15 +4114,16 @@ After training, its <em>internal activations</em> form per-residue vectors that 
 </tr>
 </tbody>
 </table>
-<p>All from <strong>sequence alone</strong> — no 3D coordinates.</p>
+<p>All from <strong>sequence alone</strong> -- no 3D coordinates.</p>
 <h3 id="notebook-outline">Notebook outline<a class="anchor-link" href="#notebook-outline">¶</a></h3><ol>
 <li>Setup &amp; Installation</li>
 <li>Generate synthetic protein structures with <code>synth-pdb</code></li>
-<li>Embed sequences with ESM-2 → <code>(L, 320)</code> float32 arrays</li>
+<li>Embed sequences with ESM-2 -- <code>(L, 320)</code> float32 arrays</li>
 <li><strong>Visualise</strong> per-residue embedding heatmaps</li>
-<li><strong>Cluster</strong> proteins in embedding space with UMAP</li>
-<li><strong>Similarity heatmap</strong> — polyalanine vs. polyvaline vs. ubiquitin</li>
-<li><strong>Linear structural probe</strong> — predict secondary structure from embeddings alone</li>
+<li><strong>Similarity heatmap</strong> -- compare proteins in embedding space</li>
+<li><strong>Cluster</strong> residues in 2D with UMAP</li>
+<li><strong>Linear structural probe</strong> -- predict secondary structure from embeddings alone</li>
+<li>Embed a structure generated by synth-pdb</li>
 </ol>
 </div>
 </div>
@@ -3961,6 +4228,27 @@ else:
 </div>
 </div>
 </div>
+</div>
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
+</div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
+<h3 id="what-is-an-embedding">What is an 'embedding'?<a class="anchor-link" href="#what-is-an-embedding">¶</a></h3><p>An <strong>embedding</strong> is a list of numbers (a <em>vector</em>) that represents something
+in a form a computer can do maths on. Think of it as a coordinate in a
+very high-dimensional space, where <em>similar things end up close together</em>.</p>
+<p>For example, in word embeddings, the vectors for <em>king</em> and <em>queen</em> point in
+similar directions, and so do <em>cat</em> and <em>dog</em>. In protein embeddings, residues
+that play similar biochemical roles -- e.g., positively charged Lys and Arg --
+end up in nearby regions of the embedding space.</p>
+<p>ESM-2 produces one 320-number vector per residue. A 20-residue peptide therefore
+gives a matrix of shape <strong>20 x 320</strong>. The 320 dimensions have no single human-
+interpretable meaning -- they are learned automatically by the model to be useful
+for predicting masked residues.</p>
+</div>
+</div>
+</div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs">
 <div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs">
 <div class="jp-Cell-inputWrapper" tabindex="0">
@@ -4013,39 +4301,59 @@ print(f"Embedding dim: {embedder.embedding_dim}  (will be 320 for the default t6
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h2 id="2-generate-synthetic-structures-with-synth-pdb">2. Generate Synthetic Structures with synth-pdb<a class="anchor-link" href="#2-generate-synthetic-structures-with-synth-pdb">¶</a></h2><p>We use <code>synth-pdb</code> to generate three canonical secondary structures so we can compare
-how their sequences are encoded differently in PLM space.</p>
+<h2 id="2-generate-synthetic-structures-with-synth-pdb">2. Generate Synthetic Structures with synth-pdb<a class="anchor-link" href="#2-generate-synthetic-structures-with-synth-pdb">¶</a></h2><p>We use <code>synth-pdb</code> to create three <strong>homopolymers</strong> -- peptides made of a single
+amino acid type repeated many times. Why homopolymers?</p>
+<ul>
+<li><strong>Controlled test cases</strong>: every residue sees the <em>same</em> local sequence context,
+so differences in embeddings between the three homopolymers must arise from
+amino acid identity, not from varying neighbours.</li>
+<li><strong>Known secondary structure preferences</strong>: Ala strongly prefers alpha-helices;
+Val (beta-branched, bulky side chain) strongly prefers beta-strands;
+Gly (no side chain) is the most flexible and tends to form coil or turns.</li>
+</ul>
 <table>
 <thead>
 <tr>
 <th>Protein</th>
 <th>Sequence</th>
 <th>Expected conformation</th>
+<th>Chemical reason</th>
 </tr>
 </thead>
 <tbody>
 <tr>
 <td>Polyalanine</td>
-<td><code>AAAAAAAAAAAAAAAAAA</code> (18 residues)</td>
-<td>α-helix (Ala strongly prefers helix)</td>
+<td><code>AAAAAAAAAAAAAAAAAA</code> (18 res)</td>
+<td>alpha-helix</td>
+<td>Ala has the highest helix propensity of all amino acids</td>
 </tr>
 <tr>
 <td>Polyvaline</td>
-<td><code>VVVVVVVVVVVVVVVVVV</code> (18 residues)</td>
-<td>β-strand (Val β-branching disfavours helix)</td>
+<td><code>VVVVVVVVVVVVVVVVVV</code> (18 res)</td>
+<td>beta-strand</td>
+<td>Val's beta-branching clashes sterically in a helix</td>
 </tr>
 <tr>
 <td>Polyglycine</td>
-<td><code>GGGGGGGGGGGGGGGGGG</code> (18 residues)</td>
-<td>Coil (Gly has no side chain → most flexible)</td>
+<td><code>GGGGGGGGGGGGGGGGGG</code> (18 res)</td>
+<td>Coil</td>
+<td>Gly has no side chain, giving it near-unrestricted backbone freedom</td>
 </tr>
 <tr>
 <td>Ubiquitin N-term</td>
-<td><code>MQIFVKTLTGKTITLEVEPSDT</code> (22 residues)</td>
-<td>Mixed: helix + strand</td>
+<td><code>MQIFVKTLTGKTITLEVEPSDT</code> (22 res)</td>
+<td>Mixed</td>
+<td>Fragment of a real 76-residue eukaryotic regulatory protein</td>
 </tr>
 </tbody>
 </table>
+<blockquote>
+<p><strong>Helix propensity</strong> (Pace &amp; Scholtz, 1998, <em>Biophysical Journal</em>) is the
+thermodynamic tendency of an amino acid to adopt an alpha-helical backbone
+conformation (phi ~-57 degrees, psi ~-47 degrees). It can be measured
+experimentally by substituting single residues into an alanine-based host peptide
+and measuring the change in helix content by circular dichroism (CD) spectroscopy.</p>
+</blockquote>
 </div>
 </div>
 </div>
@@ -4107,9 +4415,25 @@ for name, seq in sequences.items():
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h2 id="3-embed-with-esm-2">3. Embed with ESM-2<a class="anchor-link" href="#3-embed-with-esm-2">¶</a></h2><p>The first call downloads the model weights (~30 MB) and loads the transformer.
-Subsequent calls are fast (~10 ms per protein on CPU).</p>
-<p><strong>Output shape</strong>: <code>(L, 320)</code> — one 320-dimensional float32 vector per residue.</p>
+<h2 id="3-embed-with-esm-2">3. Embed with ESM-2<a class="anchor-link" href="#3-embed-with-esm-2">¶</a></h2><p>The first call downloads the model weights (~30 MB for the smallest variant)
+and loads the transformer. Subsequent calls are fast (~10 ms per protein on CPU).</p>
+<p><strong>Output shape</strong>: <code>(L, 320)</code> -- one 320-dimensional float32 vector per residue.</p>
+<h3 id="under-the-hood-how-esm-2-produces-embeddings">Under the hood -- how ESM-2 produces embeddings<a class="anchor-link" href="#under-the-hood-how-esm-2-produces-embeddings">¶</a></h3><p>ESM-2 is a <strong>Transformer</strong> neural network (the same architecture behind ChatGPT,
+but Fine tuned for proteins). The key operation is <em>self-attention</em>:</p>
+<ol>
+<li>Each residue starts as a lookup vector based on its amino acid type (like a
+dictionary: A maps to one vector, V maps to another, ...).</li>
+<li>The transformer stacks 6 layers. In each layer, every residue <em>attends</em> to
+every other residue -- it updates its own representation by asking:
+'which other positions in this sequence are most relevant to understanding me?'</li>
+<li>After 6 such rounds, each residue's 320-number vector encodes not just its own
+identity but also what its sequence neighbourhood looks like.</li>
+</ol>
+<p>This is why an Ala in the middle of a helix gets a <em>different</em> vector than the same
+Ala next to a Pro (which breaks helices) -- context changes the embedding.</p>
+<p><strong>Reference</strong>: Lin et al. (2023) <em>Evolutionary-scale prediction of atomic-level
+protein structure with a language model.</em> Science 379, 1123-1130.
+<a href="https://doi.org/10.1126/science.ade2574">https://doi.org/10.1126/science.ade2574</a></p>
 </div>
 </div>
 </div>
@@ -4173,13 +4497,40 @@ print("\n✅ All embeddings computed.")</div>
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h2 id="4-per-residue-embedding-heatmaps">4. Per-Residue Embedding Heatmaps<a class="anchor-link" href="#4-per-residue-embedding-heatmaps">¶</a></h2><p>Each row = one residue, each column = one of the 320 latent dimensions.</p>
+<h2 id="4-per-residue-embedding-heatmaps">4. Per-Residue Embedding Heatmaps<a class="anchor-link" href="#4-per-residue-embedding-heatmaps">¶</a></h2><p>Each row = one residue; each column = one of the 320 latent dimensions.
+The colour shows the activation value, normalised per row so the brightest
+colour in each row is 1.0 and the darkest is 0.0.</p>
 <p><strong>What to look for:</strong></p>
-<ul>
-<li>A <strong>uniform heatmap</strong> for polyalanine — all residues see identical local contexts</li>
-<li><strong>More variation</strong> for ubiquitin — each residue has a unique chemical neighbourhood</li>
-<li>Coloured bands = dimensions consistently activated by a particular residue type</li>
-</ul>
+<table>
+<thead>
+<tr>
+<th>Pattern</th>
+<th>Interpretation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Uniform rows (same colour across a row)</td>
+<td>Every residue sees the same context -- expected for a homopolymer</td>
+</tr>
+<tr>
+<td>Vertical stripes (same column highlighted for many rows)</td>
+<td>That dimension is activated by a particular residue type</td>
+</tr>
+<tr>
+<td>Highly variable rows</td>
+<td>Each residue has a unique chemical neighbourhood</td>
+</tr>
+</tbody>
+</table>
+<p>Poly-Ala should look very uniform (all Ala, all identical context), while
+Ubiquitin N-term should have noticeably more variation between rows.</p>
+<blockquote>
+<p><strong>Analogy for NMR spectroscopists</strong>: these heatmaps are analogous to a 2D
+HSQC spectrum, where each cross-peak encodes the chemical environment of one
+NH group. Just as HSQC peak positions shift when you mutate a neighbouring
+residue, the embedding changes when sequence context changes.</p>
+</blockquote>
 </div>
 </div>
 </div>
@@ -4228,7 +4579,7 @@ print("\n✅ All embeddings computed.")</div>
 <span class="nb">print</span><span class="p">(</span><span class="s2">"""</span>
 <span class="s2">Observations:</span>
 <span class="s2">  • Poly-Ala rows are nearly identical — every residue sees the same context.</span>
-<span class="s2">  • Ubiquitin rows vary noticeably — each residue has a unique neighbourhood.</span>
+<span class="s2">  • Ubiquitin rows vary noticeably — each residue has a unique neighborhood.</span>
 <span class="s2">  • Vertical stripes = dimensions strongly activated by a residue-type pattern.</span>
 <span class="s2">"""</span><span class="p">)</span>
 </pre></div>
@@ -4258,7 +4609,7 @@ plt.show()
 print("""
 Observations:
   • Poly-Ala rows are nearly identical — every residue sees the same context.
-  • Ubiquitin rows vary noticeably — each residue has a unique neighbourhood.
+  • Ubiquitin rows vary noticeably — each residue has a unique neighborhood.
   • Vertical stripes = dimensions strongly activated by a residue-type pattern.
 """)</div>
 </div>
@@ -4273,15 +4624,33 @@ Observations:
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h2 id="5-sequence-similarity-in-embedding-space">5. Sequence Similarity in Embedding Space<a class="anchor-link" href="#5-sequence-similarity-in-embedding-space">¶</a></h2><p>We collapse each <code>(L, 320)</code> matrix to a single <code>(320,)</code> vector by <strong>mean pooling</strong>,
-then compute <strong>cosine similarity</strong> between all pairs.</p>
+<h2 id="5-sequence-similarity-in-embedding-space">5. Sequence Similarity in Embedding Space<a class="anchor-link" href="#5-sequence-similarity-in-embedding-space">¶</a></h2><p>We collapse each <code>(L, 320)</code> matrix to a single <code>(320,)</code> vector by <strong>mean pooling</strong>
+(averaging the 320-number vectors over all L residues). This gives one vector per
+protein representing the whole sequence.</p>
+<p>We then compute <strong>cosine similarity</strong> between all pairs:</p>
 <p>$$\text{sim}(A, B) = \frac{\overline{\text{emb}}(A) \cdot \overline{\text{emb}}(B)}{\|\overline{\text{emb}}(A)\| \cdot \|\overline{\text{emb}}(B)\|}$$</p>
+<h3 id="what-is-cosine-similarity">What is cosine similarity?<a class="anchor-link" href="#what-is-cosine-similarity">¶</a></h3><p>Think of two arrows starting from the same point in 320-dimensional space.
+Cosine similarity measures the <strong>angle</strong> between them -- not their lengths:</p>
+<ul>
+<li><strong>1.0</strong> -- identical directions -- the two proteins look the same to ESM-2</li>
+<li><strong>0.0</strong> -- perpendicular -- completely uncorrelated representations</li>
+<li>Proteins with the same amino acid composition but different order can still
+have high similarity if they fold similarly.</li>
+</ul>
 <p><strong>What to expect:</strong></p>
 <ul>
-<li>Poly-Ala and Poly-Val: <strong>high</strong> similarity (both simple repetitive peptides)</li>
-<li>Poly-Gly: <strong>lower</strong> similarity to others (Gly is biochemically special — smallest residue)</li>
-<li>Ubiquitin / Villin / Trp-cage: moderate similarity (all are real folded proteins)</li>
+<li>Poly-Ala and Poly-Val: <strong>high</strong> similarity -- both are simple, repetitive homopolymers</li>
+<li>Poly-Gly: <strong>lower</strong> -- Gly is biochemically unique (only achiral amino acid,
+no side chain, exceptional backbone flexibility)</li>
+<li>Ubiquitin / Villin / Trp-cage: moderate -- all are real compact folded proteins</li>
 </ul>
+<blockquote>
+<p><strong>Why not just use BLAST sequence identity?</strong> Two proteins with &lt;20% sequence
+identity (the 'twilight zone') can still perform identical functions and have
+the same fold. Cosine similarity in PLM embedding space can detect functional
+similarity even between evolutionarily distant homologues where BLAST gives
+no meaningful alignment.</p>
+</blockquote>
 </div>
 </div>
 </div>
@@ -4387,11 +4756,28 @@ for i, a in enumerate(names):
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h2 id="6-residue-level-umap-clustering">6. Residue-Level UMAP Clustering<a class="anchor-link" href="#6-residue-level-umap-clustering">¶</a></h2><p>Each residue is a point in 320-dimensional space. We use <strong>UMAP</strong> to project down to 2D.</p>
-<p><strong>Key question</strong>: do residues cluster by amino acid identity, even though the model
-was never told what a residue <em>is</em> — only which positions are masked?</p>
-<p>The answer is yes: ESM-2 implicitly learns amino acid identity through the pattern
-of masked predictions. In UMAP space, Ala, Val, Gly etc. should form distinct clouds.</p>
+<h2 id="6-residue-level-umap-clustering">6. Residue-Level UMAP Clustering<a class="anchor-link" href="#6-residue-level-umap-clustering">¶</a></h2><p>Each residue is a point in 320-dimensional space. We use <strong>UMAP</strong> to project
+down to 2D so we can visualise it.</p>
+<h3 id="what-is-dimensionality-reduction">What is dimensionality reduction?<a class="anchor-link" href="#what-is-dimensionality-reduction">¶</a></h3><p>Imagine flattening a globe onto a flat map -- you inevitably lose some
+information, but relative positions are preserved as faithfully as possible.
+UMAP (Uniform Manifold Approximation and Projection, McInnes et al. 2018) is a
+widely used algorithm that preserves <em>local neighbourhood structure</em>: if two
+residues are close in 320-D, they will be close in the 2D plot.</p>
+<p><strong>Key question</strong>: do residues cluster by amino acid identity in this 2D map,
+even though ESM-2 was never explicitly told what a residue <em>is</em> -- only which
+positions were masked?</p>
+<p>The answer is yes. ESM-2 implicitly learns amino acid identity through the
+pattern of masked predictions. In UMAP space, Ala, Val, Gly etc. tend to form
+distinct clouds.</p>
+<blockquote>
+<p><strong>Note on homopolymers</strong>: Poly-Ala, Poly-Val, and Poly-Gly will each appear as a
+<strong>single tight dot</strong> (all residues share identical context), while Ubiquitin and
+Villin will appear as <em>clouds</em> of distinct points -- one point per residue.</p>
+</blockquote>
+<blockquote>
+<p><strong>Reference</strong>: McInnes, L., Healy, J., &amp; Melville, J. (2018). <em>UMAP: Uniform
+Manifold Approximation and Projection for Dimension Reduction.</em> arXiv:1802.03426.</p>
+</blockquote>
 </div>
 </div>
 </div>
@@ -4444,7 +4830,7 @@ of masked predictions. In UMAP space, Ala, Val, Gly etc. should form distinct cl
 
     <span class="n">fig</span><span class="p">,</span> <span class="n">axes</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">16</span><span class="p">,</span> <span class="mi">6</span><span class="p">))</span>
 
-    <span class="c1"># Left: colour by amino acid</span>
+    <span class="c1"># Left: color by amino acid</span>
     <span class="n">ax</span> <span class="o">=</span> <span class="n">axes</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
     <span class="k">for</span> <span class="n">aa</span> <span class="ow">in</span> <span class="n">unique_aas</span><span class="p">:</span>
         <span class="n">mask</span> <span class="o">=</span> <span class="n">labels</span> <span class="o">==</span> <span class="n">aa</span>
@@ -4457,7 +4843,7 @@ of masked predictions. In UMAP space, Ala, Val, Gly etc. should form distinct cl
     <span class="n">ax</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="s2">"UMAP-1"</span><span class="p">)</span>
     <span class="n">ax</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s2">"UMAP-2"</span><span class="p">)</span>
 
-    <span class="c1"># Right: colour by source protein</span>
+    <span class="c1"># Right: color by source protein</span>
     <span class="n">ax</span> <span class="o">=</span> <span class="n">axes</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
     <span class="n">source_labels</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">all_source</span><span class="p">)</span>
     <span class="n">unique_sources</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">sequences</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span>
@@ -4517,7 +4903,7 @@ of masked predictions. In UMAP space, Ala, Val, Gly etc. should form distinct cl
 
     fig, axes = plt.subplots(1, 2, figsize=(16, 6))
 
-    # Left: colour by amino acid
+    # Left: color by amino acid
     ax = axes[0]
     for aa in unique_aas:
         mask = labels == aa
@@ -4530,7 +4916,7 @@ of masked predictions. In UMAP space, Ala, Val, Gly etc. should form distinct cl
     ax.set_xlabel("UMAP-1")
     ax.set_ylabel("UMAP-2")
 
-    # Right: colour by source protein
+    # Right: color by source protein
     ax = axes[1]
     source_labels = np.array(all_source)
     unique_sources = list(sequences.keys())
@@ -4572,19 +4958,34 @@ except ImportError:
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
 <h2 id="7-linear-secondary-structure-probe">7. Linear Secondary Structure Probe<a class="anchor-link" href="#7-linear-secondary-structure-probe">¶</a></h2><p>Can a <strong>single linear layer</strong> on top of ESM-2 embeddings predict secondary structure?</p>
-<p>We test this with <strong>synthetic labelled data</strong> from <code>synth-pdb</code>:</p>
+<h3 id="what-is-a-linear-probe">What is a 'linear probe'?<a class="anchor-link" href="#what-is-a-linear-probe">¶</a></h3><p>A linear probe is the simplest possible ML classifier: it multiplies the embedding
+vector by a weight matrix and adds a bias -- just one matrix multiplication. If this
+step achieves high accuracy, secondary structure is <em>already explicitly encoded</em>
+in the embedding and requires no further non-linear processing to extract.</p>
+<p><strong>Analogy</strong>: if you can read the temperature off a thermometer by looking at a
+number (linear), the information is visually explicit. If you needed to do a
+complex chemical assay (non-linear), the information would be deeply implicit.</p>
+<h3 id="the-experiment">The experiment<a class="anchor-link" href="#the-experiment">¶</a></h3><p>We build a small labelled dataset from <code>synth-pdb</code>:</p>
 <ul>
-<li>Generate 60 helical residues (<code>Poly-Ala</code>) → label 0</li>
-<li>Generate 60 strand residues (<code>Poly-Val</code>) → label 1</li>
-<li>Generate 60 coil residues (<code>Poly-Gly</code>) → label 2</li>
+<li>30 residues of Poly-Ala (dominant helix tendency) -- label <strong>0</strong> (Helix)</li>
+<li>30 residues of Poly-Val (dominant strand tendency) -- label <strong>1</strong> (Strand)</li>
+<li>30 residues of Poly-Gly (dominant coil tendency) -- label <strong>2</strong> (Coil)</li>
 </ul>
-<p>Then train a logistic regression (which is just a linear layer + softmax) and evaluate accuracy.</p>
+<p>Then a <strong>logistic regression</strong> (a linear layer followed by softmax to produce
+class probabilities) is evaluated by <strong>5-fold cross-validation</strong>:
+the data is split into 5 equal chunks; the model trains on 4 and tests
+on the 5th, rotating through all combinations. The 5 accuracy values are averaged
+to give a robust estimate that avoids memorising any single train/test split.</p>
 <blockquote>
-<p><strong>Educational point</strong>: this test measures whether secondary structure information is
-<strong>linearly accessible</strong> in the embedding space — i.e., can it be extracted with a
-single matrix multiplication? If yes, it's explicitly encoded, not buried in non-linear
-interactions. Literature: ESM-2 achieves ~70-80% accuracy on real protein SS3 datasets
-with a linear probe.</p>
+<p><strong>Literature benchmark</strong>: Rao et al. (2019) <em>Evaluating protein transfer learning
+with TAPE</em> (NeurIPS) reported ~70-80% SS3 accuracy on real protein datasets with
+a linear probe over ESM embeddings. Our synthetic homopolymer dataset is simpler,
+so accuracy should be very high -- but the principle is identical.</p>
+</blockquote>
+<blockquote>
+<p><strong>What to expect</strong>: Near-perfect accuracy. The three homopolymers represent very
+different biochemical environments; ESM-2 should encode helix/strand/coil
+preferences linearly from the amino acid type alone.</p>
 </blockquote>
 </div>
 </div>
@@ -4747,9 +5148,40 @@ Interpretation:
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h2 id="8-embedding-a-structure-from-synth-pdb">8. Embedding a Structure from synth-pdb<a class="anchor-link" href="#8-embedding-a-structure-from-synth-pdb">¶</a></h2><p>We can also pass a <strong>biotite <code>AtomArray</code></strong> directly — <code>embed_structure()</code> extracts
-the amino acid sequence and calls <code>embed()</code> under the hood.</p>
-<p>This is the natural integration point with <code>synth-pdb</code>'s structure generator.</p>
+<h2 id="8-embedding-a-structure-from-synth-pdb">8. Embedding a Structure from synth-pdb<a class="anchor-link" href="#8-embedding-a-structure-from-synth-pdb">¶</a></h2><p>We can also pass a <strong>biotite <code>AtomArray</code></strong> (a table of atoms with 3D coordinates)
+directly to <code>embed_structure()</code>. The method extracts the amino acid sequence from
+the residue names and calls <code>embed()</code> under the hood.</p>
+<h3 id="why-combine-structure-generation-plm-embeddings">Why combine structure generation + PLM embeddings?<a class="anchor-link" href="#why-combine-structure-generation-plm-embeddings">¶</a></h3><table>
+<thead>
+<tr>
+<th>synth-pdb gives you</th>
+<th>ESM-2 gives you</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Realistic 3D atomic coordinates</td>
+<td>Sequence-derived feature vectors</td>
+</tr>
+<tr>
+<td>Backbone geometry (phi/psi angles, bond lengths)</td>
+<td>Evolutionary &amp; structural context per residue</td>
+</tr>
+<tr>
+<td>PDB format for downstream software</td>
+<td>Compact 320-dim representation for ML</td>
+</tr>
+</tbody>
+</table>
+<p>Combining both lets you build models that use <em>geometric features</em> (from 3D
+structure) <strong>and</strong> <em>sequence context features</em> (from ESM-2) -- a combination
+used in state-of-the-art protein quality assessment and design pipelines.</p>
+<blockquote>
+<p><strong>Note</strong>: <code>embed_structure()</code> only uses the <strong>sequence</strong> extracted from the
+<code>AtomArray</code>; it ignores the 3D coordinates. To use both, extract the embeddings
+here and compute geometric descriptors (angles, SASA etc.) separately, then
+concatenate them as features.</p>
+</blockquote>
 </div>
 </div>
 </div>
@@ -4777,33 +5209,43 @@ the amino acid sequence and calls <code>embed()</code> under the hood.</p>
 <span class="kn">import</span><span class="w"> </span><span class="nn">biotite.structure</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">struc</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">io</span>
 
-<span class="c1"># Generate a synthetic 20-residue alpha-helix</span>
+<span class="c1"># Generate a synthetic 20-residue peptide using synth-pdb.</span>
+<span class="c1"># 'conformation="alpha"' sets all backbone torsion angles to canonical</span>
+<span class="c1"># alpha-helix values (phi ~ -57 deg, psi ~ -47 deg).</span>
+<span class="c1"># 'minimize_energy=False' skips OpenMM energy minimisation for speed.</span>
 <span class="n">pdb_content</span> <span class="o">=</span> <span class="n">generate_pdb_content</span><span class="p">(</span>
     <span class="n">sequence_str</span><span class="o">=</span><span class="s2">"ALA-ALA-ALA-ALA-ALA-GLY-LEU-ALA-ALA-ALA-ALA-ALA-SER-ALA-ALA-ALA-ALA-ALA-ALA-ALA"</span><span class="p">,</span>
-    <span class="n">ss_type</span><span class="o">=</span><span class="s2">"helix"</span><span class="p">,</span>
+    <span class="n">conformation</span><span class="o">=</span><span class="s2">"alpha"</span><span class="p">,</span>
     <span class="n">minimize_energy</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
 <span class="p">)</span>
 
-<span class="c1"># Parse into a biotite AtomArray</span>
+<span class="c1"># Parse the PDB text into a biotite AtomArray --</span>
+<span class="c1"># a structured table of atoms with coordinates, chain IDs, residue names, etc.</span>
 <span class="n">pdb_file</span> <span class="o">=</span> <span class="n">pdb</span><span class="o">.</span><span class="n">PDBFile</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="n">io</span><span class="o">.</span><span class="n">StringIO</span><span class="p">(</span><span class="n">pdb_content</span><span class="p">))</span>
 <span class="n">structure</span> <span class="o">=</span> <span class="n">pdb_file</span><span class="o">.</span><span class="n">get_structure</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
-<span class="c1"># Get backbone only</span>
+
+<span class="c1"># Keep only backbone atoms (N, C-alpha, C, O) to discard hydrogens</span>
+<span class="c1"># and side chain atoms. For embedding we only need the residue sequence,</span>
+<span class="c1"># but filtering to backbone atoms is good practice for downstream geometry work.</span>
 <span class="n">backbone</span> <span class="o">=</span> <span class="n">structure</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">isin</span><span class="p">(</span><span class="n">structure</span><span class="o">.</span><span class="n">atom_name</span><span class="p">,</span> <span class="p">[</span><span class="s2">"N"</span><span class="p">,</span> <span class="s2">"CA"</span><span class="p">,</span> <span class="s2">"C"</span><span class="p">,</span> <span class="s2">"O"</span><span class="p">])]</span>
 
 <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Generated structure: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">struc</span><span class="o">.</span><span class="n">get_residues</span><span class="p">(</span><span class="n">backbone</span><span class="p">)[</span><span class="mi">0</span><span class="p">])</span><span class="si">}</span><span class="s2"> residues, </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">backbone</span><span class="p">)</span><span class="si">}</span><span class="s2"> atoms"</span><span class="p">)</span>
 
-<span class="c1"># Embed directly from the AtomArray</span>
-<span class="n">struct_emb</span> <span class="o">=</span> <span class="n">embedder</span><span class="o">.</span><span class="n">embed_structure</span><span class="p">(</span><span class="n">backbone</span><span class="p">)</span>   <span class="c1"># (L, 320)</span>
+<span class="c1"># embed_structure() reads the 3-letter residue names from the AtomArray,</span>
+<span class="c1"># converts them to 1-letter codes (ALA-&gt;A, GLY-&gt;G, etc.), then calls embed().</span>
+<span class="c1"># Output: (L, 320) float32 numpy array -- one embedding vector per residue.</span>
+<span class="n">struct_emb</span> <span class="o">=</span> <span class="n">embedder</span><span class="o">.</span><span class="n">embed_structure</span><span class="p">(</span><span class="n">backbone</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"PLM embedding shape: </span><span class="si">{</span><span class="n">struct_emb</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"dtype: </span><span class="si">{</span><span class="n">struct_emb</span><span class="o">.</span><span class="n">dtype</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 
-<span class="c1"># Plot the embedding</span>
+<span class="c1"># Plot the embedding matrix transposed so residues run along the x-axis.</span>
+<span class="c1"># Each vertical slice is the 320-number 'fingerprint' for one residue.</span>
 <span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">12</span><span class="p">,</span> <span class="mi">3</span><span class="p">))</span>
 <span class="n">im</span> <span class="o">=</span> <span class="n">ax</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="n">struct_emb</span><span class="o">.</span><span class="n">T</span><span class="p">,</span> <span class="n">aspect</span><span class="o">=</span><span class="s2">"auto"</span><span class="p">,</span> <span class="n">cmap</span><span class="o">=</span><span class="s2">"RdBu_r"</span><span class="p">,</span>
                <span class="n">interpolation</span><span class="o">=</span><span class="s2">"nearest"</span><span class="p">)</span>
 <span class="n">ax</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="s2">"Residue position"</span><span class="p">,</span> <span class="n">fontsize</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
 <span class="n">ax</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s2">"ESM-2 dimension (320)"</span><span class="p">,</span> <span class="n">fontsize</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
-<span class="n">ax</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s2">"synth-pdb → ESM-2 embedding:  20-residue synthetic helix"</span><span class="p">,</span>
+<span class="n">ax</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s2">"synth-pdb -&gt; ESM-2 embedding:  20-residue synthetic helix"</span><span class="p">,</span>
              <span class="n">fontsize</span><span class="o">=</span><span class="mi">11</span><span class="p">,</span> <span class="n">fontweight</span><span class="o">=</span><span class="s2">"bold"</span><span class="p">)</span>
 <span class="n">plt</span><span class="o">.</span><span class="n">colorbar</span><span class="p">(</span><span class="n">im</span><span class="p">,</span> <span class="n">ax</span><span class="o">=</span><span class="n">ax</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">"Activation"</span><span class="p">)</span>
 <span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
@@ -4811,40 +5253,51 @@ the amino acid sequence and calls <code>embed()</code> under the hood.</p>
 
 <span class="nb">print</span><span class="p">(</span><span class="s2">"</span><span class="se">\n</span><span class="s2">The embedder extracted the sequence from the AtomArray residue names,"</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="s2">"passed it through ESM-2, and returned a (L, 320) float32 matrix."</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="s2">"This can be used directly as node features in a GNN."</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">"This can be used directly as node features in a GNN, or concatenated"</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">"with geometric features (bond angles, SASA, etc.) for richer input representations."</span><span class="p">)</span>
 </pre></div>
 <div class="clipboard-copy-txt" id="cell-9">from synth_pdb.generator import generate_pdb_content
 import biotite.structure.io.pdb as pdb
 import biotite.structure as struc
 import io
 
-# Generate a synthetic 20-residue alpha-helix
+# Generate a synthetic 20-residue peptide using synth-pdb.
+# 'conformation="alpha"' sets all backbone torsion angles to canonical
+# alpha-helix values (phi ~ -57 deg, psi ~ -47 deg).
+# 'minimize_energy=False' skips OpenMM energy minimisation for speed.
 pdb_content = generate_pdb_content(
     sequence_str="ALA-ALA-ALA-ALA-ALA-GLY-LEU-ALA-ALA-ALA-ALA-ALA-SER-ALA-ALA-ALA-ALA-ALA-ALA-ALA",
-    ss_type="helix",
+    conformation="alpha",
     minimize_energy=False,
 )
 
-# Parse into a biotite AtomArray
+# Parse the PDB text into a biotite AtomArray --
+# a structured table of atoms with coordinates, chain IDs, residue names, etc.
 pdb_file = pdb.PDBFile.read(io.StringIO(pdb_content))
 structure = pdb_file.get_structure(model=1)
-# Get backbone only
+
+# Keep only backbone atoms (N, C-alpha, C, O) to discard hydrogens
+# and side chain atoms. For embedding we only need the residue sequence,
+# but filtering to backbone atoms is good practice for downstream geometry work.
 backbone = structure[np.isin(structure.atom_name, ["N", "CA", "C", "O"])]
 
 print(f"Generated structure: {len(struc.get_residues(backbone)[0])} residues, {len(backbone)} atoms")
 
-# Embed directly from the AtomArray
-struct_emb = embedder.embed_structure(backbone)   # (L, 320)
+# embed_structure() reads the 3-letter residue names from the AtomArray,
+# converts them to 1-letter codes (ALA-&gt;A, GLY-&gt;G, etc.), then calls embed().
+# Output: (L, 320) float32 numpy array -- one embedding vector per residue.
+struct_emb = embedder.embed_structure(backbone)
 print(f"PLM embedding shape: {struct_emb.shape}")
 print(f"dtype: {struct_emb.dtype}")
 
-# Plot the embedding
+# Plot the embedding matrix transposed so residues run along the x-axis.
+# Each vertical slice is the 320-number 'fingerprint' for one residue.
 fig, ax = plt.subplots(figsize=(12, 3))
 im = ax.imshow(struct_emb.T, aspect="auto", cmap="RdBu_r",
                interpolation="nearest")
 ax.set_xlabel("Residue position", fontsize=10)
 ax.set_ylabel("ESM-2 dimension (320)", fontsize=10)
-ax.set_title("synth-pdb → ESM-2 embedding:  20-residue synthetic helix",
+ax.set_title("synth-pdb -&gt; ESM-2 embedding:  20-residue synthetic helix",
              fontsize=11, fontweight="bold")
 plt.colorbar(im, ax=ax, label="Activation")
 plt.tight_layout()
@@ -4852,7 +5305,9 @@ plt.show()
 
 print("\nThe embedder extracted the sequence from the AtomArray residue names,")
 print("passed it through ESM-2, and returned a (L, 320) float32 matrix.")
-print("This can be used directly as node features in a GNN.")</div>
+print("This can be used directly as node features in a GNN, or concatenated")
+print("with geometric features (bond angles, SASA, etc.) for richer input representations.")
+</div>
 </div>
 </div>
 </div>
