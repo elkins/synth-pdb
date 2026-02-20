@@ -81,6 +81,10 @@ gnn = [
     "scikit-learn>=1.0.0",  # for train/test split and classification_report in training script
     "joblib>=1.1.0",        # for saving/loading the Random Forest model alongside GNN artefacts
 ]
+plm = [
+    "torch>=2.0.0",
+    "transformers>=4.30.0",  # HuggingFace Transformers for ESM-2 model
+]
 
 [project.scripts]
 synth-pdb = "synth_pdb.main:main"
