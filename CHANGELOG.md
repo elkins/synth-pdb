@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.19.0] - 2026-02-19
+
+### Added
+- **PLM Embeddings**: Integrated ESM-2 protein language model support via `synth_pdb.quality.plm`. Generates per-residue and pooled embeddings from generated structures, enabling zero-shot quality scoring and downstream ML tasks.
+- **PLM Tutorial**: Added `docs/tutorials/plm_embeddings.ipynb` Colab-compatible notebook demonstrating ESM-2 embedding extraction and visualization.
+- New optional dependency group `[plm]` (`torch>=2.0.0`, `transformers>=4.30.0`).
+
+---
+
+## [1.18.0] - 2026-02-19
+
+### Added
+- **GNN Quality Scorer**: New `synth_pdb.quality.gnn` module with a Graph Neural Network model for protein structure quality assessment. Nodes represent residues; edges encode sequence proximity and spatial contacts.
+- **GNN Training Script**: `scripts/train_gnn_quality.py` for training the GNN on labelled structure datasets.
+- **Random Forest Baseline**: Included alongside GNN as an interpretable quality-filter baseline (`synth_pdb.quality.rf_model`).
+- New optional dependency group `[gnn]` (`torch>=2.0.0`, `torch_geometric>=2.4.0`, `scikit-learn`, `joblib`).
+
+### Changed
+- `[ai]` optional-dependency group now covers the Random Forest model; `[gnn]` covers the full GNN stack.
+
+---
+
 ## [1.17.0] - 2026-02-11
 
 ### Changed

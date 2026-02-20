@@ -2,7 +2,7 @@
 
 A command-line tool to generate Protein Data Bank (PDB) files with full atomic representation for testing, benchmarking and educational purposes.
 
-[![PyPI version](https://img.shields.io/badge/pypi-v1.18.0-blue)](https://pypi.org/project/synth-pdb/)
+[![PyPI version](https://img.shields.io/badge/pypi-v1.19.0-blue)](https://pypi.org/project/synth-pdb/)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Tests](https://github.com/elkins/synth-pdb/actions/workflows/test.yml/badge.svg)](https://github.com/elkins/synth-pdb/actions/workflows/test.yml)
@@ -496,7 +496,7 @@ my_training_data/
 #### **Synthetic NMR Data**
 
 > **📦 NMR Functionality Powered by [`synth-nmr`](https://github.com/elkins/synth-nmr)**  
-> As of version 1.18.0, all NMR-related functionality (NOE calculation, relaxation rates, chemical shifts, J-couplings) is provided by the standalone [`synth-nmr`](https://pypi.org/project/synth-nmr/) package. This package can be used independently for NMR data generation in your own projects. The integration is fully backward compatible—all existing code continues to work without changes.
+> As of version 1.17.0, all NMR-related functionality (NOE calculation, relaxation rates, chemical shifts, J-couplings) is provided by the standalone [`synth-nmr`](https://pypi.org/project/synth-nmr/) package. This package can be used independently for NMR data generation in your own projects. The integration is fully backward compatible—all existing code continues to work without changes.
 
 
 - `--gen-nef`: Generate synthetic NOE restraints in NEF format.
