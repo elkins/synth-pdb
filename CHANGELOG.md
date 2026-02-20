@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.19.1] - 2026-02-19
+
+### Fixed
+- **PLM Tutorial Bug**: Fixed a `TypeError` in `docs/tutorials/plm_embeddings.ipynb` where an obsolete `ss_type` argument was used instead of `conformation` for `generate_pdb_content()`.
+
+### Changed
+- **Educational Enhancements**: Significantly expanded the PLM tutorial notebook (`plm_embeddings.ipynb`) with plain-language explanations of Protein Language Models, embeddings, similarity metrics, and UMAP clustering for chemists and biologists without machine learning backgrounds.
+
+---
+
 ## [1.19.0] - 2026-02-19
 
 ### Added
