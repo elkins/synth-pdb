@@ -56,8 +56,9 @@ def test_helix_trends(mocker):
     structure.chain_id = np.array(["A"] * 5)
     structure.res_id = np.array([1, 2, 3, 4, 5])
     
+    from synth_nmr.chemical_shifts import predict_empirical_shifts
     # Run
-    shifts = predict_chemical_shifts(structure)
+    shifts = predict_empirical_shifts(structure)
     
     # Residue 2 (Index 2 in Py, ID 3) should have Alpha angles (-60, -50)
     # Index 2: Phi[2]=-60, Psi[2]=-50. Matches Alpha criteria.
@@ -84,7 +85,8 @@ def test_sheet_trends(mocker):
     structure.chain_id = np.array(["A"] * 5)
     structure.res_id = np.array([1, 2, 3, 4, 5])
     
-    shifts = predict_chemical_shifts(structure)
+    from synth_nmr.chemical_shifts import predict_empirical_shifts
+    shifts = predict_empirical_shifts(structure)
     
     # Residue 3
     res3 = shifts['A'][3]

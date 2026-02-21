@@ -261,10 +261,10 @@ class TestScientificRigor(unittest.TestCase):
         strand_struct = self._get_structure(strand_content)
 
         # ── Predict shifts and compute CSI ─────────────────────────────────────
-        from synth_nmr.chemical_shifts import predict_chemical_shifts, calculate_csi
+        from synth_nmr.chemical_shifts import predict_empirical_shifts, calculate_csi
 
-        helix_shifts = predict_chemical_shifts(helix_struct)
-        strand_shifts = predict_chemical_shifts(strand_struct)
+        helix_shifts = predict_empirical_shifts(helix_struct)
+        strand_shifts = predict_empirical_shifts(strand_struct)
 
         helix_csi = calculate_csi(helix_shifts, helix_struct)
         strand_csi = calculate_csi(strand_shifts, strand_struct)

@@ -2,7 +2,7 @@
 import pytest
 import numpy as np
 import biotite.structure as struc
-from synth_pdb.chemical_shifts import predict_chemical_shifts, RANDOM_COIL_SHIFTS
+from synth_nmr.chemical_shifts import predict_empirical_shifts, RANDOM_COIL_SHIFTS
 
 def create_mock_phe_system():
     """
@@ -67,7 +67,7 @@ def test_ring_current_shielding():
         warnings.simplefilter("ignore", RuntimeWarning)
         # Mock random normal to return 0.0 (remove noise)
         with patch("numpy.random.normal", return_value=0.0):
-            shifts = predict_chemical_shifts(system)
+            shifts = predict_empirical_shifts(system)
     
     # Get Baseline (Random Coil) for ALA HA
     base_shift = RANDOM_COIL_SHIFTS["ALA"]["HA"]
@@ -99,7 +99,7 @@ def test_ring_current_deshielding():
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", RuntimeWarning)
         with patch("numpy.random.normal", return_value=0.0):
-            shifts = predict_chemical_shifts(system)
+            shifts = predict_empirical_shifts(system)
     
     base_shift = RANDOM_COIL_SHIFTS["ALA"]["HA"]
     
