@@ -3790,7 +3790,7 @@ span.linenos.special { color: #000000; background-color: #ffffc0; padding-left: 
         <span class="nb">print</span><span class="p">(</span><span class="s2">"   ✅ synth-pdb already installed"</span><span class="p">)</span>
     <span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
         <span class="nb">print</span><span class="p">(</span><span class="s2">"   📦 Installing synth-pdb..."</span><span class="p">)</span>
-        <span class="err">!</span><span class="n">pip</span> <span class="n">install</span> <span class="o">-</span><span class="n">q</span> <span class="n">synth</span><span class="o">-</span><span class="n">pdb</span>
+        <span class="err">!</span><span class="n">pip</span> <span class="n">install</span> <span class="o">-</span><span class="n">q</span> <span class="n">synth</span><span class="o">-</span><span class="n">pdb</span> <span class="n">py3Dmol</span>
         <span class="nb">print</span><span class="p">(</span><span class="s2">"   ✅ Installation complete"</span><span class="p">)</span>
     
     <span class="c1"># Colab uses 'notebook' renderer for Plotly</span>
@@ -3820,7 +3820,7 @@ if IN_COLAB:
         print("   ✅ synth-pdb already installed")
     except ImportError:
         print("   📦 Installing synth-pdb...")
-        !pip install -q synth-pdb
+        !pip install -q synth-pdb py3Dmol
         print("   ✅ Installation complete")
     
     # Colab uses 'notebook' renderer for Plotly
