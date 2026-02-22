@@ -10,21 +10,21 @@ If you use synth-pdb in your research, please cite it using the following:
   title = {synth-pdb: High-Performance Protein Structure Generator for AI/ML and Education},
   year = {2026},
   url = {https://github.com/elkins/synth-pdb},
-  version = {1.19.0}
+  version = {1.20.0}
 }
 ```
 
 ## APA
 
-Elkins, G. (2026). *synth-pdb: High-Performance Protein Structure Generator for AI/ML and Education* (Version 1.19.0) [Computer software]. https://github.com/elkins/synth-pdb
+Elkins, G. (2026). *synth-pdb: High-Performance Protein Structure Generator for AI/ML and Education* (Version 1.20.0) [Computer software]. https://github.com/elkins/synth-pdb
 
 ## MLA
 
-Elkins, George. *synth-pdb: High-Performance Protein Structure Generator for AI/ML and Education*. Version 1.19.0, 2026, https://github.com/elkins/synth-pdb.
+Elkins, George. *synth-pdb: High-Performance Protein Structure Generator for AI/ML and Education*. Version 1.20.0, 2026, https://github.com/elkins/synth-pdb.
 
 ## Chicago
 
-Elkins, George. 2026. *synth-pdb: High-Performance Protein Structure Generator for AI/ML and Education*. Version 1.19.0. https://github.com/elkins/synth-pdb.
+Elkins, George. 2026. *synth-pdb: High-Performance Protein Structure Generator for AI/ML and Education*. Version 1.20.0. https://github.com/elkins/synth-pdb.
 
 ## Zenodo DOI
 

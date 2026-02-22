@@ -11,4 +11,4 @@ from synth_pdb.validator import PDBValidator
 
 logger.debug("synth_pdb package initialized.")
 
-__version__ = "1.20.1"
+__version__ = "1.20.0"
